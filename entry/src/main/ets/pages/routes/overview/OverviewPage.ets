@@ -7,6 +7,8 @@ import { TrendAnalysisSection } from "./TrendAnalysisSection";
 import { OverviewCard, OverviewViewModel } from "./OverviewViewModel";
 import { SortSheet } from "./SortSheet";
 import { getImmersiveTitleBarStyle } from "../../../common/style/NavStyles";
+import { SettingsConstants } from "../../../common/local/SettingsConstants";
+import { BlurBackgroundModifier } from "../../../utils/animation/BlurBackgroundModifier";
 
 @Component
 export struct OverviewPage {
@@ -23,6 +25,10 @@ export struct OverviewPage {
 
   @State isSortSheetShow: boolean = false;
 
+
+  @StorageProp('customBackgroundImage') customBg: string = '';
+  @StorageProp(SettingsConstants.KEY_ENABLE_API23) api23: boolean = false;
+
   // --- Tab 配置 ---
   @State tabOptions: SegmentButtonOptions = SegmentButtonOptions.tab({
     buttons: [
@@ -30,8 +36,9 @@ export struct OverviewPage {
       { text: '趋势' },
       { text: '上月' }
     ] as ItemRestriction<SegmentButtonTextItem>,
-    backgroundBlurStyle: BlurStyle.NONE,
+    backgroundBlurStyle: (!!this.customBg && this.api23) ? BlurStyle.Thin : BlurStyle.NONE,
     selectedBackgroundColor: $r('sys.color.segment_button_v2_tab_selected_item_background'),
+    backgroundColor: $r('sys.color.comp_background_tertiary'),
     buttonPadding: 10
   })
 
@@ -174,7 +181,7 @@ export struct OverviewPage {
           }
           .width(40)
           .height(40)
-          .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+          .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.api23), $r('sys.color.comp_background_tertiary')))
           .onClick(() => {
             if (this.selectedIndexes[0] <= 1) {
               this.isSortSheetShow = true;
@@ -191,7 +198,7 @@ export struct OverviewPage {
         }
         .width(40)
         .height(40)
-        .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+        .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.api23), $r('sys.color.comp_background_tertiary')))
         .onClick(() => {
           this.isHelpPopupShow = true;
         })
@@ -223,7 +230,8 @@ export struct OverviewPage {
       Stack() {
         if (!this.isLoading) {
           TopSafeContainer({
-            topAvoidHeight: this.statusBarHeight + this.SEGMENT_HEIGHT
+            topAvoidHeight: this.statusBarHeight + this.SEGMENT_HEIGHT,
+            needBgTransparent: true
           }) {
             if (this.selectedIndexes[0] === 0) {
               OverviewStatsSection({

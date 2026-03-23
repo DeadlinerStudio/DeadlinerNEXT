@@ -4,6 +4,7 @@ import { LoginPanelView } from "../common/LoginPanelView";
 import { authentication } from "@kit.AccountKit";
 import { HuaweiAccountUtils } from "../../utils/account/HuaweiAccountUtils";
 import { ITheme } from "../../common/theme/ThemeModel";
+import { BlurBackgroundModifier } from "../../utils/animation/BlurBackgroundModifier";
 
 /**
  * SettingsSection: 类似 Android 的 Surface 容器
@@ -11,10 +12,14 @@ import { ITheme } from "../../common/theme/ThemeModel";
  */
 @Component
 export struct SettingsSection {
+
+  @StorageProp('customBackgroundImage') customBg: string = '';
+
   title?: string | Resource;
   @BuilderParam content: () => void;
 
   @State bgColor: ResourceColor = $r('app.color.background_secondary');
+  @Prop mainUserPage: boolean = false;
 
   build() {
     Column() {
@@ -33,8 +38,7 @@ export struct SettingsSection {
         this.content()
       }
       .width('100%')
-      // 核心样式：背景色 + 大圆角 (24vp)
-      .backgroundColor(this.bgColor)
+      .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.mainUserPage), this.bgColor, BlurStyle.Regular))
       .borderRadius(24)
       .padding(4) // 让内部 Item 离边缘有间隙 (对应 Android 的 container padding)
       .margin({ left: 16, right: 16 }) // 卡片离屏幕两边的距离

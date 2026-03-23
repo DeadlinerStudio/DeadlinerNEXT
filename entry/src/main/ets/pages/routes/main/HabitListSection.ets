@@ -551,7 +551,7 @@ export struct HabitListSection {
 
   build() {
     Column() {
-      TopSafeContainer({ topAvoidHeight: this.topAvoidHeight, scrollable: false }) {
+      TopSafeContainer({ topAvoidHeight: this.topAvoidHeight, scrollable: false, needBgTransparent: true }) {
         Column() {
           HabitProgress({ progress: this.getTodayCompletionRatio() })
             .margin({ top: 12, bottom: 12 })

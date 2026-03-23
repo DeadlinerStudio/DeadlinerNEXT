@@ -240,8 +240,9 @@ export struct DDLItemCardSimplified {
     .width('100%')
     .height(76)
     .borderRadius(24)
-    .backgroundColor(this.globalBgColor)
+    // .backgroundColor(this.globalBgColor)
     .clip(true)
+    .backgroundBlurStyle(BlurStyle.Regular)
   }
 }
 
@@ -286,9 +287,6 @@ struct SelectionOverlay {
       }
       .width(24)
       .height(24)
-      // 左上角圆角处理：让打钩背景左上角是圆的，右下角也是圆的，或者保持圆形
-      // 如果你希望它是贴合卡片左上角的扇形，需要特殊处理；
-      // 这里保持你原来的圆形设计，稍微调整 margin
       .borderRadius(12)
       .backgroundColor(this.primaryColor)
       .shadow({ radius: 2 })
@@ -361,7 +359,7 @@ export struct DDLItemCardSwipeable {
             .padding({ left: 20 })
             .justifyContent(FlexAlign.Start)
             .alignItems(VerticalAlign.Center)
-            .backgroundColor(this.surfaceVariant)
+            // .backgroundColor(this.surfaceVariant)
           } else {
             // 向左滑 -> 删除 (EndToStart)
             Row() {
@@ -381,7 +379,7 @@ export struct DDLItemCardSwipeable {
             .padding({ right: 20 })
             .justifyContent(FlexAlign.End)
             .alignItems(VerticalAlign.Center)
-            .backgroundColor(this.surfaceVariant)
+            // .backgroundColor(this.surfaceVariant)
           }
         }
         .width('100%')

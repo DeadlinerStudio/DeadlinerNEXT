@@ -9,9 +9,12 @@ import { HdsNavDestination, HdsNavDestinationAttribute } from '@kit.UIDesignKit'
 import { TopSafeContainer } from '../../../components/TopSafeContainer';
 import { common } from '@kit.AbilityKit';
 import { getImmersiveTitleBarStyle } from '../../../../common/style/NavStyles';
-import { window } from '@kit.ArkUI';
+import { promptAction, window } from '@kit.ArkUI';
 import { ThemeSelectSheet } from './components/ThemeSelectSheet';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import { ThemeManager } from '../../../../common/theme/ThemeManager';
+import { ImageCropSheet } from './components/ImageCropSheet';
 
 @Builder
 export function AppearanceSettingsBuilder() {
@@ -54,6 +57,58 @@ struct AppearanceSettings {
     })
   }
 
+  @State isBackgroundSheetShow: boolean = false;
+  @State pickedImageUri: string = '';
+  @StorageProp('customBackgroundImage') currentBgUri: string = '';
+  @StorageProp('customBackgroundBlur') isBgBlur: boolean = false;
+
+
+  async pickImageFromGallery() {
+    try {
+      const photoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
+      photoSelectOptions.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+      photoSelectOptions.maxSelectNumber = 1; // 只能选一张
+
+      const photoViewPicker = new photoAccessHelper.PhotoViewPicker();
+      const photoSelectResult = await photoViewPicker.select(photoSelectOptions);
+
+      if (photoSelectResult && photoSelectResult.photoUris.length > 0) {
+        this.pickedImageUri = photoSelectResult.photoUris[0];
+        // 选图成功，触发裁剪 Sheet 显示
+        this.isBackgroundSheetShow = true;
+      }
+    } catch (err) {
+      console.error('[AppearanceSettings] Pick image failed:', err);
+    }
+  }
+
+  @Builder
+  cropSheetBuilder() {
+    ImageCropSheet({
+      // 把当前的背景图路径传进去，如果没有的话内部会显示“暂未选择”
+      sourceUri: this.currentBgUri,
+      initBlurState: this.isBgBlur,
+      title: '自定义背景',
+      enableCompression: false,
+      saveDirName: 'custom_backgrounds', // 换个文件夹存
+      cropRatio: undefined,
+      onCancel: () => {
+        this.isBackgroundSheetShow = false;
+      },
+      onComplete: (croppedUri: string, isBlur: boolean) => {
+        this.isBackgroundSheetShow = false;
+        ThemeManager.setCustomBackground(croppedUri, isBlur);
+        promptAction.showToast({ message: '自定义背景已生效' });
+      },
+      onClearBackground: () => {
+        // 用户点击了“恢复默认”
+        this.isBackgroundSheetShow = false;
+        ThemeManager.clearCustomBackground();
+        promptAction.showToast({ message: '已恢复默认背景' });
+      }
+    })
+  }
+
   @State menuOptions: SelectOption[] = [
     { value: '自适应' },
     { value: '流畅' },
@@ -81,6 +136,17 @@ struct AppearanceSettings {
               icon: $r('sys.symbol.brush'),
               onItemClick: () => {
                 this.isThemeSelectSheetShow = true;
+              }
+            })
+
+            SettingsDivider()
+
+            SettingsItem({
+              title: "自定义背景",
+              subtitle: "自定义一级界面的背景图片",
+              icon: $r('sys.symbol.background_blurred'),
+              onItemClick: () => {
+                this.isBackgroundSheetShow = true;
               }
             })
           }
@@ -213,6 +279,9 @@ struct AppearanceSettings {
         .padding(16)
         .justifyContent(FlexAlign.Start)
         .constraintSize({ minHeight: '100%' })
+        .bindSheet($$this.isBackgroundSheetShow, this.cropSheetBuilder(), {
+          showClose: false
+        })
       }
     }
     .titleBar({

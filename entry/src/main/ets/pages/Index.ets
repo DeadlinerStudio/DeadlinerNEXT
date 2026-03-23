@@ -14,7 +14,6 @@ import { OverviewPageTablet } from './routes/overview/OverviewPageTablet';
 import { SettingsConstants as C } from '../common/local/SettingsConstants';
 import { ITheme } from '../common/theme/ThemeModel';
 import { TaskRepository } from '../common/repository/TaskRepository';
-import { TimelinePage } from './routes/timeline/TimelinePage';
 import { hdsMaterial, HdsNavigation, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
 import { AdaptedHdsTabs } from './components/AdaptedHdsTabs';
 
@@ -30,6 +29,8 @@ const TAB_VERTICAL_PADDING = 86;
 @Component
 struct Index {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @StorageProp('customBackgroundImage') customBg: string = '';
+  @StorageProp('customBackgroundBlur') isBgBlurred: boolean = false;
 
   // 全局路由栈
   @Provide('appPathStack') appPathStack: NavPathStack = new NavPathStack();
@@ -252,6 +253,26 @@ struct Index {
 
   build() {
     Stack() {
+      if (this.customBg) {
+        Image(this.customBg)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+          .syncLoad(true)
+          .interpolation(ImageInterpolation.High)
+          .animation({ duration: 300, curve: Curve.EaseInOut })
+          .blur(this.isBgBlurred ? 12 : 0)
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+
+        Row()
+          .width('100%')
+          .height('100%')
+          .backgroundColor(this.theme.bgPrimary)
+          .opacity(0.15)
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+          .hitTestBehavior(HitTestMode.None)
+      }
+
       if (this.isShowUI) {
         HdsNavigation(this.appPathStack) {
           AdaptedHdsTabs({
@@ -293,20 +314,6 @@ struct Index {
             }
             .tabBar(this.getTabBarStyle(this.tabs[0]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-            .backgroundColor(this.theme.bgPrimary)
-
-            // TabContent() {
-            //   TimelinePage()
-            //     .width('100%')
-            //     .height('100%')
-            //     .attributeModifier(new TabAnimModifier(1, this.currentIndex))
-            //     .animation({
-            //       duration: 300,
-            //       curve: Curve.EaseInOut
-            //     })
-            // }
-            // .tabBar(this.getTabBarStyle(this.tabs[1]))
-            // .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
             // .backgroundColor(this.theme.bgPrimary)
 
             // --- Tab 2: 概览 ---
@@ -330,7 +337,7 @@ struct Index {
             }
             .tabBar(this.getTabBarStyle(this.tabs[1]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-            .backgroundColor(this.theme.bgPrimary)
+            // .backgroundColor(this.theme.bgPrimary)
 
             // --- Tab 3: 我的 ---
             TabContent() {
@@ -344,7 +351,7 @@ struct Index {
             }
             .tabBar(this.getTabBarStyle(this.tabs[2]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-            .backgroundColor(this.theme.bgPrimary)
+            // .backgroundColor(this.theme.bgPrimary)
           }
         }
         .mode(NavigationMode.Stack)

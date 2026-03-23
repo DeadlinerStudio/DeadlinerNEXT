@@ -234,15 +234,15 @@ export struct UserPage {
 
   build() {
     HdsNavigation(this.userLocalPathStack) {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT, needBgTransparent: true }) {
         Column({ space: 16 }) {
           if (!this.isBasicMode) {
-            SettingsSection() {
+            SettingsSection({ mainUserPage: true }) {
               SettingsUserProfile()
             }
           }
 
-          SettingsSection() {
+          SettingsSection({ mainUserPage: true }) {
             Row() {
               SettingsGridItem({
                 title: "归档管理",
@@ -278,7 +278,7 @@ export struct UserPage {
             .width('100%')
           }
 
-          SettingsSection({ title: '偏好设置' }) {
+          SettingsSection({ title: '偏好设置', mainUserPage: true }) {
             SettingsItem({
               title: "显示与个性化",
               subtitle: "界面布局 · 动画效果 · 小组件样式",
@@ -312,7 +312,7 @@ export struct UserPage {
           }
 
           if (!this.isBasicMode) {
-            SettingsSection({ title: '数据与服务' }) {
+            SettingsSection({ title: '数据与服务', mainUserPage: true }) {
               SettingsItem({
                 title: "数据同步与备份",
                 subtitle: "WebDAV 云同步 · 本地导入导出",
@@ -350,7 +350,7 @@ export struct UserPage {
               })
             }
           } else {
-            SettingsSection({ title: '模式切换' }) {
+            SettingsSection({ title: '模式切换', mainUserPage: true }) {
               SettingsSwitch({
                 title: "基础模式",
                 subtitle: "仅保留核心任务管理功能",
@@ -367,7 +367,7 @@ export struct UserPage {
             }
           }
 
-          SettingsSection({ title: "更多" }) {
+          SettingsSection({ title: "更多", mainUserPage: true }) {
             SettingsItem({
               title: "关于与协议",
               subtitle: `版本 ${this.versionName} · 开发故事 · 隐私政策与许可`,

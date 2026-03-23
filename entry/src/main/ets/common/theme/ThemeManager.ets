@@ -21,6 +21,9 @@ export class ThemeManager {
   private static readonly KEY_THEME_UI = 'key_current_theme_ui';        // 存 'classic', 'custom', 'lavender' 等
   private static readonly KEY_THEME_INDICATOR = 'key_current_theme_indicator'; // 存 'morandi', 'vibrant'
 
+  private static readonly KEY_CUSTOM_BACKGROUND = 'key_custom_background';
+  private static readonly KEY_CUSTOM_BACKGROUND_BLUR = 'key_custom_background_blur';
+
   // 自定义 UI 相关的 Key
   private static readonly KEY_CUSTOM_BRAND = 'key_custom_brand';
   private static readonly KEY_CUSTOM_ACCENT = 'key_custom_accent';
@@ -34,6 +37,12 @@ export class ThemeManager {
   static async init(context: Context) {
     try {
       ThemeManager.pref = await preferences.getPreferences(context, ThemeManager.STORE_NAME);
+
+      let bgUri = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_BACKGROUND, '') as string;
+      AppStorage.setOrCreate('customBackgroundImage', bgUri);
+
+      let bgBlur = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_BACKGROUND_BLUR, false) as boolean;
+      AppStorage.setOrCreate('customBackgroundBlur', bgBlur);
 
       // 1. 读取配置
       let uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_UI, '') as string;
@@ -56,6 +65,32 @@ export class ThemeManager {
       console.error('[ThemeManager] Init failed:', err);
       // 兜底：Classic + Morandi
       ThemeManager.updateAppState(ThemeManager.mergeTheme(ThemeMap['classic'], INDICATORS_MORANDI));
+    }
+  }
+
+  static async setCustomBackground(uri: string, isBlur: boolean) {
+    console.info('[ThemeManager] Setting custom background:', uri);
+    // 立即更新内存，触发 UI 刷新
+    AppStorage.setOrCreate('customBackgroundImage', uri);
+    AppStorage.setOrCreate('customBackgroundBlur', isBlur);
+
+    // 异步持久化到本地
+    if (ThemeManager.pref) {
+      try {
+        await ThemeManager.pref.put(ThemeManager.KEY_CUSTOM_BACKGROUND, uri);
+        await ThemeManager.pref.put(ThemeManager.KEY_CUSTOM_BACKGROUND_BLUR, isBlur);
+        await ThemeManager.pref.flush();
+      } catch (e) {
+        console.error('[ThemeManager] Failed to save custom background', e);
+      }
+    }
+  }
+
+  static async clearCustomBackground() {
+    AppStorage.setOrCreate('customBackgroundImage', '');
+    if (ThemeManager.pref) {
+      await ThemeManager.pref.put(ThemeManager.KEY_CUSTOM_BACKGROUND, '');
+      await ThemeManager.pref.flush();
     }
   }
 

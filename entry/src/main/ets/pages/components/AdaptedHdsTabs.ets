@@ -58,7 +58,7 @@ export struct AdaptedHdsTabs {
             materialLevel: getHdsMaterialLevel()
           },
           gradientMask: {
-            maskColor: this.theme.bgPrimary,
+            maskColor: $r('app.color.background_primary_50'),
             maskHeight: 42
           },
           lightColor: this.theme.tabIcon

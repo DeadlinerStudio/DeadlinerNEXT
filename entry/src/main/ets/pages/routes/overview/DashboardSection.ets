@@ -2,6 +2,7 @@ import { DDLItem } from "../../../model/DDLModels";
 import { Metric, generateDashboardMetrics } from "../../../utils/OverviewUtils";
 import { LengthMetrics } from '@kit.ArkUI';
 import { FloatUpModifier } from "../../../utils/animation/FloatUpModifier";
+import { BlurBackgroundModifier } from "../../../utils/animation/BlurBackgroundModifier";
 
 @Component
 export struct DashboardSection {
@@ -91,6 +92,8 @@ struct DashboardHeader {
 struct MetricCard {
   @Prop metric: Metric;
 
+  @StorageProp('customBackgroundImage') customBg: string = '';
+
   build() {
     Column() {
       // 标题
@@ -131,7 +134,7 @@ struct MetricCard {
     }
     .width('100%')
     .padding(16)
-    .backgroundColor($r('app.color.background_secondary'))
+    .attributeModifier(new BlurBackgroundModifier(!!this.customBg, $r('app.color.background_secondary'), BlurStyle.Regular))
     .borderRadius(24)
     .alignItems(HorizontalAlign.Start)
   }

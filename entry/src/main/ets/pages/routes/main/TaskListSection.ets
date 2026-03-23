@@ -499,7 +499,7 @@ export struct TaskListSection {
           .height(50)
           .margin({ top: 100 })
       } else {
-        TopSafeContainer({ topAvoidHeight: this.topAvoidHeight }) {
+        TopSafeContainer({ topAvoidHeight: this.topAvoidHeight, needBgTransparent: true }) {
           Column() {
             Refresh({ refreshing: $$this.isRefreshing }) {
               List({

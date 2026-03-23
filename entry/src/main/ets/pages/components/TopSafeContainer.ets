@@ -11,10 +11,12 @@ import { ITheme } from '../../common/theme/ThemeModel';
 @Component
 export struct TopSafeContainer {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @StorageProp('customBackgroundImage') customBg: string = '';
 
   @BuilderParam content: () => void;
 
   @State bgColor: Resource | Color | ResourceColor = this.theme.bgPrimary;
+  @Prop needBgTransparent: boolean = false;
 
   // 顶部需要避让的高度（通常是 状态栏高度 + 标题栏高度）
   @Prop topAvoidHeight: number = 0;
@@ -45,7 +47,7 @@ export struct TopSafeContainer {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(this.bgColor)
+      .backgroundColor((this.needBgTransparent && this.customBg) ? Color.Transparent : this.bgColor)
       .scrollBar(BarState.Off) // 隐藏外层滚动条，视觉更纯净
       .edgeEffect(EdgeEffect.Spring)
       // 关键：允许外层 Scroll 延伸到屏幕边缘（包括状态栏区域）
@@ -65,7 +67,7 @@ export struct TopSafeContainer {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(this.bgColor)
+      .backgroundColor((this.needBgTransparent && this.customBg) ? Color.Transparent : this.bgColor)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
     }
   }

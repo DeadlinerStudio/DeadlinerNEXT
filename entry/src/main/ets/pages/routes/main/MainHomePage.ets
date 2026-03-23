@@ -28,6 +28,7 @@ import { AddHabitSheet } from './modify/habit/AddHabitSheet'
 import { LocalValues } from '../../../common/local/LocalValues'
 import { MainButtonType } from '../../../common/local/LocalModels'
 import { getImmersiveTitleBarStyle } from '../../../common/style/NavStyles'
+import { BlurBackgroundModifier } from '../../../utils/animation/BlurBackgroundModifier'
 
 enum MainTabIndex {
   TASKS = 0,
@@ -82,6 +83,8 @@ export struct MainHomePage {
   @State confettiController: ConfettiController = new ConfettiController();
 
   @StorageLink('QuickAddTaskTrigger') @Watch('onQuickAddTaskChange') quickAddTrigger: boolean = false;
+  @StorageProp('customBackgroundImage') customBg: string = '';
+  @StorageProp(C.KEY_ENABLE_API23) api23: boolean = false;
 
   /**
    * 监听回调函数
@@ -212,7 +215,7 @@ export struct MainHomePage {
 
   @State tabOptions: SegmentButtonOptions = SegmentButtonOptions.tab({
     buttons: [{ text: '任务' }, { text: '习惯' }] as ItemRestriction<SegmentButtonTextItem>,
-    backgroundBlurStyle: BlurStyle.NONE,
+    backgroundBlurStyle: (!!this.customBg && this.api23) ? BlurStyle.Thin : BlurStyle.NONE,
     selectedBackgroundColor: $r('sys.color.segment_button_v2_tab_selected_item_background'),
     backgroundColor: $r('sys.color.comp_background_tertiary'),
     buttonPadding: 10
@@ -281,7 +284,7 @@ export struct MainHomePage {
         }
         .width(40)
         .height(40)
-        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.api23), $r('sys.color.comp_background_tertiary')))
         .onClick(() => {
           this.leftBtn.onClick();
         })
@@ -315,7 +318,7 @@ export struct MainHomePage {
         }
         .width(40)
         .height(40)
-        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.api23), $r('sys.color.comp_background_tertiary')))
         .onClick(() => {
           this.rightBtn.onClick();
         })
@@ -511,7 +514,6 @@ export struct MainHomePage {
         }
         .height('100%')
         .width('100%')
-        .backgroundColor(this.pageBackground)
         .bindSheet($$this.isArchiveSheetShow, this.archiveSheet(), {
           height: SheetSize.FIT_CONTENT,
           dragBar: true,

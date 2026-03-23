@@ -46,6 +46,7 @@
     { "name": "background_tertiary", "value": "#CC222222"},
     { "name": "background_emphasize", "value": "#474747"},
     { "name": "background_primary_30", "value": "#4D000000"},
+    { "name": "background_primary_50", "value": "#80000000"},
     { "name": "comp_divider", "value": "#3D3D3D"},
     { "name": "interactive_active", "value": "#FFFFFF"},
     { "name": "interactive_select", "value": "#333333"},

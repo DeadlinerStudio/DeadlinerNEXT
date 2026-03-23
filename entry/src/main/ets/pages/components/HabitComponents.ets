@@ -580,5 +580,6 @@ export struct HabitRow {
       LongPressGesture()
         .onAction(() => this.onLongPress())
     )
+    .backgroundBlurStyle(BlurStyle.Regular)
   }
 }
