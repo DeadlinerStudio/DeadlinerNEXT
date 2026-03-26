@@ -3,6 +3,7 @@ import {
   Habit, HabitPeriod, HabitGoalType, HabitRecord, HabitRecordStatus, HabitStatus
 } from '../../model/DDLModels'; // 假设你的路径
 import { ReminderScheduler } from '../../utils/notification/ReminderScheduler';
+import { TaskRepository } from './TaskRepository';
 
 export class HabitRepository {
   private static instance: HabitRepository;
@@ -68,6 +69,7 @@ export class HabitRepository {
     };
     const id = await this.db.insertHabit(habit);
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
     return id;
   }
 
@@ -106,11 +108,13 @@ export class HabitRepository {
 
     await this.db.updateHabit(updated);
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
   }
 
   async deleteHabitByDdlId(ddlId: number): Promise<void> {
     await this.db.deleteHabitByDdlId(ddlId);
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
   }
 
   // ================= Habit 打卡记录 =================
@@ -149,11 +153,14 @@ export class HabitRepository {
       status: status,
       createdAt: this.nowISO()
     };
-    return await this.db.insertHabitRecord(record);
+    const id = await this.db.insertHabitRecord(record);
+    this.triggerDataSync();
+    return id;
   }
 
   async deleteRecordsForHabitOnDate(habitId: number, date: Date): Promise<void> {
     await this.db.deleteHabitRecordsForHabitOnDate(habitId, this.formatDate(date));
+    this.triggerDataSync();
   }
 
   async getCompletedIdsForDate(date: Date): Promise<Set<number>> {
@@ -271,6 +278,7 @@ export class HabitRepository {
 
     // 触发提醒更新
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
   }
 
   public async initialReminderCheck() {
@@ -286,6 +294,10 @@ export class HabitRepository {
     this.reminderUpdateTimer = setTimeout(() => {
       this.performReminderRefresh();
     }, 1000);
+  }
+
+  private triggerDataSync() {
+    TaskRepository.getInstance().triggerExternalUpdates();
   }
 
   /**

@@ -45,7 +45,7 @@ export function getImmersiveTitleBarStyle(
             ThemeManager.getCurrentTheme().bgPrimary :
             // $r('sys.color.ohos_id_color_navigation_background_blur'),
             $r('app.color.background_primary_50'),
-          blurRadius: 32
+          // blurRadius: 32
         },
         contentStyle: {
           titleStyle: {

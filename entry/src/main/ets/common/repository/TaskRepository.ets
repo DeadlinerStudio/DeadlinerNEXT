@@ -167,6 +167,10 @@ export class TaskRepository {
     this.scheduleReminderRefresh();
   }
 
+  public triggerExternalUpdates() {
+    this.triggerUpdates();
+  }
+
   // ==========================================
   // 增删改查
   // ==========================================

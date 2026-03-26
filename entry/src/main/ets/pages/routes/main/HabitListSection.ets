@@ -618,6 +618,7 @@ export struct HabitListSection {
             .padding({ left: 12, right: 12 })
             .scrollBar(BarState.Off)
             .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+            .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
           }
           .onRefreshing(async () => {
             this.isRefreshing = true
@@ -626,10 +627,12 @@ export struct HabitListSection {
           })
           .layoutWeight(1)
           .width('100%')
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
         }
         .height('100%')
         .width('100%')
         .layoutWeight(1)
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       }
     }
     .width('100%')
