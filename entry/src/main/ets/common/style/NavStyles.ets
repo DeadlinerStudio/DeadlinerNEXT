@@ -26,9 +26,7 @@ export function getImmersiveTitleBarStyle(
       },
       originalStyle: {
         backgroundStyle: {
-          backgroundColor: isWideScreen ?
-            ThemeManager.getCurrentTheme().bgPrimary :
-            $r('sys.color.ohos_id_color_background_transparent'),
+          backgroundColor: $r('sys.color.ohos_id_color_background_transparent'),
         },
         contentStyle: {
           titleStyle: {

@@ -16,6 +16,7 @@ import { ITheme } from '../common/theme/ThemeModel';
 import { TaskRepository } from '../common/repository/TaskRepository';
 import { hdsMaterial, HdsNavigation, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
 import { AdaptedHdsTabs } from './components/AdaptedHdsTabs';
+import { deviceInfo } from '@kit.BasicServicesKit';
 
 interface TabData {
   title: string,
@@ -52,6 +53,11 @@ struct Index {
 
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
   @StorageLink(C.KEY_ENABLE_TABLET_UI) tabletUi: boolean = true;
+  @StorageProp(C.KEY_ENABLE_API23) enableApi23: boolean = false;
+
+  getFloatingTabs(): boolean {
+    return (deviceInfo.distributionOSApiVersion >= 60100) && this.enableApi23
+  }
 
   listener = mediaquery.matchMediaSync('(min-width: 840vp)');
 
@@ -309,7 +315,7 @@ struct Index {
                     duration: 300, // 保持与 Tabs 动画时长一致
                     curve: Curve.EaseInOut
                   })
-                  .padding({ left: this.isWideScreen ? TAB_VERTICAL_PADDING : 0 })
+                  .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
               }
             }
             .tabBar(this.getTabBarStyle(this.tabs[0]))
@@ -332,7 +338,7 @@ struct Index {
                     duration: 300, // 保持与 Tabs 动画时长一致
                     curve: Curve.EaseInOut
                   })
-                  .padding({ left: TAB_VERTICAL_PADDING })
+                  .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
               }
             }
             .tabBar(this.getTabBarStyle(this.tabs[1]))
@@ -347,7 +353,7 @@ struct Index {
                   duration: 300, // 保持与 Tabs 动画时长一致
                   curve: Curve.EaseInOut
                 })
-                .padding({ left: (this.isWideScreen && this.tabletUi) ? TAB_VERTICAL_PADDING : 0 })
+                .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
             }
             .tabBar(this.getTabBarStyle(this.tabs[2]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
@@ -375,5 +381,6 @@ struct Index {
     .height('100%')
     .width('100%')
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .backgroundColor(this.theme.bgPrimary)
   }
 }

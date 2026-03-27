@@ -27,13 +27,12 @@ export struct AdaptedHdsTabs {
     if (deviceInfo.distributionOSApiVersion >= 60100 && LocalValues.getInstance().getApi23Enable()) {
 
       HdsTabs({
-        barPosition: (this.isWideScreen && this.tabletUi) ? BarPosition.Start : BarPosition.End,
+        barPosition: BarPosition.End,
         index: this.currentIndex,
         controller: this.controller
       }) {
         this.content()
       }
-        .vertical(this.isWideScreen && this.tabletUi)
         .barMode(BarMode.Fixed)
         .barOverlap(true)
         // .background(this.theme.bgPrimary)
@@ -52,7 +51,7 @@ export struct AdaptedHdsTabs {
         .clip(false)
         .barFloatingStyle({
           barSideMargin: 24,
-          barBottomMargin: 0,
+          barBottomMargin: this.isWideScreen ? 24 : 0,
           systemMaterialEffect: {
             materialType: hdsMaterial.MaterialType.IMMERSIVE,
             materialLevel: getHdsMaterialLevel()
@@ -61,7 +60,8 @@ export struct AdaptedHdsTabs {
             maskColor: $r('app.color.background_primary_50'),
             maskHeight: 42
           },
-          lightColor: this.theme.tabIcon
+          lightColor: this.theme.tabIcon,
+          adaptToHandedness: this.isWideScreen
         })
     } else {
       HdsTabs({
@@ -89,6 +89,10 @@ export struct AdaptedHdsTabs {
       })
       .clip(false)
       .divider({ mode: DividerMode.NONE })
+      .barBackgroundEffect((this.tabletUi && this.isWideScreen) ? {
+        radius: 0,
+        color: this.theme.bgPrimary
+      } : { radius: 0 })
     }
   }
 }
