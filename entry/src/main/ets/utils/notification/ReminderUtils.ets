@@ -27,7 +27,7 @@ export class ReminderUtils {
 
     // 2. 使用 Timer 模拟 Calendar
     let targetReminder: reminderAgentManager.ReminderRequestTimer = {
-      reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_TIMER,
+      reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_CALENDAR,
       triggerTimeInSeconds: diffInSeconds, // 核心：把日期转换为秒数
 
       title: title,
@@ -60,7 +60,7 @@ export class ReminderUtils {
     const reminderId = ReminderUtils.generateId();
 
     let targetReminder: reminderAgentManager.ReminderRequestAlarm = {
-      reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM,
+      reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_CALENDAR,
       hour: hour,
       minute: minute,
       daysOfWeek: daysOfWeek, // Alarm 独有的重复属性
