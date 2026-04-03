@@ -15,6 +15,7 @@ import { ConfettiController } from '../../../components/confetti/ConfettiControl
 import { SearchUtils, TaskUIModel, ArchivedSearchModel } from '../../../../utils/SearchUtils';
 import { DDLItem, Habit } from '../../../../model/DDLModels';
 import { ITheme } from '../../../../common/theme/ThemeModel';
+import { TaskState, TaskStateAction } from '../../../../model/TaskStateMachine';
 
 @Builder
 export function SearchPageBuilder() {
@@ -91,20 +92,51 @@ export struct SearchPage {
 
   // —— 交互操作 ——
 
-  private async onTaskComplete(taskUI: TaskUIModel) {
+  private async onTaskPrimaryAction(taskUI: TaskUIModel) {
     VibrationUtils.vibrateShort();
     try {
-      const item = taskUI.originalItem;
-      const newStatus = !item.isCompleted;
-      item.isCompleted = newStatus;
-      item.completeTime = newStatus ? new Date().toISOString() : "";
-      if (newStatus) this.confetti.fire();
-      await this.taskRepo.updateDDL(item);
+      if (taskUI.taskState === TaskState.ACTIVE) {
+        await this.taskRepo.transitionDDL(taskUI.dbId, TaskStateAction.MARK_COMPLETE);
+        this.confetti.fire();
+      } else {
+        await this.taskRepo.transitionDDL(taskUI.dbId, TaskStateAction.RESTORE_ACTIVE);
+      }
       this.handleSearch(this.searchText);
       getContext(this).eventHub.emit('sync_done');
     } catch (e) {
       console.error('Task complete failed', e);
     }
+  }
+
+  private onTaskSecondaryAction(taskUI: TaskUIModel) {
+    if (taskUI.taskState === TaskState.ACTIVE) {
+      AlertDialog.show({
+        title: '放弃确认',
+        message: `确定要放弃任务“${taskUI.title}”吗？`,
+        primaryButton: {
+          value: '取消',
+          fontColor: this.theme.brand,
+          action: () => {}
+        },
+        secondaryButton: {
+          value: '放弃',
+          fontColor: Color.Red,
+          action: async () => {
+            await this.taskRepo.transitionDDL(taskUI.dbId, TaskStateAction.MARK_GIVE_UP);
+            this.handleSearch(this.searchText);
+            getContext(this).eventHub.emit('sync_done');
+          }
+        }
+      });
+      return;
+    }
+
+    this.taskRepo.transitionDDL(taskUI.dbId, TaskStateAction.MARK_ARCHIVE).then(() => {
+      this.handleSearch(this.searchText);
+      getContext(this).eventHub.emit('sync_done');
+    }).catch((e: Error) => {
+      console.error('Task archive failed', e);
+    });
   }
 
   private async onHabitToggle(item: HabitWithDailyStatus) {
@@ -236,8 +268,17 @@ export struct SearchPage {
                       status: item.status,
                       selectionMode: false,
                       selected: false,
-                      onComplete: (): Promise<void> => this.onTaskComplete(item),
-                      onDelete: () => { promptAction.showToast({message: '请在主页进行删除操作'}) }
+                      primaryActionSymbol: item.taskState === TaskState.ACTIVE
+                        ? $r('sys.symbol.checkmark_circle')
+                        : $r('sys.symbol.arrowshape_turn_up_left'),
+                      secondaryActionSymbol: item.taskState === TaskState.ACTIVE
+                        ? $r('sys.symbol.flag')
+                        : $r('sys.symbol.archivebox'),
+                      secondaryActionColor: item.taskState === TaskState.ACTIVE
+                        ? $r('app.color.chart_yellow')
+                        : $r('app.color.chart_red'),
+                      onPrimaryAction: (): Promise<void> => this.onTaskPrimaryAction(item),
+                      onSecondaryAction: (): void => this.onTaskSecondaryAction(item)
                     })
                   }
                   .attributeModifier(new FloatUpModifier(index, 15, false))
@@ -286,6 +327,8 @@ export struct SearchPage {
                       startTime: item.detail1,   // 对应左下
                       completeTime: item.detail2, // 对应右下
                       note: item.note,
+                      badgeText: item.badgeText,
+                      showRestore: false,
                       onDelete: (): Promise<void> => this.onArchivedDelete(item)
                     })
                   }
@@ -316,10 +359,12 @@ export struct SearchPage {
       }
     }
     .backgroundColor(this.bgColor)
-    .titleBar({
+        .titleBar({
       content: {
         title: { mainTitle: '' },
-        stackBuilder: this.searchBuilder.bind(this),
+        stackBuilder: () => {
+          this.searchBuilder();
+        },
         backIcon: {
           action: this.backAction
         }

@@ -33,7 +33,7 @@ This document is normative for cross-platform migration.
 ### Canonical state
 
 ```json
-"state": "active | completed | archived | abandoned"
+"state": "active | completed | archived | abandoned | abandonedArchived"
 ```
 
 Meaning:
@@ -42,6 +42,7 @@ Meaning:
 - `completed`: task finished by user
 - `archived`: task already completed and moved out of active list
 - `abandoned`: user explicitly gave up the task
+- `abandonedArchived`: user explicitly gave up the task and then archived it
 
 ### Tombstone
 
@@ -53,6 +54,28 @@ Meaning:
 
 - `state` answers: what is the task lifecycle status?
 - `deleted` answers: should the record be treated as deleted in sync?
+
+### Tombstone retention and GC
+
+Tombstone does not need to exist forever.
+
+Clients may apply a local retention window, for example `30 days`.
+
+Rules:
+
+- within the retention window, tombstone continues to participate in normal LWW merge
+- after the retention window expires, client may:
+  - drop the tombstone during local snapshot build
+  - drop the tombstone during merge
+  - physically delete the local tombstone after a successful sync
+- if retention is configured as `0`, tombstone is kept forever
+- tombstone age is evaluated using `item.ver.ts`
+- if `ver.ts` cannot be parsed, client should conservatively keep the tombstone
+
+Tradeoff:
+
+- a device that stays offline for an extremely long time may miss very old deletion markers
+- this is an accepted engineering tradeoff to control snapshot growth and local garbage accumulation
 
 ## Snapshot V2 File
 
@@ -202,6 +225,22 @@ Required rule:
 - if `state` is invalid, throw an error
 - do not silently downgrade unknown states
 - do not infer a new state from unrelated fields when canonical state already exists
+
+## Tombstone GC Requirements
+
+Recommended local setting:
+
+- `tombstoneRetentionDays`
+- default: `30`
+- `0` means disable automatic cleanup and keep tombstones forever
+
+Client behavior:
+
+1. local snapshot build should filter expired tombstones
+2. merge should filter expired tombstones from both local and remote candidates
+3. after successful sync, client should physically delete expired local tombstones
+
+This applies to task tombstones and any habit tombstone that reuses carrier DDL tombstone semantics.
 
 ## State Transition Rules
 

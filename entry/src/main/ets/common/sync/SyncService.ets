@@ -8,6 +8,7 @@ import {
   HabitStatus
 } from '../../model/DDLModels';
 import { ISyncProvider } from './SyncProvider';
+import { LocalValues } from '../local/LocalValues';
 
 export interface SnapshotVer {
   ts: string;
@@ -15,7 +16,7 @@ export interface SnapshotVer {
   dev: string;
 }
 
-export type SnapshotState = 'active' | 'completed' | 'archived' | 'abandoned';
+export type SnapshotState = 'active' | 'completed' | 'archived' | 'abandoned' | 'abandonedArchived';
 
 export interface SnapshotSubTask {
   id: string;
@@ -143,6 +144,7 @@ interface LegacyFlags {
 interface SnapshotMergeable {
   uid: string;
   ver: SnapshotVer;
+  deleted: boolean;
 }
 
 interface CarrierLookupResult {
@@ -464,7 +466,13 @@ export class SyncService {
   }
 
   private static validateState(state: string | null | undefined): SnapshotState {
-    if (state === 'active' || state === 'completed' || state === 'archived' || state === 'abandoned') {
+    if (
+      state === 'active' ||
+      state === 'completed' ||
+      state === 'archived' ||
+      state === 'abandoned' ||
+      state === 'abandonedArchived'
+    ) {
       return state;
     }
     throw new Error(`[Sync] Invalid snapshot state: ${state}`);
@@ -482,8 +490,10 @@ export class SyncService {
         return { is_completed: 0, is_archived: 0 };
       case 'completed':
         return { is_completed: 1, is_archived: 0 };
-      case 'archived':
       case 'abandoned':
+        return { is_completed: 0, is_archived: 0 };
+      case 'archived':
+      case 'abandonedArchived':
         return { is_completed: 1, is_archived: 1 };
       default:
         throw new Error(`[Sync] Invalid snapshot state: ${state}`);
@@ -563,6 +573,55 @@ export class SyncService {
     return aVer.dev >= bVer.dev;
   }
 
+  static isTombstoneExpired(ver: SnapshotVer, retentionDays: number, nowTs: string): boolean {
+    if (retentionDays <= 0) {
+      return false;
+    }
+    const tombstoneAt = Date.parse(ver.ts);
+    const nowAt = Date.parse(nowTs);
+    if (isNaN(tombstoneAt) || isNaN(nowAt)) {
+      return false;
+    }
+    const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+    const cutoff = nowAt - retentionMs;
+    return tombstoneAt < cutoff;
+  }
+
+  static filterExpiredTombstones<T extends SnapshotMergeable>(
+    items: T[],
+    retentionDays: number,
+    nowTs: string
+  ): T[] {
+    if (retentionDays <= 0) {
+      return items;
+    }
+    const kept: T[] = [];
+    for (const item of items) {
+      if (item.deleted && SyncService.isTombstoneExpired(item.ver, retentionDays, nowTs)) {
+        continue;
+      }
+      kept.push(item);
+    }
+    return kept;
+  }
+
+  static findExpiredTombstoneUids<T extends SnapshotMergeable>(
+    items: T[],
+    retentionDays: number,
+    nowTs: string
+  ): string[] {
+    if (retentionDays <= 0) {
+      return [];
+    }
+    const expired: string[] = [];
+    for (const item of items) {
+      if (item.deleted && SyncService.isTombstoneExpired(item.ver, retentionDays, nowTs)) {
+        expired.push(item.uid);
+      }
+    }
+    return expired;
+  }
+
   private static createSnapshotVersion(ts: string, ctr: number, dev: string): SnapshotVer {
     return {
       ts: ts,
@@ -634,7 +693,7 @@ export class SyncService {
     };
   }
 
-  private async buildLocalSnapshot(): Promise<SnapshotRoot> {
+  private async buildLocalSnapshot(retentionDays: number, nowTs: string): Promise<SnapshotRoot> {
     const store = this.db.getRdbStore();
     if (!store) throw new Error('DB not initialized');
 
@@ -685,20 +744,25 @@ export class SyncService {
         };
       }
 
+      if (deleted && SyncService.isTombstoneExpired(ver, retentionDays, nowTs)) {
+        console.info(`[Sync] Prune expired tombstone uid=${uid} ver=${ver.ts} during local DDL snapshot build.`);
+        continue;
+      }
+
       items.push(SyncService.createSnapshotItem(uid, ver, deleted, doc));
     }
     resultSet.close();
 
     const deviceId = await this.db.getDeviceId();
-    const nowTs = new Date().toISOString();
+    const snapshotTs = new Date().toISOString();
 
     return {
-      version: SyncService.createSnapshotInterface(nowTs, deviceId),
+      version: SyncService.createSnapshotInterface(snapshotTs, deviceId),
       items: items
     };
   }
 
-  private async buildLocalHabitSnapshot(): Promise<HabitSnapshotRoot> {
+  private async buildLocalHabitSnapshot(retentionDays: number, nowTs: string): Promise<HabitSnapshotRoot> {
     const store = this.db.getRdbStore();
     if (!store) throw new Error('DB not initialized');
 
@@ -760,6 +824,10 @@ export class SyncService {
       );
 
       if (buildMode === 'emit_tombstone') {
+        if (SyncService.isTombstoneExpired(ver, retentionDays, nowTs)) {
+          console.info(`[Sync] Prune expired tombstone uid=${uid} ver=${ver.ts} during local Habit snapshot build.`);
+          continue;
+        }
         console.info(`[Sync] Emit local Habit tombstone for carrier=${uid}.`);
         items.push(SyncService.createHabitSnapshotItem(uid, ver, true, null));
         continue;
@@ -800,9 +868,9 @@ export class SyncService {
     resultSet.close();
 
     const deviceId = await this.db.getDeviceId();
-    const nowTs = new Date().toISOString();
+    const snapshotTs = new Date().toISOString();
     return {
-      version: SyncService.createSnapshotInterface(nowTs, deviceId),
+      version: SyncService.createSnapshotInterface(snapshotTs, deviceId),
       items
     };
   }
@@ -856,13 +924,17 @@ export class SyncService {
 
   private mergeSnapshots<T extends SnapshotMergeable>(
     localItems: T[],
-    remoteItems: T[]
+    remoteItems: T[],
+    retentionDays: number,
+    nowTs: string
   ): T[] {
     const map = new Map<string, T>();
-    for (const item of localItems) {
+    const localFiltered = SyncService.filterExpiredTombstones(localItems, retentionDays, nowTs);
+    const remoteFiltered = SyncService.filterExpiredTombstones(remoteItems, retentionDays, nowTs);
+    for (const item of localFiltered) {
       map.set(item.uid, item);
     }
-    for (const item of remoteItems) {
+    for (const item of remoteFiltered) {
       const existing = map.get(item.uid);
       if (!existing || this.isVerNewer(item.ver, existing.ver)) {
         map.set(item.uid, item);
@@ -871,17 +943,17 @@ export class SyncService {
     return Array.from(map.values());
   }
 
-  private mergeDdlSnapshots(local: SnapshotRoot, remote: SnapshotRoot): SnapshotRoot {
+  private mergeDdlSnapshots(local: SnapshotRoot, remote: SnapshotRoot, retentionDays: number, nowTs: string): SnapshotRoot {
     return {
       version: local.version,
-      items: this.mergeSnapshots(local.items, remote.items)
+      items: this.mergeSnapshots(local.items, remote.items, retentionDays, nowTs)
     };
   }
 
-  private mergeHabitSnapshots(local: HabitSnapshotRoot, remote: HabitSnapshotRoot): HabitSnapshotRoot {
+  private mergeHabitSnapshots(local: HabitSnapshotRoot, remote: HabitSnapshotRoot, retentionDays: number, nowTs: string): HabitSnapshotRoot {
     return {
       version: local.version,
-      items: this.mergeSnapshots(local.items, remote.items)
+      items: this.mergeSnapshots(local.items, remote.items, retentionDays, nowTs)
     };
   }
 
@@ -1308,7 +1380,13 @@ export class SyncService {
     const stateIndex = resultSet.getColumnIndex('state');
     if (stateIndex >= 0) {
       const rawState = resultSet.getString(stateIndex);
-      if (rawState === 'active' || rawState === 'completed' || rawState === 'archived' || rawState === 'abandoned') {
+      if (
+        rawState === 'active' ||
+        rawState === 'completed' ||
+        rawState === 'archived' ||
+        rawState === 'abandoned' ||
+        rawState === 'abandonedArchived'
+      ) {
         return rawState;
       }
       if (rawState && rawState.length > 0) {
@@ -1323,8 +1401,11 @@ export class SyncService {
   }
 
   private async syncSnapshotOnce(): Promise<SyncResult> {
-    const localDdlSnapshot = await this.buildLocalSnapshot();
-    const localHabitSnapshot = await this.buildLocalHabitSnapshot();
+    const nowTs = new Date().toISOString();
+    const retentionDays = LocalValues.getInstance().getTombstoneRetentionDays();
+
+    const localDdlSnapshot = await this.buildLocalSnapshot(retentionDays, nowTs);
+    const localHabitSnapshot = await this.buildLocalHabitSnapshot(retentionDays, nowTs);
 
     const remoteRes = await this.provider.getRemoteSnapshot();
     if (!remoteRes.success) {
@@ -1341,13 +1422,13 @@ export class SyncService {
 
     const mergedDdlSnapshot = remoteDdlSnapshot === null
       ? localDdlSnapshot
-      : this.mergeDdlSnapshots(localDdlSnapshot, remoteDdlSnapshot);
+      : this.mergeDdlSnapshots(localDdlSnapshot, remoteDdlSnapshot, retentionDays, nowTs);
 
     const ddlChanges = await this.applySnapshotToLocal(mergedDdlSnapshot);
 
     const mergedHabitSnapshot = remoteHabitSnapshot === null
       ? localHabitSnapshot
-      : this.mergeHabitSnapshots(localHabitSnapshot, remoteHabitSnapshot);
+      : this.mergeHabitSnapshots(localHabitSnapshot, remoteHabitSnapshot, retentionDays, nowTs);
 
     const habitChanges = await this.applyHabitSnapshotToLocal(mergedHabitSnapshot);
 
@@ -1358,6 +1439,11 @@ export class SyncService {
     }
 
     await this.provider.triggerSync();
+    if (retentionDays > 0) {
+      const cutoffTs = new Date(Date.parse(nowTs) - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+      const prunedCount = await this.db.pruneExpiredDeletedDDLs(cutoffTs);
+      console.info(`[Sync] Pruned ${prunedCount} expired tombstones after sync success.`);
+    }
     return { success: true, hasLocalChanges: ddlChanges || habitChanges };
   }
 }

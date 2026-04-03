@@ -535,7 +535,9 @@ export struct MainHomePage {
           mainTitle: 'Deadliner',
           subTitle: this.navSubtitle
         },
-        stackBuilder: this.topSegment.bind(this),
+        stackBuilder: () => {
+          this.topSegment();
+        },
         divider: { showType: DividerShowType.OFF }
       }
     })

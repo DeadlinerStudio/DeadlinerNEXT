@@ -56,6 +56,7 @@
 
     { "name": "chart_red", "value": "#FFF77E66"},
     { "name": "chart_green", "value": "#FFBFD1C4"},
+    { "name": "chart_yellow", "value": "#FFFED59E"},
     { "name": "chart_orange", "value": "#FFFED59E"},
     { "name": "chart_blue", "value": "#FFB3CAD8"},
 

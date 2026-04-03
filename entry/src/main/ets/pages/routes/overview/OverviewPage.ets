@@ -279,9 +279,13 @@ export struct OverviewPage {
       style: getImmersiveTitleBarStyle(false),
       content: {
         title: { mainTitle: '概览' },
-        stackBuilder: this.titleMenuBuilder.bind(this),
+        stackBuilder: () => {
+          this.titleMenuBuilder();
+        },
         bottomBuilder: {
-          builder: this.tabSegment.bind(this),
+          builder: () => {
+            this.tabSegment();
+          },
           height: this.SEGMENT_HEIGHT,
           showType: BottomBuilderShowType.DIRECTLY_SHOW
         },

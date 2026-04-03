@@ -1,3 +1,5 @@
+import { TaskState, TaskStateAction, TaskStateMachine } from './TaskStateMachine';
+
 // 对应 Kotlin: DeadlineType
 export enum DeadlineType {
   TASK = 'task',
@@ -38,6 +40,7 @@ export interface DDLItem {
   name: string;
   startTime: string;
   endTime: string;
+  state: TaskState;
   isCompleted: boolean;
   completeTime: string;
   note: string;
@@ -106,4 +109,69 @@ export interface Ver {
   ts: string;
   ctr: number;
   dev: string;
+}
+
+export function resolveTaskState(state: string | null | undefined, isCompleted: boolean, isArchived: boolean): TaskState {
+  if (state === TaskState.ACTIVE ||
+    state === TaskState.COMPLETED ||
+    state === TaskState.ARCHIVED ||
+    state === TaskState.ABANDONED ||
+    state === TaskState.ABANDONED_ARCHIVED) {
+    return state;
+  }
+  if (isArchived) return TaskState.ARCHIVED;
+  if (isCompleted) return TaskState.COMPLETED;
+  return TaskState.ACTIVE;
+}
+
+export function isTaskCompletedState(state: TaskState): boolean {
+  return TaskStateMachine.isCompletedLike(state);
+}
+
+export function isTaskArchivedState(state: TaskState): boolean {
+  return TaskStateMachine.isArchivedLike(state);
+}
+
+export function isTaskAbandonedState(state: TaskState): boolean {
+  return TaskStateMachine.isAbandonedLike(state);
+}
+
+export function transitionDDLItem(item: DDLItem, action: TaskStateAction, actionTime: string): DDLItem {
+  const nextState = TaskStateMachine.nextState(item.state, action);
+  const nextCompleteTime = shouldResetCompletionTime(action)
+    ? ''
+    : shouldWriteCompletionTime(nextState)
+      ? actionTime
+      : item.completeTime;
+
+  return {
+    id: item.id,
+    name: item.name,
+    startTime: item.startTime,
+    endTime: item.endTime,
+    state: nextState,
+    isCompleted: isTaskCompletedState(nextState),
+    isArchived: isTaskArchivedState(nextState),
+    completeTime: nextCompleteTime,
+    note: item.note,
+    isStared: item.isStared,
+    type: item.type,
+    habitCount: item.habitCount,
+    habitTotalCount: item.habitTotalCount,
+    calendarEventId: item.calendarEventId,
+    timeStamp: item.timeStamp,
+    uid: item.uid,
+    deleted: item.deleted,
+    verTs: item.verTs,
+    verCtr: item.verCtr,
+    verDev: item.verDev
+  };
+}
+
+function shouldWriteCompletionTime(state: TaskState): boolean {
+  return state === TaskState.COMPLETED || state === TaskState.ABANDONED;
+}
+
+function shouldResetCompletionTime(action: TaskStateAction): boolean {
+  return action === TaskStateAction.RESTORE_ACTIVE;
 }

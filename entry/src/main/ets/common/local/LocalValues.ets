@@ -50,6 +50,9 @@ export class LocalValues {
       const autoArchiveDays = await this.pref.get(C.KEY_AUTO_ARCHIVE_DAYS, 3);
       AppStorage.setOrCreate(C.KEY_AUTO_ARCHIVE_DAYS, autoArchiveDays);
 
+      const tombstoneRetentionDays = await this.pref.get(C.KEY_TOMBSTONE_RETENTION_DAYS, 30);
+      AppStorage.setOrCreate(C.KEY_TOMBSTONE_RETENTION_DAYS, tombstoneRetentionDays);
+
       const vibration = await this.pref.get(C.KEY_VIBRATION_ENABLE, true);
       AppStorage.setOrCreate(C.KEY_VIBRATION_ENABLE, vibration);
 
@@ -576,6 +579,14 @@ export class LocalValues {
 
   async setAutoArchiveDays(days: number) {
     await this.setValue(C.KEY_AUTO_ARCHIVE_DAYS, days);
+  }
+
+  getTombstoneRetentionDays(): number {
+    return AppStorage.get(C.KEY_TOMBSTONE_RETENTION_DAYS) ?? 30;
+  }
+
+  async setTombstoneRetentionDays(days: number) {
+    await this.setValue(C.KEY_TOMBSTONE_RETENTION_DAYS, days);
   }
 
   getApi23Enable(): boolean {

@@ -2,5 +2,6 @@ export enum DDLStatus {
   UNDERGO,
   NEAR,
   PASSED,
-  COMPLETED
+  COMPLETED,
+  ABANDONED
 }

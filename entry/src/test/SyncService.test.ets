@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@ohos/hypium';
-import { SyncService, SnapshotVer } from '../main/ets/common/sync/SyncService';
+import { SyncService, SnapshotVer, SnapshotItem } from '../main/ets/common/sync/SyncService';
 
 export default function syncServiceTests() {
   describe('SyncServiceHabitSnapshotRules', () => {
@@ -123,6 +123,99 @@ export default function syncServiceTests() {
       expect(SyncService.shouldApplyHabitSnapshot(afterVer, beforeVer)).assertEqual(true);
       expect(beforeUpdatedAt === afterUpdatedAt).assertEqual(false);
       expect(afterUpdatedAt).assertEqual('2026-03-24T12:00:03.100001Z');
+    });
+  });
+
+  describe('SyncServiceTombstoneRetention', () => {
+    it('keeps tombstone during build when retention is enabled but tombstone is still fresh', 0, () => {
+      const nowTs = '2026-04-01T12:00:00.000Z';
+      const ver: SnapshotVer = { ts: '2026-03-20T12:00:00.000Z', ctr: 0, dev: 'LOCAL' };
+
+      expect(SyncService.isTombstoneExpired(ver, 30, nowTs)).assertEqual(false);
+    });
+
+    it('filters tombstone during build when retention is enabled and tombstone is expired', 0, () => {
+      const nowTs = '2026-04-01T12:00:00.000Z';
+      const items: SnapshotItem[] = [{
+        uid: 'LOCAL:1',
+        ver: { ts: '2026-02-20T12:00:00.000Z', ctr: 0, dev: 'LOCAL' },
+        deleted: true,
+        doc: null
+      }];
+
+      const filtered = SyncService.filterExpiredTombstones(items, 30, nowTs);
+      expect(filtered.length).assertEqual(0);
+    });
+
+    it('filters expired tombstones during merge candidates', 0, () => {
+      const nowTs = '2026-04-01T12:00:00.000Z';
+      const items: SnapshotItem[] = [
+        {
+          uid: 'LOCAL:1',
+          ver: { ts: '2026-02-20T12:00:00.000Z', ctr: 0, dev: 'LOCAL' },
+          deleted: true,
+          doc: null
+        },
+        {
+          uid: 'LOCAL:2',
+          ver: { ts: '2026-03-31T12:00:00.000Z', ctr: 0, dev: 'LOCAL' },
+          deleted: true,
+          doc: null
+        }
+      ];
+
+      const filtered = SyncService.filterExpiredTombstones(items, 30, nowTs);
+      expect(filtered.length).assertEqual(1);
+      expect(filtered[0].uid).assertEqual('LOCAL:2');
+    });
+
+    it('finds expired tombstones for db cleanup after sync success', 0, () => {
+      const nowTs = '2026-04-01T12:00:00.000Z';
+      const items: SnapshotItem[] = [
+        {
+          uid: 'LOCAL:expired',
+          ver: { ts: '2026-02-20T12:00:00.000Z', ctr: 0, dev: 'LOCAL' },
+          deleted: true,
+          doc: null
+        },
+        {
+          uid: 'LOCAL:active',
+          ver: { ts: '2026-03-31T12:00:00.000Z', ctr: 0, dev: 'LOCAL' },
+          deleted: false,
+          doc: null
+        }
+      ];
+
+      const expired = SyncService.findExpiredTombstoneUids(items, 30, nowTs);
+      expect(expired.length).assertEqual(1);
+      expect(expired[0]).assertEqual('LOCAL:expired');
+    });
+
+    it('does not filter or gc tombstones when retention is zero', 0, () => {
+      const nowTs = '2026-04-01T12:00:00.000Z';
+      const items: SnapshotItem[] = [{
+        uid: 'LOCAL:1',
+        ver: { ts: '2025-01-01T00:00:00.000Z', ctr: 0, dev: 'LOCAL' },
+        deleted: true,
+        doc: null
+      }];
+
+      expect(SyncService.filterExpiredTombstones(items, 0, nowTs).length).assertEqual(1);
+      expect(SyncService.findExpiredTombstoneUids(items, 0, nowTs).length).assertEqual(0);
+    });
+
+    it('keeps tombstone conservatively when ver.ts is invalid', 0, () => {
+      const nowTs = '2026-04-01T12:00:00.000Z';
+      const items: SnapshotItem[] = [{
+        uid: 'LOCAL:bad-ts',
+        ver: { ts: 'not-a-date', ctr: 0, dev: 'LOCAL' },
+        deleted: true,
+        doc: null
+      }];
+
+      expect(SyncService.isTombstoneExpired(items[0].ver, 30, nowTs)).assertEqual(false);
+      expect(SyncService.filterExpiredTombstones(items, 30, nowTs).length).assertEqual(1);
+      expect(SyncService.findExpiredTombstoneUids(items, 30, nowTs).length).assertEqual(0);
     });
   });
 }

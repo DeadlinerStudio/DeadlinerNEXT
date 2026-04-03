@@ -3,6 +3,7 @@ import { SyncService } from '../sync/SyncService';
 import { WebUtils } from '../network/WebUtils';
 import { LocalValues } from '../local/LocalValues';
 import { DDLItem, DeadlineType, SubTask } from '../../model/DDLModels';
+import { TaskStateAction } from '../../model/TaskStateMachine';
 import { common } from '@kit.AbilityKit';
 import { WidgetUpdater } from '../../utils/WidgetUpdater';
 import { ReminderScheduler } from '../../utils/notification/ReminderScheduler';
@@ -230,6 +231,28 @@ export class TaskRepository {
   async getDDLsByType(type: DeadlineType): Promise<DDLItem[]> {
     await this.ensureDbReady();
     return this.db.getDDLsByType(type);
+  }
+
+  async getMainListDDLsByType(type: DeadlineType): Promise<DDLItem[]> {
+    await this.ensureDbReady();
+    return this.db.getMainListDDLsByType(type);
+  }
+
+  async getArchivedDDLs(): Promise<DDLItem[]> {
+    await this.ensureDbReady();
+    return this.db.getArchivedDDLs();
+  }
+
+  async getDDLById(id: number): Promise<DDLItem | null> {
+    await this.ensureDbReady();
+    return this.db.getDDLById(id);
+  }
+
+  async transitionDDL(id: number, action: TaskStateAction): Promise<DDLItem> {
+    await this.ensureDbReady();
+    const item = await this.db.transitionDDLState(id, action);
+    this.triggerUpdates();
+    return item;
   }
 
   private scheduleWidgetUpdate() {

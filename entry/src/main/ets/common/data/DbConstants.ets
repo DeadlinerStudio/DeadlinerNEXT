@@ -9,7 +9,7 @@ export class DbConstants {
     securityLevel: 1 // S1
   };
 
-  static readonly VERSION_V2 = 22;
+  static readonly VERSION_V2 = 23;
 
   static readonly TABLE_NAME = "ddl_items";
   static readonly COLUMN_ID = "id";

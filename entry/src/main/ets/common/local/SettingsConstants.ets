@@ -47,6 +47,7 @@ export class SettingsConstants {
   static readonly KEY_DIRECT_ADD_ON_AI = 'direct_add_on_ai';
 
   static readonly KEY_AUTO_ARCHIVE_DAYS = 'auto_archive_days';
+  static readonly KEY_TOMBSTONE_RETENTION_DAYS = 'tombstone_retention_days';
 
   static readonly KEY_ENABLE_API23 = 'enable_api23';
   static readonly KEY_API23_MATERIAL_LEVEL = 'material_level';

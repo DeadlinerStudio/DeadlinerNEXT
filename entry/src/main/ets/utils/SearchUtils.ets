@@ -4,6 +4,7 @@ import { TaskRepository } from "../common/repository/TaskRepository";
 import { DDLItem, DeadlineType, Habit, HabitGoalType, HabitRecordStatus, HabitStatus, HabitPeriod } from "../model/DDLModels";
 import { DDLStatus } from "../model/DDLStatus";
 import { HabitWithDailyStatus } from "../pages/components/HabitComponents";
+import { TaskState, TaskStateMachine } from "../model/TaskStateMachine";
 
 export interface TaskUIModel {
   title: string;
@@ -13,6 +14,7 @@ export interface TaskUIModel {
   isStarred: boolean;
   status: DDLStatus;
   dbId: number;
+  taskState: TaskState;
   originalItem: DDLItem;
 }
 
@@ -23,6 +25,7 @@ export interface ArchivedSearchModel {
   detail1: string;        // 对应卡片的 startTime (左下角信息)
   detail2: string;        // 对应卡片的 completeTime (右下角信息)
   note: string;
+  badgeText: string;
   originalType: 'task' | 'habit';
   originalItem: DDLItem | Habit;
 }
@@ -88,8 +91,8 @@ export class SearchUtils {
     // ---------------------------------------------------------
 
     // --- 活跃任务 ---
-    const activeTasks = matchedTasks.filter(t => !t.isArchived);
-    activeTasks.sort((a, b) => (Number(a.isCompleted) - Number(b.isCompleted)));
+    const activeTasks = matchedTasks.filter(t => TaskStateMachine.isVisibleInMainList(t.state));
+    activeTasks.sort((a, b) => this.taskPriority(a.state) - this.taskPriority(b.state));
     const taskResults = activeTasks.map(t => this.mapTaskToUI(t));
 
     // --- 活跃习惯 ---
@@ -100,7 +103,7 @@ export class SearchUtils {
     );
 
     // --- 归档内容 (混合任务和习惯) ---
-    const archivedTasks = matchedTasks.filter(t => t.isArchived);
+    const archivedTasks = matchedTasks.filter(t => TaskStateMachine.isVisibleInArchiveList(t.state));
     const archivedHabits = matchedHabits.filter(h => h.status === HabitStatus.ARCHIVED);
 
     const archivedResults: ArchivedSearchModel[] = [
@@ -125,6 +128,7 @@ export class SearchUtils {
       detail1: this.formatDate(item.startTime),
       detail2: this.formatDate(item.completeTime),
       note: item.note || "",
+      badgeText: TaskStateMachine.archiveBadgeText(item.state),
       originalType: 'task',
       originalItem: item
     };
@@ -146,6 +150,7 @@ export class SearchUtils {
       detail1: `${periodStr} · ${goalStr}`,
       detail2: `归档于 ${this.formatDate(item.updatedAt)}`,
       note: item.description || "无备注",
+      badgeText: '习惯归档',
       originalType: 'habit',
       originalItem: item
     };
@@ -172,19 +177,22 @@ export class SearchUtils {
     const start = item.startTime ? new Date(item.startTime).getTime() : 0;
     const end = item.endTime ? new Date(item.endTime).getTime() : 0;
     let status = DDLStatus.UNDERGO;
-    if (item.isCompleted) status = DDLStatus.COMPLETED;
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) status = DDLStatus.COMPLETED;
+    else if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) status = DDLStatus.ABANDONED;
     else if (now > end) status = DDLStatus.PASSED;
     else if ((end - now) < 24 * 60 * 60 * 1000) status = DDLStatus.NEAR;
 
     let progress = 0.0;
-    if (item.isCompleted) progress = 1.0;
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) progress = 1.0;
     else {
       const totalDuration = end - start;
       const elapsed = now - start;
       if (totalDuration > 0) progress = Math.max(0, Math.min(1, elapsed / totalDuration));
     }
 
-    let timeText = item.isCompleted ? "已完成" : "进行中"; // 简化示意
+    let timeText = "进行中";
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) timeText = "已完成";
+    if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) timeText = "已放弃";
 
     const progressDir = LocalValues.getInstance().getProgressDir();
     const displayProgress = progressDir ? progress : 1.0 - progress;
@@ -197,8 +205,16 @@ export class SearchUtils {
       isStarred: item.isStared,
       status: status,
       dbId: item.id,
+      taskState: item.state,
       originalItem: item
     };
+  }
+
+  private taskPriority(state: TaskState): number {
+    if (state === TaskState.ACTIVE) return 0;
+    if (state === TaskState.COMPLETED) return 1;
+    if (state === TaskState.ABANDONED) return 2;
+    return 9;
   }
 
   private async buildHabitStatusForDate(habit: Habit, date: Date): Promise<HabitWithDailyStatus> {

@@ -15,6 +15,7 @@ import { DateTimePicker } from "../../components/DateTimePicker";
 import { TaskEditSheet } from "./modify/task/TaskEditSheet";
 import { PressEffectModifier } from "../../../utils/animation/PressModifier";
 import { ITheme } from "../../../common/theme/ThemeModel";
+import { TaskState, TaskStateAction } from "../../../model/TaskStateMachine";
 
 export interface TaskUIModel {
   title: string;
@@ -24,6 +25,7 @@ export interface TaskUIModel {
   isStarred: boolean;
   status: DDLStatus;
   dbId: number;
+  taskState: TaskState;
 }
 
 @Component
@@ -62,6 +64,7 @@ export struct TaskListSection {
   async aboutToAppear() {
     this.bindController();
 
+    await this.repo.checkAndAutoArchive();
     await this.loadData();
     // 监听同步完成事件，自动刷新
     getContext(this).eventHub.on('sync_done', () => {
@@ -93,28 +96,13 @@ export struct TaskListSection {
     try {
       this.isLoading = true;
 
-      const dbItems = await this.repo.getDDLsByType(DeadlineType.TASK);
+      const dbItems = await this.repo.getMainListDDLsByType(DeadlineType.TASK);
 
       const now = new Date().getTime();
 
-      // 2. 预处理：过滤 & 排序
-      const processedItems = dbItems
-        .filter((item) => {
-          // 过滤条件：未归档 (isArchived=false) 且 未删除 (deleted=false)
-          // 注意：getAllDDLs SQL层可能已经过滤了 deleted，但这里双重保障
-          return !item.isArchived && !item.deleted && item.type !== DeadlineType.HABIT
-        })
-        .sort((a, b) => {
-          if (a.isCompleted && !b.isCompleted) return 1;  // a完成，b未完成 -> a放后面
-          if (!a.isCompleted && b.isCompleted) return -1; // a未完成，b完成 -> a放前面
-
-          // 逻辑B：状态相同时，按截止时间排序（越早越靠前）
-          const timeA = new Date(a.endTime).getTime();
-          const timeB = new Date(b.endTime).getTime();
-          return timeA - timeB;
-        });
-
-      this.taskList = processedItems.map((item) => {
+      this.taskList = dbItems
+        .filter((item) => !item.deleted && item.type !== DeadlineType.HABIT)
+        .map((item) => {
         return this.mapToUI(item, now);
       });
 
@@ -147,8 +135,10 @@ export struct TaskListSection {
 
     // 1. 计算状态
     let status = DDLStatus.UNDERGO;
-    if (item.isCompleted) {
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) {
       status = DDLStatus.COMPLETED;
+    } else if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) {
+      status = DDLStatus.ABANDONED;
     } else if (now > end) {
       status = DDLStatus.PASSED;
     } else if ((end - now) < 24 * 60 * 60 * 1000) {
@@ -159,8 +149,10 @@ export struct TaskListSection {
 
     // 2. 计算进度
     let progress = 0.0;
-    if (item.isCompleted) {
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) {
       progress = 1.0;
+    } else if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) {
+      progress = 0;
     } else {
       const totalDuration = end - start;
       const elapsed = now - start;
@@ -173,8 +165,10 @@ export struct TaskListSection {
 
     // 3. 计算剩余时间文本
     let timeText = "";
-    if (item.isCompleted) {
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) {
       timeText = "已完成";
+    } else if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) {
+      timeText = "已放弃";
     } else {
       const diffMs = end - now;
       if (diffMs < 0) {
@@ -199,49 +193,69 @@ export struct TaskListSection {
       progress: displayProgress,
       isStarred: item.isStared,
       status: status,
-      dbId: item.id
+      dbId: item.id,
+      taskState: item.state
     };
   }
 
-  private async handleComplete(dbId: number) {
+  private async performTaskAction(dbId: number, action: TaskStateAction, successMessage: string, fireConfetti: boolean = false) {
     VibrationUtils.vibrateShort();
 
     try {
-      // 1. 获取原始数据
-      const allItems = await this.repo.getAllDDLs();
-      const targetItem = allItems.find(item => item.id === dbId);
-
-      if (!targetItem) {
-        console.warn('Item not found for complete');
-        return;
-      }
-
-      // 2. 状态反转
-      const newStatus = !targetItem.isCompleted;
-      targetItem.isCompleted = newStatus;
-
-      // 3. 更新完成时间
-      if (newStatus) {
-        targetItem.completeTime = new Date().toISOString();
+      await this.repo.transitionDDL(dbId, action);
+      if (fireConfetti) {
         this.confetti.fire();
-      } else {
-        targetItem.completeTime = "";
       }
-
-      // 4. 写库 + 触发同步
-      await this.repo.updateDDL(targetItem);
-
-      // 5. 刷新 UI
       await this.loadData();
-
-      promptAction.showToast({
-        message: newStatus ? $r('app.string.toast_finished') : $r('app.string.toast_definished')
-      });
-
+      promptAction.showToast({ message: successMessage });
     } catch (e) {
-      console.error(`Complete failed: ${e}`);
+      console.error(`Task action failed: ${e}`);
       promptAction.showToast({ message: '操作失败' });
     }
+  }
+
+  private handleStateAction(dbId: number, state: TaskState) {
+    if (state === TaskState.ACTIVE) {
+      this.performTaskAction(dbId, TaskStateAction.MARK_COMPLETE, '任务已完成', true);
+      return;
+    }
+    if (state === TaskState.COMPLETED || state === TaskState.ABANDONED) {
+      this.performTaskAction(dbId, TaskStateAction.RESTORE_ACTIVE, '任务已恢复');
+      return;
+    }
+  }
+
+  private handleSecondaryAction(dbId: number, title: string, state: TaskState) {
+    if (state === TaskState.ACTIVE) {
+      this.confirmGiveUp(dbId, title);
+      return;
+    }
+    if (state === TaskState.COMPLETED || state === TaskState.ABANDONED) {
+      this.performTaskAction(dbId, TaskStateAction.MARK_ARCHIVE, '任务已归档');
+    }
+  }
+
+  private confirmGiveUp(dbId: number, title: string) {
+    AlertDialog.show({
+      title: '放弃确认',
+      message: `确定要放弃任务“${title}”吗？`,
+      autoCancel: true,
+      alignment: DialogAlignment.Bottom,
+      offset: { dx: 0, dy: -20 },
+      primaryButton: {
+        value: '取消',
+        fontColor: this.theme.brand,
+        action: () => {}
+      },
+      secondaryButton: {
+        value: '放弃',
+        fontColor: $r('app.color.warning'),
+        action: async () => {
+          await this.performTaskAction(dbId, TaskStateAction.MARK_GIVE_UP, '任务已放弃');
+        }
+      },
+      backgroundBlurStyle: BlurStyle.Thick
+    });
   }
 
   private handleDelete(dbId: number, title: string) {
@@ -322,20 +336,18 @@ export struct TaskListSection {
       const allItems = await this.repo.getAllDDLs();
       // 找到所有选中的项目
       const targets = allItems.filter(item => this.selectedIds.includes(item.id));
+      const completable = targets.filter(item => item.state === TaskState.ACTIVE);
+      const skippedCount = targets.length - completable.length;
 
-      // 更新状态
-      targets.forEach(item => {
-        item.isCompleted = true;
-        item.completeTime = new Date().toISOString();
-      });
-
-      // 批量更新数据库 (假设 repo 支持 updateDDL，如果不支持批量，需要循环 await)
-      // 建议 repo 增加 updateDDLs(items: Array<DDLItem>)
-      for (const item of targets) {
-        await this.repo.updateDDL(item);
+      for (const item of completable) {
+        await this.repo.transitionDDL(item.id, TaskStateAction.MARK_COMPLETE);
       }
 
-      promptAction.showToast({ message: `已完成 ${targets.length} 项任务` });
+      let message = `已完成 ${completable.length} 项任务`;
+      if (skippedCount > 0) {
+        message += `，${skippedCount} 项当前状态无法完成`;
+      }
+      promptAction.showToast({ message: message });
       this.exitSelectionMode();
       await this.loadData();
     } catch (e) {
@@ -354,21 +366,20 @@ export struct TaskListSection {
       let skippedCount = 0;
 
       targets.forEach(item => {
-        if (item.isCompleted) {
-          item.isArchived = true;
+        if (item.state === TaskState.COMPLETED || item.state === TaskState.ABANDONED) {
           itemsToArchive.push(item);
         } else {
           skippedCount++;
         }
       });
 
-      const updatePromises = itemsToArchive.map(item => this.repo.updateDDL(item));
+      const updatePromises = itemsToArchive.map(item => this.repo.transitionDDL(item.id, TaskStateAction.MARK_ARCHIVE));
       await Promise.all(updatePromises);
 
       let message = `已归档 ${itemsToArchive.length} 项任务`;
 
       if (skippedCount > 0) {
-        message += `，${skippedCount} 项因未完成无法归档`;
+        message += `，${skippedCount} 项当前状态无法归档`;
       }
 
       promptAction.showToast({ message: message });
@@ -519,13 +530,22 @@ export struct TaskListSection {
 
                         selectionMode: this.isSelectionMode,
                         selected: this.selectedIds.includes(item.dbId),
-
-                        onComplete: async () => {
-                          this.handleComplete(item.dbId)
+                        primaryActionSymbol: item.taskState === TaskState.ACTIVE
+                          ? $r('sys.symbol.checkmark_circle')
+                          : $r('sys.symbol.arrowshape_turn_up_left'),
+                        secondaryActionSymbol: item.taskState === TaskState.ACTIVE
+                          ? $r('sys.symbol.flag')
+                          : $r('sys.symbol.archivebox'),
+                        secondaryActionColor: item.taskState === TaskState.ACTIVE
+                          ? $r('app.color.chart_yellow')
+                          : $r('app.color.chart_red'),
+                        onPrimaryAction: async () => {
+                          this.handleStateAction(item.dbId, item.taskState)
                         },
-                        onDelete: async () => {
-                          this.handleDelete(item.dbId, item.title)
+                        onSecondaryAction: async () => {
+                          this.handleSecondaryAction(item.dbId, item.title, item.taskState)
                         },
+                        onClickItem: () => {},
 
                         onLongPressSelect: () => {
                           if (!this.isSelectionMode) {

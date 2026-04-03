@@ -120,7 +120,9 @@ struct Index {
       this.checkAndRepairUserProfile();
     }
 
-    TaskRepository.getInstance().checkAndAutoArchive();
+    TaskRepository.getInstance().checkAndAutoArchive().catch((e: Error) => {
+      console.error(`[Index] checkAndAutoArchive failed: ${e.message}`);
+    });
 
     this.checkAndShowDialog();
   }

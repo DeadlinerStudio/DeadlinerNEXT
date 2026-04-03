@@ -42,6 +42,7 @@ export struct SettingsWebDavPage {
   @StorageLink(SettingsConstants.KEY_WEBDAV_URL) webUrl: string = '';
   @StorageLink(SettingsConstants.KEY_WEBDAV_USERNAME) username: string = '';
   @StorageLink(SettingsConstants.KEY_WEBDAV_PASSWORD) password: string = '';
+  @StorageLink(SettingsConstants.KEY_TOMBSTONE_RETENTION_DAYS) tombstoneRetentionDays: number = 30;
 
   @State isSyncing: boolean = false;
   @State buttonBg: ResourceColor = $r('sys.color.brand');
@@ -147,6 +148,29 @@ export struct SettingsWebDavPage {
             Divider().color(Color.Transparent).height(12)
 
             // 4. 保存并测试按钮
+            SettingsSection({ title: '墓碑回收' }) {
+              Text('已删除记录保留天数')
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+                .width('100%')
+
+              Text('删除后的同步墓碑会保留 N 天，之后自动回收，减少 snapshot 体积和垃圾数据堆积。设为 0 表示永久保留。')
+                .fontSize(12)
+                .fontColor($r('app.color.font_secondary'))
+                .margin({ top: 6, bottom: 8 })
+
+              TextInput({ text: `${this.tombstoneRetentionDays}`, placeholder: '默认 30，0 表示永久保留' })
+                .type(InputType.Number)
+                .backgroundColor(Color.Transparent)
+                .onChange((value: string) => {
+                  const parsed = parseInt(value.length > 0 ? value : '0');
+                  this.tombstoneRetentionDays = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+                })
+                .onSubmit(async () => {
+                  await LocalValues.getInstance().setTombstoneRetentionDays(this.tombstoneRetentionDays);
+                })
+            }
+
             Button(this.isSyncing ? '正在同步...' : '保存并立即同步', { type: ButtonType.Capsule })
               .width('90%')
               .buttonStyle(ButtonStyleMode.EMPHASIZED)
@@ -162,6 +186,7 @@ export struct SettingsWebDavPage {
                     LocalValues.getInstance().setWebDavAuth(this.username, this.password);
                     LocalValues.getInstance().setWebDavUrl(this.webUrl);
                   }
+                  await LocalValues.getInstance().setTombstoneRetentionDays(this.tombstoneRetentionDays);
 
                   promptAction.showToast({ message: '开始同步...' });
 

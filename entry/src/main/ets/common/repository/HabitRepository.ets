@@ -85,6 +85,10 @@ export class HabitRepository {
     return await this.db.getAllHabits();
   }
 
+  async getArchivedHabits(): Promise<Habit[]> {
+    return await this.db.getArchivedHabits();
+  }
+
   async updateHabit(habit: Habit): Promise<void> {
     const now = this.nowISO();
 
@@ -113,6 +117,35 @@ export class HabitRepository {
 
   async deleteHabitByDdlId(ddlId: number): Promise<void> {
     await this.db.deleteHabitByDdlId(ddlId);
+    this.scheduleReminderRefresh();
+    this.triggerDataSync();
+  }
+
+  async unarchiveHabit(habitId: number): Promise<void> {
+    const habit = await this.db.getHabitById(habitId);
+    if (!habit) {
+      throw new Error(`[HabitRepository] Habit not found: ${habitId}`);
+    }
+
+    const updated: Habit = {
+      id: habit.id,
+      ddlId: habit.ddlId,
+      name: habit.name,
+      description: habit.description,
+      color: habit.color,
+      iconKey: habit.iconKey,
+      period: habit.period,
+      timesPerPeriod: habit.timesPerPeriod,
+      goalType: habit.goalType,
+      totalTarget: habit.totalTarget,
+      createdAt: habit.createdAt,
+      updatedAt: this.nowISO(),
+      status: HabitStatus.ACTIVE,
+      sortOrder: habit.sortOrder,
+      alarmTime: habit.alarmTime
+    };
+
+    await this.db.updateHabit(updated);
     this.scheduleReminderRefresh();
     this.triggerDataSync();
   }

@@ -60,6 +60,7 @@
 
     { "name": "chart_red", "value": "#FFF77E66" },
     { "name": "chart_green", "value": "#FF82ABA3" },
+    { "name": "chart_yellow", "value": "#FFFEC37D" },
     { "name": "chart_orange", "value": "#FFFEC37D" },
     { "name": "chart_blue", "value": "#FF97A5C0" },
 
