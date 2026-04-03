@@ -15,31 +15,29 @@ export class ReminderScheduler {
    * * 场景：用户卸载重装（保留数据）或系统清理了过期任务，导致 DB 有记录但系统无任务。
    * 作用：强制对账。如果 DB 里有，但系统里没有，则删除 DB 记录，迫使后续逻辑重新发布。
    */
-  private static async syncWithSystem(activeReminders: ActiveReminder[]) {
+  private static async syncWithSystem(activeReminders: ActiveReminder[]): Promise<string[]> {
     if (activeReminders.length === 0) return [];
 
     try {
       const systemReminders = await reminderAgentManager.getValidReminders();
-
-      const systemIds = new Set(systemReminders.map(r => r.notificationId));
-
-      const manager = ReminderDataManager.getInstance();
-      const removedIds: string[] = [];
-
-      for (const record of activeReminders) {
-        // 如果本地有 ID，但系统里没有
-        if (!systemIds.has(record.reminderId)) {
-          console.warn(`[Scheduler] Zombie reminder found! Target:${record.targetId} (ID:${record.reminderId}) is missing in system.`);
-
-          // 从 DB 移除
-          await manager.remove(record.targetId);
-          removedIds.push(record.targetId);
-        }
+      if (systemReminders.length === 0 && activeReminders.length > 0) {
+        // 如果系统返回空，但本地有记录，可能是接口延迟或权限问题，保守处理，暂不视为僵尸
+        console.warn(`[Scheduler] System returned 0 reminders but local has ${activeReminders.length}. Skipping sync.`);
+        return [];
       }
 
-      return removedIds;
+      const systemIds = new Set(systemReminders.map(r => r.notificationId));
+      const zombieIds: string[] = [];
+
+      for (const record of activeReminders) {
+        if (!systemIds.has(record.reminderId)) {
+          console.warn(`[Scheduler] Potential zombie found: ${record.targetId} (ID:${record.reminderId}).`);
+          zombieIds.push(record.targetId);
+        }
+      }
+      return zombieIds;
     } catch (e) {
-      console.error(`[Scheduler] Sync failed: ${e}. Assuming all local data is valid (safe fallback).`);
+      console.error(`[Scheduler] Sync failed: ${e}.`);
       return [];
     }
   }
@@ -55,9 +53,17 @@ export class ReminderScheduler {
 
     let activeReminders = manager.getAll().filter(r => r.type === 'DDL');
 
-    await ReminderScheduler.syncWithSystem(activeReminders);
+    const zombieIds = await ReminderScheduler.syncWithSystem(activeReminders);
+    // 这里我们依然保留 activeReminders，但如果发现在 zombieIds 里，我们后续逻辑会自动触发补录
+    // 为了保险，我们不直接从 DB 删，而是在补录阶段如果没变化就不动，有变化才重新发
 
-    activeReminders = manager.getAll().filter(r => r.type === 'DDL');
+    const activeMap = new Map<string, ActiveReminder>();
+    activeReminders.forEach(r => {
+      // 如果不是僵尸，才放入 Map
+      if (!zombieIds.includes(r.targetId)) {
+        activeMap.set(r.targetId, r);
+      }
+    });
 
     if (!isEnabled) {
       if (activeReminders.length > 0) {
@@ -65,14 +71,9 @@ export class ReminderScheduler {
         for (const record of activeReminders) {
           await ReminderScheduler.cancelAndRemove(record.targetId, record.reminderId, "Feature disabled");
         }
-      } else {
-        console.info('[Scheduler] DDL Warning is DISABLED. No actions needed.');
       }
       return;
     }
-
-    const activeMap = new Map<string, ActiveReminder>();
-    activeReminders.forEach(r => activeMap.set(r.targetId, r));
 
     const now = Date.now();
 
@@ -134,11 +135,16 @@ export class ReminderScheduler {
     const manager = ReminderDataManager.getInstance();
 
     let activeReminders = manager.getAll().filter(r => r.type === 'HABIT');
-    await ReminderScheduler.syncWithSystem(activeReminders);
-    activeReminders = manager.getAll().filter(r => r.type === 'HABIT');
+    const zombieIds = await ReminderScheduler.syncWithSystem(activeReminders);
 
     const activeMap = new Map<string, ActiveReminder>();
-    activeReminders.forEach(r => activeMap.set(r.targetId, r));
+    activeReminders.forEach(r => {
+      if (!zombieIds.includes(r.targetId)) {
+        activeMap.set(r.targetId, r);
+      } else {
+        manager.remove(r.targetId);
+      }
+    });
 
     if (!isEnabled) {
       if (activeReminders.length > 0) {
@@ -198,22 +204,6 @@ export class ReminderScheduler {
     const manager = ReminderDataManager.getInstance();
     let existingRecord = manager.getByTargetId(TARGET_ID);
 
-    // 在决定是否发布前，先确认现有的 ID 是否真的有效
-    if (existingRecord) {
-      try {
-        const systemReminders = await reminderAgentManager.getValidReminders();
-        const existsInSystem = systemReminders.some(r => r.notificationId === existingRecord!.reminderId);
-
-        if (!existsInSystem) {
-          console.warn('[Scheduler] Daily Summary zombie record found. Cleaning up...');
-          await manager.remove(TARGET_ID); // 只删 DB
-          existingRecord = undefined; // 标记为不存在
-        }
-      } catch (e) {
-        console.error('[Scheduler] System check failed for summary.');
-      }
-    }
-
     // 如果 summaryTimeStr 为 null，或者 LocalValues 里关闭了 (双重保障)
     // Settings 页面传参时已经处理了逻辑，传 null 即表示关闭
     if (!summaryTimeStr) {
@@ -249,7 +239,8 @@ export class ReminderScheduler {
         "回顾今天，规划明天。点击查看今日概览。",
         hour,
         minute,
-        daysOfWeek
+        daysOfWeek,
+        100000 // 固定 ID
       );
 
       const recordTime = new Date();
@@ -295,7 +286,8 @@ export class ReminderScheduler {
       const reminderId = await ReminderUtils.publishCalendar(
         `任务临近提醒: ${ddl.name}`,
         contentText,
-        remindTime
+        remindTime,
+        ddl.id // 使用业务 ID 确保覆盖
       );
 
       const newRecord: ActiveReminder = {
@@ -326,7 +318,8 @@ export class ReminderScheduler {
         `坚持就是胜利！该完成"${habit.name}"了。`,
         hour,
         minute,
-        daysOfWeek
+        daysOfWeek,
+        habit.id // 使用业务 ID 确保覆盖
       );
 
       const recordTime = new Date();
