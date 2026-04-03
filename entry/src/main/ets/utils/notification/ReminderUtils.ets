@@ -9,8 +9,8 @@ export class ReminderUtils {
    * 【核心修改】由于 Calendar 是 System API，这里内部自动转换为 Timer (倒计时) 实现。
    * 只要发布成功，系统就会接管倒计时，App 杀死后依然有效。
    */
-  static async publishCalendar(title: string, content: string, targetTime: Date): Promise<number> {
-    const reminderId = ReminderUtils.generateId();
+  static async publishCalendar(title: string, content: string, targetTime: Date, notificationId?: number): Promise<number> {
+    const reminderId = notificationId ?? ReminderUtils.generateId();
 
     // 1. 计算时间差 (单位：秒)
     const now = Date.now();
@@ -56,8 +56,8 @@ export class ReminderUtils {
    * 【核心修改】使用 Alarm 类型，支持原生重复，无需计算日期，只关心 HH:mm
    * @param daysOfWeek 1=周一, 7=周日. 传入 [1,2,3,4,5,6,7] 代表每天
    */
-  static async publishAlarm(title: string, content: string, hour: number, minute: number, daysOfWeek: number[]): Promise<number> {
-    const reminderId = ReminderUtils.generateId();
+  static async publishAlarm(title: string, content: string, hour: number, minute: number, daysOfWeek: number[], notificationId?: number): Promise<number> {
+    const reminderId = notificationId ?? ReminderUtils.generateId();
 
     let targetReminder: reminderAgentManager.ReminderRequestAlarm = {
       reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM,
@@ -114,7 +114,7 @@ export class ReminderUtils {
   }
 
   private static generateId(): number {
-    // 限制 ID 范围，防止溢出
-    return Math.floor((Date.now() % 100000000));
+    // 限制 ID 范围，防止溢出。如果不传入固定 ID，回退到基于时间的低频冲突 ID
+    return Math.floor(Math.random() * 1000000);
   }
 }
