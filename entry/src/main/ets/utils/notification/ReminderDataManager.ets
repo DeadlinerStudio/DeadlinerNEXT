@@ -84,12 +84,17 @@ export class ReminderDataManager {
    * @param record
    */
   async addOrUpdate(record: ActiveReminder) {
+    const existing = this.memoryCache.find(r => r.targetId === record.targetId);
+    if (existing) {
+      console.info(`[ReminderData] Updating existing record: ${record.targetId}. Old SystemID:${existing.reminderId} New SystemID:${record.reminderId}`);
+    } else {
+      console.info(`[ReminderData] Adding new record: ${record.targetId} -> SystemID:${record.reminderId}`);
+    }
     // 先移除旧的（如果有）
     this.memoryCache = this.memoryCache.filter(r => r.targetId !== record.targetId);
     //以此 ID 为准加入新的
     this.memoryCache.push(record);
     await this.saveToDisk();
-    console.info(`[ReminderData] Saved mapping: ${record.targetId} -> ID:${record.reminderId}`);
   }
 
   /**
@@ -100,8 +105,10 @@ export class ReminderDataManager {
     const before = this.memoryCache.length;
     this.memoryCache = this.memoryCache.filter(r => r.targetId !== targetId);
     if (this.memoryCache.length !== before) {
+      console.info(`[ReminderData] Removed record for: ${targetId}`);
       await this.saveToDisk();
-      console.info(`[ReminderData] Removed mapping for: ${targetId}`);
+    } else {
+      console.warn(`[ReminderData] Attempted to remove non-existent record: ${targetId}`);
     }
   }
 
