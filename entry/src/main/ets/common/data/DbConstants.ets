@@ -9,7 +9,7 @@ export class DbConstants {
     securityLevel: 1 // S1
   };
 
-  static readonly VERSION_V2 = 23;
+  static readonly VERSION_V2 = 24;
 
   static readonly TABLE_NAME = "ddl_items";
   static readonly COLUMN_ID = "id";
@@ -77,4 +77,10 @@ export class DbConstants {
   static readonly ST_VER_TS = "ver_ts";
   static readonly ST_VER_CTR = "ver_ctr";
   static readonly ST_VER_DEV = "ver_dev";
+
+  static readonly TABLE_INSPIRATION = "inspiration_items";
+  static readonly INSPIRATION_ID = "id";
+  static readonly INSPIRATION_TEXT = "text";
+  static readonly INSPIRATION_CREATED_AT = "created_at";
+  static readonly INSPIRATION_UPDATED_AT = "updated_at";
 }

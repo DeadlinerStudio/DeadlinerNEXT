@@ -24,6 +24,8 @@ export struct ArchivedDDLItemCard {
   @State private timeColor: ResourceColor = Color.Gray; // 新增时间颜色
   @State private globalBgColor: ResourceColor = $r('app.color.background_secondary');
 
+  @State private isPopUpShow: boolean = false;
+
   onWillApplyTheme(theme: Theme) {
     this.titleColor = theme.colors.fontPrimary;
     this.noteColor = theme.colors.fontSecondary;
@@ -33,6 +35,19 @@ export struct ArchivedDDLItemCard {
     // 强制使用 Undergo 风格
     this.indicatorColor = this.theme.indicatorUndergo;
     this.bgColor = $r('app.color.background_secondary');
+  }
+
+  @Builder
+  notePopupBuilder() {
+    Column() {
+      Text(this.note)
+        .fontSize(14)
+        .fontColor(this.titleColor)
+        .lineHeight(20)
+    }
+    .padding(16)
+    .constraintSize({ maxWidth: 280 })
+    .borderRadius(16)
   }
 
   build() {
@@ -91,7 +106,7 @@ export struct ArchivedDDLItemCard {
         .height('100%')
 
         // 右侧：红色删除按钮
-        Column({ space: 8 }) {
+        Row({ space: 8 }) {
           if (this.showRestore) {
             Button({ type: ButtonType.Circle, stateEffect: true }) {
               SymbolGlyph($r('sys.symbol.arrowshape_turn_up_left'))
@@ -130,6 +145,24 @@ export struct ArchivedDDLItemCard {
     .borderRadius(24)
     .backgroundColor(this.globalBgColor)
     .clip(true)
+    .onClick(() => {
+      // 只有存在 note 内容时才弹出
+      if (this.note && this.note.length > 0) {
+        this.isPopUpShow = true;
+      }
+    })
+    // 3. 完善：绑定 Popup 属性
+    .bindPopup(this.isPopUpShow, {
+      builder: this.notePopupBuilder,     // 绑定的内容构建器
+      placement: Placement.Bottom,        // 弹出位置（可根据需要改成 Top）
+      enableArrow: true,                  // 是否显示箭头
+      onStateChange: (e) => {
+        // 关键：当用户点击弹窗外部导致弹窗关闭时，同步更新状态变量
+        if (!e.isVisible) {
+          this.isPopUpShow = false;
+        }
+      }
+    })
   }
 
   // 辅助函数：颜色透明度处理

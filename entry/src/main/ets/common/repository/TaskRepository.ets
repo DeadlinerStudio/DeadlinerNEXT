@@ -405,6 +405,7 @@ export class TaskRepository {
         // 3. 触发同步和 Widget 更新
         this.scheduleSync();
         this.scheduleWidgetUpdate();
+        this.scheduleReminderRefresh();
       }
     } catch (e) {
       console.error(`[TaskRepo] checkAndAutoArchive failed: ${e}`);

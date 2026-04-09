@@ -8,6 +8,7 @@ import {
   isTaskArchivedState, isTaskCompletedState
 } from '../../model/DDLModels';
 import { TaskState, TaskStateAction, TaskStateMachine } from '../../model/TaskStateMachine';
+import { InspirationItem } from '../../model/InspirationModels';
 
 export interface DDLInsertParams {
   name: string;
@@ -198,6 +199,17 @@ export class DatabaseHelper {
     `;
     await store.executeSql(createSubTaskSql);
     await store.executeSql(`CREATE INDEX IF NOT EXISTS idx_st_ddl_id ON ${C.TABLE_SUBTASK}(${C.ST_DDL_ID})`);
+
+    const createInspirationSql = `
+      CREATE TABLE IF NOT EXISTS ${C.TABLE_INSPIRATION} (
+        ${C.INSPIRATION_ID} INTEGER PRIMARY KEY AUTOINCREMENT,
+        ${C.INSPIRATION_TEXT} TEXT NOT NULL,
+        ${C.INSPIRATION_CREATED_AT} TEXT NOT NULL,
+        ${C.INSPIRATION_UPDATED_AT} TEXT NOT NULL
+      )
+    `;
+    await store.executeSql(createInspirationSql);
+    await store.executeSql(`CREATE INDEX IF NOT EXISTS idx_inspiration_updated_at ON ${C.TABLE_INSPIRATION}(${C.INSPIRATION_UPDATED_AT} DESC)`);
   }
 
   private async upgradeToV2(store: relationalStore.RdbStore) {
@@ -594,6 +606,62 @@ export class DatabaseHelper {
     return updated;
   }
 
+  // ================= Inspiration Operations =================
+
+  async insertInspiration(text: string): Promise<number> {
+    if (!this.rdbStore) return -1;
+
+    const now = new Date().toISOString();
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.INSPIRATION_TEXT] = text;
+    bucket[C.INSPIRATION_CREATED_AT] = now;
+    bucket[C.INSPIRATION_UPDATED_AT] = now;
+
+    try {
+      return await this.rdbStore.insert(C.TABLE_INSPIRATION, bucket);
+    } catch (error) {
+      console.error(`[DatabaseHelper] insertInspiration failed: ${error}`);
+      return -1;
+    }
+  }
+
+  async getAllInspirations(): Promise<InspirationItem[]> {
+    if (!this.rdbStore) return [];
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_INSPIRATION);
+    predicates.orderByDesc(C.INSPIRATION_UPDATED_AT);
+    predicates.orderByDesc(C.INSPIRATION_ID);
+    const resultSet = await this.rdbStore.query(predicates);
+    return this.parseInspirationResultSet(resultSet);
+  }
+
+  async getInspirationById(id: number): Promise<InspirationItem | null> {
+    if (!this.rdbStore) return null;
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_INSPIRATION);
+    predicates.equalTo(C.INSPIRATION_ID, id);
+    const resultSet = await this.rdbStore.query(predicates);
+    const items = this.parseInspirationResultSet(resultSet);
+    return items.length > 0 ? items[0] : null;
+  }
+
+  async updateInspiration(item: InspirationItem): Promise<void> {
+    if (!this.rdbStore) return;
+
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.INSPIRATION_TEXT] = item.text;
+    bucket[C.INSPIRATION_UPDATED_AT] = new Date().toISOString();
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_INSPIRATION);
+    predicates.equalTo(C.INSPIRATION_ID, item.id);
+    await this.rdbStore.update(bucket, predicates);
+  }
+
+  async deleteInspiration(id: number): Promise<void> {
+    if (!this.rdbStore) return;
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_INSPIRATION);
+    predicates.equalTo(C.INSPIRATION_ID, id);
+    await this.rdbStore.delete(predicates);
+  }
+
   // ================= Sync Utilities =================
 
   async getDeviceId(): Promise<string> {
@@ -713,6 +781,20 @@ export class DatabaseHelper {
         verTs: resultSet.getString(resultSet.getColumnIndex(C.COLUMN_VER_TS)),
         verCtr: resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_VER_CTR)),
         verDev: resultSet.getString(resultSet.getColumnIndex(C.COLUMN_VER_DEV)),
+      });
+    }
+    resultSet.close();
+    return list;
+  }
+
+  private parseInspirationResultSet(resultSet: relationalStore.ResultSet): InspirationItem[] {
+    const list: InspirationItem[] = [];
+    while (resultSet.goToNextRow()) {
+      list.push({
+        id: resultSet.getLong(resultSet.getColumnIndex(C.INSPIRATION_ID)),
+        text: resultSet.getString(resultSet.getColumnIndex(C.INSPIRATION_TEXT)),
+        createdAt: resultSet.getString(resultSet.getColumnIndex(C.INSPIRATION_CREATED_AT)),
+        updatedAt: resultSet.getString(resultSet.getColumnIndex(C.INSPIRATION_UPDATED_AT))
       });
     }
     resultSet.close();

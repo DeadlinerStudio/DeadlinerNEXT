@@ -1,7 +1,9 @@
 import { LocalValues } from "../common/local/LocalValues";
 import { HabitRepository } from "../common/repository/HabitRepository";
+import { InspirationRepository } from "../common/repository/InspirationRepository";
 import { TaskRepository } from "../common/repository/TaskRepository";
 import { DDLItem, DeadlineType, Habit, HabitGoalType, HabitRecordStatus, HabitStatus, HabitPeriod } from "../model/DDLModels";
+import { InspirationItem } from "../model/InspirationModels";
 import { DDLStatus } from "../model/DDLStatus";
 import { HabitWithDailyStatus } from "../pages/components/HabitComponents";
 import { TaskState, TaskStateMachine } from "../model/TaskStateMachine";
@@ -33,6 +35,7 @@ export interface ArchivedSearchModel {
 interface SearchResult {
   tasks: TaskUIModel[];
   habits: HabitWithDailyStatus[];
+  inspirations: InspirationItem[];
   archived: ArchivedSearchModel[]; // [新增] 归档结果集
 }
 
@@ -40,9 +43,11 @@ export class SearchUtils {
   private static instance: SearchUtils;
   private taskRepo = TaskRepository.getInstance();
   private habitRepo = HabitRepository.getInstance();
+  private inspirationRepo = InspirationRepository.getInstance();
 
   private allTasksCache: DDLItem[] = [];
   private allHabitsCache: Habit[] = [];
+  private allInspirationsCache: InspirationItem[] = [];
 
   public static getInstance(): SearchUtils {
     if (!SearchUtils.instance) {
@@ -58,6 +63,9 @@ export class SearchUtils {
 
       const habits = await this.habitRepo.getAllHabits();
       this.allHabitsCache = habits; // 加载所有习惯
+
+      const inspirations = await this.inspirationRepo.getAllInspirations();
+      this.allInspirationsCache = inspirations;
     } catch (e) {
       console.error('[SearchLogic] Preload failed:', e);
     }
@@ -65,7 +73,7 @@ export class SearchUtils {
 
   async executeSearch(query: string): Promise<SearchResult> {
     if (!query || query.trim() === '') {
-      return { tasks: [], habits: [], archived: [] };
+      return { tasks: [], habits: [], inspirations: [], archived: [] };
     }
 
     const lowerValue = query.toLowerCase().trim();
@@ -84,6 +92,10 @@ export class SearchUtils {
     const matchedHabits = this.allHabitsCache.filter(item =>
     item.name.toLowerCase().includes(lowerValue) ||
       (item.description && item.description.toLowerCase().includes(lowerValue))
+    );
+
+    const matchedInspirations = this.allInspirationsCache.filter(item =>
+      item.text.toLowerCase().includes(lowerValue)
     );
 
     // ---------------------------------------------------------
@@ -115,7 +127,7 @@ export class SearchUtils {
     // 这里简单处理，如果需要更复杂的混合排序，可解析 detail2 中的日期
     archivedResults.sort((a, b) => b.id.localeCompare(a.id));
 
-    return { tasks: taskResults, habits: habitResults, archived: archivedResults };
+    return { tasks: taskResults, habits: habitResults, inspirations: matchedInspirations, archived: archivedResults };
   }
 
   // --- Helpers ---

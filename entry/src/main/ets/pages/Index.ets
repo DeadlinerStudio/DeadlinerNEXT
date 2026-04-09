@@ -17,6 +17,7 @@ import { TaskRepository } from '../common/repository/TaskRepository';
 import { hdsMaterial, HdsNavigation, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
 import { AdaptedHdsTabs } from './components/AdaptedHdsTabs';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { CapturePage } from './routes/capture/CapturePage';
 
 interface TabData {
   title: string,
@@ -38,6 +39,7 @@ struct Index {
   @Provide('isAiFlowShown') isAiFlowShown: boolean = false;
 
   @StorageProp('IsAppDataReady') @Watch('onDataReady') isAppDataReady: boolean = false;
+  @StorageProp(C.KEY_PRIVACY_AGREE) privacyAgreed: boolean = false;
   @State isShowUI: boolean = false;
 
   @StorageLink('isLoggedIn') @Watch('onLoginStatusChange') isLoggedIn: boolean = false;
@@ -70,6 +72,7 @@ struct Index {
 
   @State isBlocking: boolean = false;
   private isDialogOpened: boolean = false;
+  private isCheckingPrivacyDialog: boolean = false;
 
   dialogController: CustomDialogController | null = new CustomDialogController({
     builder: PrivacyDialog({
@@ -105,6 +108,8 @@ struct Index {
       animateTo({ duration: 600, curve: Curve.EaseOut }, () => {
         this.isShowUI = true;
       });
+
+      this.checkAndShowDialog();
     }
   }
 
@@ -124,7 +129,9 @@ struct Index {
       console.error(`[Index] checkAndAutoArchive failed: ${e.message}`);
     });
 
-    this.checkAndShowDialog();
+    if (this.isAppDataReady) {
+      this.checkAndShowDialog();
+    }
   }
 
   onPageShow() {
@@ -171,15 +178,38 @@ struct Index {
   }
 
   async checkAndShowDialog() {
+    if (!this.isAppDataReady) {
+      console.info('App data is not ready, skip privacy check.');
+      return;
+    }
+
+    if (this.isCheckingPrivacyDialog) {
+      return;
+    }
+
     if (this.appPathStack.size() > 0) {
       console.info('Current stack has pages, skip privacy check.');
       return;
     }
 
-    const isAgreed = await LocalValues.getInstance().getIsPrivacyAgreed();
-    if (!isAgreed && !this.isDialogOpened) {
-      this.isBlocking = true;
-      this.dialogController?.open();
+    if (this.privacyAgreed) {
+      this.isBlocking = false;
+      return;
+    }
+
+    this.isCheckingPrivacyDialog = true;
+
+    try {
+      const isAgreed = await LocalValues.getInstance().getIsPrivacyAgreed();
+      if (!isAgreed && !this.isDialogOpened) {
+        this.isBlocking = true;
+        this.isDialogOpened = true;
+        this.dialogController?.open();
+      } else if (isAgreed) {
+        this.isBlocking = false;
+      }
+    } finally {
+      this.isCheckingPrivacyDialog = false;
     }
   }
 
@@ -212,20 +242,14 @@ struct Index {
   private tabsController: HdsTabsController = new HdsTabsController();
 
   // 用于控制三个 Tab 的动画触发状态 (0: 初始, 每次点击增加以触发动画)
-  @State tabAnimationTriggers: number[] = [0, 0, 0];
+  @State tabAnimationTriggers: number[] = [0, 0, 0, 0];
 
   // 定义 Tab 数据
-  // private tabs: Array<TabData> = [
-  //   { title: '清单', icon: $r('sys.symbol.checkmark_circle_on_circle_fill'), index: 0 },
-  //   { title: '时间线', icon: $r('sys.symbol.rectangle_and_line_horizontal_and_rectangle_filled'), index: 1 },
-  //   { title: '概览', icon: $r('sys.symbol.data_proportion_fill'), index: 2 },
-  //   { title: '我的', icon: $r('sys.symbol.person_crop_circle_fill_1'), index: 3 },
-  // ]
-
   private tabs: Array<TabData> = [
     { title: '清单', icon: $r('sys.symbol.checkmark_circle_on_circle_fill'), index: 0 },
     { title: '概览', icon: $r('sys.symbol.data_proportion_fill'), index: 1 },
-    { title: '我的', icon: $r('sys.symbol.person_crop_circle_fill_1'), index: 2 },
+    { title: '灵感', icon: $r('sys.symbol.quote'), index: 2 },
+    { title: '我的', icon: $r('sys.symbol.person_crop_circle_fill_1'), index: 3 },
   ]
 
   private getTabBarStyle(item: TabData): BottomTabBarStyle {
@@ -347,17 +371,30 @@ struct Index {
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
             // .backgroundColor(this.theme.bgPrimary)
 
-            // --- Tab 3: 我的 ---
+            // --- Tab 3: 灵感 ---
+            TabContent() {
+              CapturePage({ currentTabIndex: this.currentIndex })
+                .attributeModifier(new TabAnimModifier(2, this.currentIndex))
+                .animation({
+                  duration: 300,
+                  curve: Curve.EaseInOut
+                })
+                .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+            }
+            .tabBar(this.getTabBarStyle(this.tabs[2]))
+            .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+
+            // --- Tab 4: 我的 ---
             TabContent() {
               UserPage()
-                .attributeModifier(new TabAnimModifier(2, this.currentIndex))
+                .attributeModifier(new TabAnimModifier(3, this.currentIndex))
                 .animation({
                   duration: 300, // 保持与 Tabs 动画时长一致
                   curve: Curve.EaseInOut
                 })
                 .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
             }
-            .tabBar(this.getTabBarStyle(this.tabs[2]))
+            .tabBar(this.getTabBarStyle(this.tabs[3]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
             // .backgroundColor(this.theme.bgPrimary)
           }

@@ -1,11 +1,11 @@
 import {
-  HdsNavDestination,
-  HdsNavDestinationAttribute
+  HdsNavDestination
 } from '@kit.UIDesignKit';
 import { promptAction } from '@kit.ArkUI';
 import { TopSafeContainer } from '../../../components/TopSafeContainer';
 import { TaskRepository } from '../../../../common/repository/TaskRepository';
 import { HabitRepository } from '../../../../common/repository/HabitRepository';
+import { InspirationRepository } from '../../../../common/repository/InspirationRepository';
 import { DDLStatus } from '../../../../model/DDLStatus';
 import { DDLItemCardSwipeable, ArchivedDDLItemCard } from '../../../components/TaskItemCard'; // [导入] 归档卡片
 import { HabitRow, HabitWithDailyStatus } from '../../../components/HabitComponents';
@@ -14,8 +14,12 @@ import { VibrationUtils } from '../../../../utils/VibrationUtils';
 import { ConfettiController } from '../../../components/confetti/ConfettiController';
 import { SearchUtils, TaskUIModel, ArchivedSearchModel } from '../../../../utils/SearchUtils';
 import { DDLItem, Habit } from '../../../../model/DDLModels';
+import { InspirationItem } from '../../../../model/InspirationModels';
 import { ITheme } from '../../../../common/theme/ThemeModel';
 import { TaskState, TaskStateAction } from '../../../../model/TaskStateMachine';
+import { InspirationEditSheet, InspirationSearchCard } from '../../capture/CaptureComponents';
+import { AddTaskSheet } from '../modify/task/AddTaskSheet';
+import { AddHabitSheet } from '../modify/habit/AddHabitSheet';
 
 @Builder
 export function SearchPageBuilder() {
@@ -38,23 +42,37 @@ export struct SearchPage {
 
   @State taskResults: TaskUIModel[] = [];
   @State habitResults: HabitWithDailyStatus[] = [];
+  @State inspirationResults: InspirationItem[] = [];
   @State archivedResults: ArchivedSearchModel[] = []; // [新增] 归档结果
 
   private logic = SearchUtils.getInstance();
   private taskRepo = TaskRepository.getInstance();
   private habitRepo = HabitRepository.getInstance();
+  private inspirationRepo = InspirationRepository.getInstance();
 
   private scroller: Scroller = new Scroller();
   private confetti: ConfettiController = new ConfettiController();
   @State isFirstLoad: boolean = true;
 
+  @State isInspirationSheetShow: boolean = false;
+  @State editingInspiration: InspirationItem | null = null;
+  @State inspirationDraftText: string = '';
+  @State isAddTaskSheetShow: boolean = false;
+  @State isAddHabitSheetShow: boolean = false;
+  @State aiTargetText: string = '';
+  @State directTaskName: string = '';
+  @State directTaskNote: string = '';
+  @State directHabitName: string = '';
+
   readonly SEARCH_INPUT_ID = 'search_input';
 
   async aboutToAppear() {
     await this.logic.preloadData();
-    getContext(this).eventHub.on('sync_done', () => {
-      this.logic.preloadData().then(() => {
-        if (this.searchText) this.handleSearch(this.searchText);
+    getContext(this).eventHub.on('sync_done', (): void => {
+      void this.logic.preloadData().then(async (): Promise<void> => {
+        if (this.searchText) {
+          await this.handleSearch(this.searchText);
+        }
       });
     });
     setTimeout(() => {
@@ -75,6 +93,7 @@ export struct SearchPage {
     if (!hasTerm) {
       this.taskResults = [];
       this.habitResults = [];
+      this.inspirationResults = [];
       this.archivedResults = [];
       return;
     }
@@ -85,6 +104,7 @@ export struct SearchPage {
     animateTo({ duration: 300, curve: Curve.FastOutSlowIn }, () => {
       this.taskResults = results.tasks;
       this.habitResults = results.habits;
+      this.inspirationResults = results.inspirations;
       this.archivedResults = results.archived; // [新增]
       this.isSearching = false;
     })
@@ -185,9 +205,82 @@ export struct SearchPage {
     })
   }
 
+  private async saveInspirationDetail(): Promise<void> {
+    if (!this.editingInspiration) {
+      return;
+    }
+
+    const text = this.inspirationDraftText.trim();
+    if (!text) {
+      promptAction.showToast({ message: '留一点内容再保存吧' });
+      return;
+    }
+
+    await this.inspirationRepo.updateInspiration({
+      id: this.editingInspiration.id,
+      text: text,
+      createdAt: this.editingInspiration.createdAt,
+      updatedAt: this.editingInspiration.updatedAt
+    });
+    this.isInspirationSheetShow = false;
+    this.editingInspiration = null;
+    await this.logic.preloadData();
+    await this.handleSearch(this.searchText);
+    getContext(this).eventHub.emit('sync_done');
+  }
+
+  private async deleteInspiration(item: InspirationItem): Promise<void> {
+    await this.inspirationRepo.deleteInspiration(item.id);
+    promptAction.showToast({ message: '已删除' });
+    await this.logic.preloadData();
+    await this.handleSearch(this.searchText);
+    getContext(this).eventHub.emit('sync_done');
+  }
+
+  private openInspirationDetail(item: InspirationItem): void {
+    this.editingInspiration = item;
+    this.inspirationDraftText = item.text;
+    this.isInspirationSheetShow = true;
+  }
+
+  private guessTitleFromText(text: string): string {
+    const normalized = text.replace(/\n+/g, ' ').trim();
+    if (!normalized) {
+      return '未命名灵感';
+    }
+    return normalized.length > 24 ? normalized.slice(0, 24) : normalized;
+  }
+
+  private openAiTaskFromText(text: string): void {
+    this.aiTargetText = text;
+    this.isInspirationSheetShow = false;
+    this.isAddTaskSheetShow = true;
+  }
+
+  private openAiHabitFromText(text: string): void {
+    this.aiTargetText = text;
+    this.isInspirationSheetShow = false;
+    this.isAddHabitSheetShow = true;
+  }
+
+  private openDirectTaskFromText(text: string): void {
+    this.aiTargetText = '';
+    this.directTaskName = this.guessTitleFromText(text);
+    this.directTaskNote = text;
+    this.isInspirationSheetShow = false;
+    this.isAddTaskSheetShow = true;
+  }
+
+  private openDirectHabitFromText(text: string): void {
+    this.aiTargetText = '';
+    this.directHabitName = this.guessTitleFromText(text);
+    this.isInspirationSheetShow = false;
+    this.isAddHabitSheetShow = true;
+  }
+
   @Builder searchBuilder() {
     Row() {
-      Search({ value: this.searchText, placeholder: '搜索任务或习惯...' })
+      Search({ value: this.searchText, placeholder: '搜索任务、习惯或灵感...' })
         .searchButton('搜索', { fontColor: this.theme.brand })
         .id('search_input')
         .defaultFocus(true)
@@ -210,7 +303,7 @@ export struct SearchPage {
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('sys.color.ohos_id_color_text_secondary'))
-        Text('支持搜索标题、备注和鼓励语')
+        Text('支持搜索任务、习惯和灵感内容')
           .fontSize(14)
           .fontColor($r('sys.color.ohos_id_color_text_tertiary'))
       }
@@ -232,6 +325,55 @@ export struct SearchPage {
     .width('100%')
     .height(300)
     .justifyContent(FlexAlign.Center)
+  }
+
+  @Builder inspirationSheetBuilder() {
+    InspirationEditSheet({
+      isShow: $isInspirationSheetShow,
+      draftText: $inspirationDraftText,
+      item: this.editingInspiration,
+      onSave: async (): Promise<void> => {
+        await this.saveInspirationDetail();
+      },
+      onDelete: async (): Promise<void> => {
+        if (this.editingInspiration) {
+          await this.deleteInspiration(this.editingInspiration);
+          this.isInspirationSheetShow = false;
+        }
+      },
+      onAiTask: (): void => this.openAiTaskFromText(this.inspirationDraftText),
+      onAiHabit: (): void => this.openAiHabitFromText(this.inspirationDraftText),
+      onDirectTask: (): void => this.openDirectTaskFromText(this.inspirationDraftText),
+      onDirectHabit: (): void => this.openDirectHabitFromText(this.inspirationDraftText)
+    })
+  }
+
+  @Builder addTaskSheetBuilder() {
+    AddTaskSheet({
+      onDone: () => {
+        this.isAddTaskSheetShow = false;
+        this.aiTargetText = '';
+        this.directTaskName = '';
+        this.directTaskNote = '';
+      },
+      initialAiInputText: this.aiTargetText,
+      autoTriggerAI: this.aiTargetText.length > 0,
+      initialName: this.directTaskName,
+      initialNote: this.directTaskNote
+    })
+  }
+
+  @Builder addHabitSheetBuilder() {
+    AddHabitSheet({
+      onDone: () => {
+        this.isAddHabitSheetShow = false;
+        this.aiTargetText = '';
+        this.directHabitName = '';
+      },
+      initialAiInputText: this.aiTargetText,
+      autoTriggerAI: this.aiTargetText.length > 0,
+      initialName: this.directHabitName
+    })
   }
 
   build() {
@@ -310,6 +452,28 @@ export struct SearchPage {
                 }, (item: HabitWithDailyStatus) => `habit_${item.habit.id}`)
               }
 
+              if (this.inspirationResults.length > 0) {
+                ListItem() {
+                  Text('灵感')
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+                    .margin({ top: 16, bottom: -4, left: 12 })
+                }
+                ForEach(this.inspirationResults, (item: InspirationItem, index: number) => {
+                  ListItem() {
+                    InspirationSearchCard({
+                      item: item,
+                      onCardClick: (): void => this.openInspirationDetail(item),
+                      onDelete: (): void => { void this.deleteInspiration(item); },
+                      onAiTask: (): void => this.openAiTaskFromText(item.text),
+                      onAiHabit: (): void => this.openAiHabitFromText(item.text)
+                    })
+                  }
+                  .attributeModifier(new FloatUpModifier(index + 9, 15, false))
+                }, (item: InspirationItem) => `inspiration_${item.id}`)
+              }
+
               // [新增] C. 归档组
               if (this.archivedResults.length > 0) {
                 ListItem() {
@@ -339,6 +503,7 @@ export struct SearchPage {
               // D. 搜索无结果
               if (this.taskResults.length === 0 &&
                 this.habitResults.length === 0 &&
+                this.inspirationResults.length === 0 &&
                 this.archivedResults.length === 0) {
                 ListItem() {
                   this.buildNoResultPlaceholder()
@@ -353,13 +518,57 @@ export struct SearchPage {
             .padding({ left: 12, right: 12 })
             .transition(TransitionEffect.OPACITY.animation({ duration: 200 }))
           }
+
+          Blank()
+            .width(0)
+            .height(0)
+            .bindSheet($$this.isInspirationSheetShow, this.inspirationSheetBuilder(), {
+              height: SheetSize.LARGE,
+              blurStyle: BlurStyle.Regular,
+              backgroundColor: Color.Transparent,
+              showClose: false,
+              onDisappear: () => {
+                this.isInspirationSheetShow = false;
+                this.editingInspiration = null;
+              },
+              title: {
+                title: '编辑灵感',
+                subtitle: '保留它的原始样子，之后再整理'
+              }
+            })
+
+          Blank()
+            .width(0)
+            .height(0)
+            .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), {
+              height: SheetSize.LARGE,
+              blurStyle: BlurStyle.Regular,
+              backgroundColor: Color.Transparent,
+              showClose: false,
+              onDisappear: () => {
+                this.isAddTaskSheetShow = false;
+              }
+            })
+
+          Blank()
+            .width(0)
+            .height(0)
+            .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), {
+              height: SheetSize.LARGE,
+              blurStyle: BlurStyle.Regular,
+              backgroundColor: Color.Transparent,
+              showClose: false,
+              onDisappear: () => {
+                this.isAddHabitSheetShow = false;
+              }
+            })
         }
         .width('100%')
         .height('100%')
       }
     }
     .backgroundColor(this.bgColor)
-        .titleBar({
+    .titleBar({
       content: {
         title: { mainTitle: '' },
         stackBuilder: () => {

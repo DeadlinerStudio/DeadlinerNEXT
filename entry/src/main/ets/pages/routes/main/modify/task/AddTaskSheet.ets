@@ -11,6 +11,10 @@ export interface AddTaskParams {
 @Component
 export struct AddTaskSheet {
   onDone: () => void = () => {}
+  initialAiInputText: string = '';
+  autoTriggerAI: boolean = false;
+  initialName: string = '';
+  initialNote: string = '';
 
   @State name: string = '';
   @State note: string = '';
@@ -19,6 +23,22 @@ export struct AddTaskSheet {
 
   @State aiInputText: string = '';
   @State isAILoading: boolean = false;
+
+  aboutToAppear(): void {
+    if (this.initialName) {
+      this.name = this.initialName;
+    }
+    if (this.initialNote) {
+      this.note = this.initialNote;
+    }
+    if (this.initialAiInputText) {
+      this.aiInputText = this.initialAiInputText;
+    }
+
+    if (this.autoTriggerAI && this.initialAiInputText) {
+      this.onAITriggered();
+    }
+  }
 
   private async saveTask() {
     const isSuccess = await TaskFormHelper.saveNewTask(

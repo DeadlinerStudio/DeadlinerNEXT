@@ -8,6 +8,9 @@ import { HabitFormHelper } from './HabitFormHelper'; // 引入 Helper
 export struct AddHabitSheet {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
   onDone: () => void = () => {}
+  initialAiInputText: string = '';
+  autoTriggerAI: boolean = false;
+  initialName: string = '';
 
   @State name: string = '';
   @State selectedPeriodIndex: number[] = [0];
@@ -16,6 +19,19 @@ export struct AddHabitSheet {
   @State totalTarget: string = '';
   @State aiInputText: string = '';
   @State isAILoading: boolean = false;
+
+  aboutToAppear(): void {
+    if (this.initialName) {
+      this.name = this.initialName;
+    }
+    if (this.initialAiInputText) {
+      this.aiInputText = this.initialAiInputText;
+    }
+
+    if (this.autoTriggerAI && this.initialAiInputText) {
+      this.onAITriggered();
+    }
+  }
 
   private async saveHabit() {
     const pIndex = this.selectedPeriodIndex.length > 0 ? this.selectedPeriodIndex[0] : 0;

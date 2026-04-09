@@ -34,6 +34,9 @@ export class LocalValues {
       const basicMode = await this.pref.get(C.KEY_BASIC_MODE, false);
       AppStorage.setOrCreate(C.KEY_BASIC_MODE, basicMode);
 
+      const privacyAgreed = await this.pref.get(C.KEY_PRIVACY_AGREE, false);
+      AppStorage.setOrCreate(C.KEY_PRIVACY_AGREE, privacyAgreed);
+
       // --- 1. 普通数据 (Preferences) ---
       const syncEnable = await this.pref.get(C.KEY_CLOUD_SYNC_ENABLE, false);
       AppStorage.setOrCreate(C.KEY_CLOUD_SYNC_ENABLE, syncEnable);
@@ -301,16 +304,24 @@ export class LocalValues {
    * 隐私协议相关
    */
   async getIsPrivacyAgreed(): Promise<boolean> {
+    const cached = AppStorage.get<boolean>(C.KEY_PRIVACY_AGREE);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     if (!this.pref) return false;
 
     try {
-      return await this.pref.get(C.KEY_PRIVACY_AGREE, false) as boolean;
+      const value = await this.pref.get(C.KEY_PRIVACY_AGREE, false) as boolean;
+      AppStorage.setOrCreate(C.KEY_PRIVACY_AGREE, value);
+      return value;
     } catch (_) {
       return false;
     }
   }
 
   async setPrivacyAgreed(): Promise<void> {
+    AppStorage.setOrCreate(C.KEY_PRIVACY_AGREE, true);
     if (!this.pref) return;
 
     try {
@@ -322,6 +333,7 @@ export class LocalValues {
   }
 
   async revokePrivacy(): Promise<void> {
+    AppStorage.setOrCreate(C.KEY_PRIVACY_AGREE, false);
     if (!this.pref) return;
 
     try {
