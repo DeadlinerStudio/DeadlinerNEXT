@@ -7,12 +7,9 @@ import { VibrationUtils } from "../../../utils/VibrationUtils";
 import { TopSafeContainer } from "../../components/TopSafeContainer";
 import { TaskListController } from "./TaskListController"
 import { ConfettiController } from "../../components/confetti/ConfettiController";
-import { TimeInputButton } from "../../components/TimeInputButton";
 import { SettingsConstants as C } from "../../../common/local/SettingsConstants"
 import { FloatUpModifier } from "../../../utils/animation/FloatUpModifier";
-import { DateTimeUtils } from "../../../utils/DateTimeUtils";
-import { DateTimePicker } from "../../components/DateTimePicker";
-import { TaskEditSheet } from "./modify/task/TaskEditSheet";
+import { TaskDetailSheet } from "./modify/task/TaskDetailSheet";
 import { PressEffectModifier } from "../../../utils/animation/PressModifier";
 import { ITheme } from "../../../common/theme/ThemeModel";
 import { TaskState, TaskStateAction } from "../../../model/TaskStateMachine";
@@ -49,13 +46,8 @@ export struct TaskListSection {
 
   @Prop confetti: ConfettiController;
 
-  @State isEditSheetShow: boolean = false;
-  @State editingTask: DDLItem | null = null; // 暂存正在编辑的完整对象
-  @State editingTitle: string = "";          // 绑定输入框
-  @State editingNote: string = "";           // 绑定输入框
-
-  @State editingStartTime: Date = new Date();
-  @State editingEndTime: Date = new Date();
+  @State isDetailSheetShow: boolean = false;
+  @State detailTask: DDLItem | null = null;
 
   private repo = TaskRepository.getInstance();
 
@@ -427,50 +419,39 @@ export struct TaskListSection {
     });
   }
 
+  private async openTaskDetail(taskId: number) {
+    try {
+      const task = await this.repo.getDDLById(taskId);
+      if (!task) {
+        promptAction.showToast({ message: '找不到该任务' });
+        return;
+      }
+      this.detailTask = task;
+      this.isDetailSheetShow = true;
+    } catch (e) {
+      console.error('Open detail failed:', e);
+      promptAction.showToast({ message: '无法打开任务详情' });
+    }
+  }
+
   private async handleBatchEdit() {
     if (this.selectedIds.length === 0) {
       promptAction.showToast({ message: '未选中任何任务' });
       return;
     }
     const targetId = this.selectedIds[0];
-    try {
-      const allItems = await this.repo.getAllDDLs();
-      const target = allItems.find(item => item.id === targetId);
-
-      if (target) {
-        this.editingTask = target;
-        this.editingTitle = target.name;
-        this.editingNote = target.note || "";
-
-        console.log("[EDIT DEBUG] editingTask | target: ", this.editingTask.name, '|', target.name);
-
-        this.editingStartTime = target.startTime ? new Date(target.startTime) : new Date();
-        this.editingEndTime = target.endTime ? new Date(target.endTime) : new Date();
-
-        this.isEditSheetShow = true;
-        this.exitSelectionMode();
-      } else {
-        promptAction.showToast({ message: '找不到该任务' });
-      }
-    } catch (e) {
-      console.error('Fetch task for edit failed:', e);
-      promptAction.showToast({ message: '无法打开编辑' });
-    }
-  }
-
-  private async handleSave(task: DDLItem) {
-    await this.repo.updateDDL(task);
-
-    this.isEditSheetShow = false;
-    await this.loadData();
+    await this.openTaskDetail(targetId);
+    this.exitSelectionMode();
   }
 
   @Builder
-  taskEditSheet() {
-    TaskEditSheet({
-      isShow: $isEditSheetShow,        // 绑定显隐状态
-      editingTask: this.editingTask, // 传递数据
-      onSave: (task): Promise<void> => this.handleSave(task)
+  taskDetailSheet() {
+    TaskDetailSheet({
+      isShow: $isDetailSheetShow,
+      task: this.detailTask,
+      onTaskChanged: async (): Promise<void> => {
+        await this.loadData();
+      }
     })
   }
 
@@ -545,7 +526,9 @@ export struct TaskListSection {
                         onSecondaryAction: async () => {
                           this.handleSecondaryAction(item.dbId, item.title, item.taskState)
                         },
-                        onClickItem: () => {},
+                        onClickItem: () => {
+                          this.openTaskDetail(item.dbId);
+                        },
 
                         onLongPressSelect: () => {
                           if (!this.isSelectionMode) {
@@ -606,19 +589,16 @@ export struct TaskListSection {
     }
     .width("100%")
     .height("100%")
-    .bindSheet($$this.isEditSheetShow, this.taskEditSheet(), {
+    .bindSheet($$this.isDetailSheetShow, this.taskDetailSheet(), {
       height: SheetSize.FIT_CONTENT,
       dragBar: true,
       onDisappear: () => {
-        this.isEditSheetShow = false;
-        this.editingTask = null;
+        this.isDetailSheetShow = false;
+        this.detailTask = null;
       },
+      showClose: false,
       blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
-      title: {
-        title: '编辑任务',
-        subtitle: '修改任务信息。'
-      }
+      backgroundColor: Color.Transparent
     })
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
   }

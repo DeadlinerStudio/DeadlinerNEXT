@@ -356,6 +356,74 @@ export class DatabaseHelper {
     }
   }
 
+  /**
+   * 更新子任务内容
+   */
+  async updateSubTaskContent(id: number, content: string): Promise<void> {
+    if (!this.rdbStore) return;
+
+    const v = await this.nextVersionUTC();
+    const ddlId = await this.getSubTaskDDLId(id);
+    if (ddlId === null) {
+      console.warn(`[DatabaseHelper] updateSubTaskContent: Missing ddlId for subtask ${id}`);
+      return;
+    }
+
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.ST_CONTENT] = content;
+    bucket[C.ST_VER_TS] = v.ts;
+    bucket[C.ST_VER_CTR] = v.ctr;
+    bucket[C.ST_VER_DEV] = v.dev;
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_SUBTASK);
+    predicates.equalTo(C.ST_ID, id);
+
+    try {
+      const rows = await this.rdbStore.update(bucket, predicates);
+      if (rows === 0) {
+        console.warn(`[DatabaseHelper] updateSubTaskContent: No rows updated for id ${id}`);
+        return;
+      }
+      await this.touchDDLVersion(ddlId, v);
+    } catch (e) {
+      console.error(`[DatabaseHelper] updateSubTaskContent failed: ${e}`);
+    }
+  }
+
+  /**
+   * 软删除子任务（用于同步保留 tombstone）
+   */
+  async deleteSubTask(id: number): Promise<void> {
+    if (!this.rdbStore) return;
+
+    const v = await this.nextVersionUTC();
+    const ddlId = await this.getSubTaskDDLId(id);
+    if (ddlId === null) {
+      console.warn(`[DatabaseHelper] deleteSubTask: Missing ddlId for subtask ${id}`);
+      return;
+    }
+
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.ST_DELETED] = 1;
+    bucket[C.ST_VER_TS] = v.ts;
+    bucket[C.ST_VER_CTR] = v.ctr;
+    bucket[C.ST_VER_DEV] = v.dev;
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_SUBTASK);
+    predicates.equalTo(C.ST_ID, id);
+
+    try {
+      const rows = await this.rdbStore.update(bucket, predicates);
+      if (rows === 0) {
+        console.warn(`[DatabaseHelper] deleteSubTask: No rows updated for id ${id}`);
+        return;
+      }
+      await this.touchDDLVersion(ddlId, v);
+    } catch (e) {
+      console.error(`[DatabaseHelper] deleteSubTask failed: ${e}`);
+    }
+  }
+
   // ================= DDL Operations =================
 
   // DatabaseHelper.ets

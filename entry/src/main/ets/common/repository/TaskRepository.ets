@@ -301,6 +301,18 @@ export class TaskRepository {
     this.triggerUpdates();
   }
 
+  async deleteSubTask(subTaskId: number): Promise<void> {
+    await this.ensureDbReady();
+    await this.db.deleteSubTask(subTaskId);
+    this.triggerUpdates();
+  }
+
+  async updateSubTaskContent(subTaskId: number, content: string): Promise<void> {
+    await this.ensureDbReady();
+    await this.db.updateSubTaskContent(subTaskId, content);
+    this.triggerUpdates();
+  }
+
   // ==========================================
   // 手动同步
   // ==========================================

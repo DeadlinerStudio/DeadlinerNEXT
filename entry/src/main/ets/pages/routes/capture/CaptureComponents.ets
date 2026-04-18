@@ -1,6 +1,7 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { ITheme } from '../../../common/theme/ThemeModel';
 import { InspirationItem } from '../../../model/InspirationModels';
+import { BlurBackgroundModifier } from '../../../utils/animation/BlurBackgroundModifier';
 import { PressEffectModifier } from '../../../utils/animation/PressModifier';
 
 @Component
@@ -69,6 +70,8 @@ export struct InspirationItemCard {
   onLongPressSelect: () => void = (): void => {};
   onToggleSelect: () => void = (): void => {};
 
+  @StorageProp('customBackgroundImage') customBg: string = '';
+
   private previewText(): string {
     return this.item.text.trim();
   }
@@ -119,7 +122,7 @@ export struct InspirationItemCard {
         top: 16,
         bottom: 16
       })
-      .backgroundColor($r('sys.color.comp_background_secondary'))
+      .attributeModifier(new BlurBackgroundModifier(!!this.customBg, $r('sys.color.comp_background_secondary'), BlurStyle.Thick))
       .borderRadius(24)
     }
     .width('100%')

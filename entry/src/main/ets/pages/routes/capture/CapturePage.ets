@@ -14,6 +14,7 @@ import { InspirationEditSheet, InspirationItemCard } from './CaptureComponents';
 import { AddTaskSheet } from '../main/modify/task/AddTaskSheet';
 import { AddHabitSheet } from '../main/modify/habit/AddHabitSheet';
 import { ITheme } from '../../../common/theme/ThemeModel';
+import { BlurBackgroundModifier } from '../../../utils/animation/BlurBackgroundModifier';
 
 @Component
 export struct CapturePage {
@@ -271,6 +272,8 @@ export struct CapturePage {
     this.isAddHabitSheetShow = true;
   }
 
+  @StorageProp('customBackgroundImage') customBg: string = '';
+
   @Builder
   private inputCardBuilder() {
     Column({ space: 14 }) {
@@ -321,28 +324,8 @@ export struct CapturePage {
     }
     .width('100%')
     .padding(16)
-    .backgroundColor($r('app.color.background_secondary'))
+    .attributeModifier(new BlurBackgroundModifier(!!this.customBg, $r('app.color.background_secondary'), BlurStyle.Regular))
     .borderRadius(24)
-  }
-
-  @Builder
-  private selectionBannerBuilder() {
-    Row({ space: 10 }) {
-      Text('多选中')
-        .fontSize(13)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(this.theme.brand)
-
-      Text('先把几条碎片放在一起，等它们更清楚一点，再决定要不要整理。')
-        .layoutWeight(1)
-        .fontSize(12)
-        .lineHeight(18)
-        .fontColor($r('sys.color.ohos_id_color_text_secondary'))
-    }
-    .width('100%')
-    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-    .backgroundColor(this.theme.brand50)
-    .borderRadius(20)
   }
 
   @Builder
@@ -536,7 +519,7 @@ export struct CapturePage {
       }
     }
     .titleBar({
-      style: getImmersiveTitleBarStyle(false, true),
+      style: getImmersiveTitleBarStyle(false, false),
       content: {
         title: {
           mainTitle: this.selectionMode ? `已选 ${this.selectedIds.length} 项` : '灵感'

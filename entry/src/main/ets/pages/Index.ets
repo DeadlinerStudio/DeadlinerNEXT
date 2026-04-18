@@ -248,7 +248,7 @@ struct Index {
   private tabs: Array<TabData> = [
     { title: '清单', icon: $r('sys.symbol.checkmark_circle_on_circle_fill'), index: 0 },
     { title: '概览', icon: $r('sys.symbol.data_proportion_fill'), index: 1 },
-    { title: '灵感', icon: $r('sys.symbol.quote'), index: 2 },
+    { title: '灵感', icon: $r('sys.symbol.pencil_crcle_fill'), index: 2 },
     { title: '我的', icon: $r('sys.symbol.person_crop_circle_fill_1'), index: 3 },
   ]
 

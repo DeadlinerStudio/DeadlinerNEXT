@@ -3,6 +3,7 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 import { ITheme } from '../../common/theme/ThemeModel';
 import { LocalValues } from '../../common/local/LocalValues';
 import { getHdsMaterialLevel } from '../../common/style/MaterialLevel';
+import { ThemeManager } from '../../common/theme/ThemeManager';
 
 @Component
 export struct AdaptedHdsTabs {
@@ -60,7 +61,7 @@ export struct AdaptedHdsTabs {
             maskColor: $r('app.color.background_primary_50'),
             maskHeight: 42
           },
-          lightColor: this.theme.tabIcon,
+          lightColor: (this.theme.tabIcon),
           adaptToHandedness: this.isWideScreen
         })
     } else {
