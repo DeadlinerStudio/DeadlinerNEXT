@@ -156,6 +156,8 @@ interface CarrierLookupResult {
 
 interface HabitLookupResult {
   id: number;
+  status: HabitStatus;
+  updatedAt: string;
 }
 
 export type LocalHabitSnapshotBuildMode = 'emit_doc' | 'emit_tombstone' | 'skip';
@@ -193,7 +195,7 @@ export class SyncService {
 
     return {
       version: SyncService.createSnapshotInterface(version.ts ?? new Date().toISOString(), version.dev ?? ''),
-      items: items.map((item) => SyncService.normalizeSnapshotItem(item))
+      items: SyncService.normalizeSnapshotItems(items)
     };
   }
 
@@ -203,7 +205,7 @@ export class SyncService {
 
     return {
       version: SyncService.createSnapshotInterface(version.ts ?? new Date().toISOString(), version.dev ?? ''),
-      items: items.map((item) => SyncService.normalizeHabitSnapshotItem(item))
+      items: SyncService.normalizeHabitSnapshotItems(items)
     };
   }
 
@@ -211,7 +213,7 @@ export class SyncService {
     const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
     return {
       version: snapshot?.version ?? SyncService.createSnapshotInterface(new Date().toISOString(), ''),
-      items: items.map((item) => SyncService.upgradeV1ItemToV2(item))
+      items: SyncService.upgradeV1ItemsToV2(items)
     };
   }
 
@@ -356,7 +358,15 @@ export class SyncService {
       return [];
     }
 
-    return subTasks.map((subTask, index) => SyncService.normalizeSubTask(subTask, index));
+    const normalized: SnapshotSubTask[] = [];
+    for (let index = 0; index < subTasks.length; index++) {
+      try {
+        normalized.push(SyncService.normalizeSubTask(subTasks[index], index));
+      } catch (e) {
+        console.warn(`[Sync] Skip malformed sub-task at index=${index}: ${e}`);
+      }
+    }
+    return normalized;
   }
 
   private static normalizeSubTask(subTask: SnapshotSubTask, index: number): SnapshotSubTask {
@@ -403,7 +413,15 @@ export class SyncService {
       return [];
     }
 
-    return records.map((record) => SyncService.normalizeHabitRecord(record));
+    const normalized: HabitRecordSnapshot[] = [];
+    for (const record of records) {
+      try {
+        normalized.push(SyncService.normalizeHabitRecord(record));
+      } catch (e) {
+        console.warn(`[Sync] Skip malformed habit record: ${e}`);
+      }
+    }
+    return normalized;
   }
 
   private static normalizeHabitRecord(record: HabitRecordSnapshot): HabitRecordSnapshot {
@@ -557,14 +575,43 @@ export class SyncService {
     habitUpdatedAt: string
   ): boolean {
     if (!SyncService.isHabitAppliedVersionInitialized(appliedVer)) {
-      return habitUpdatedAt === SyncService.habitUpdatedAtForLocalPayloadChange(carrierVer);
+      return SyncService.isHabitPayloadFreshForCarrier(carrierVer, habitUpdatedAt);
     }
 
     if (!SyncService.isVerNewerStatic(carrierVer, appliedVer as SnapshotVer)) {
       return true;
     }
 
-    return habitUpdatedAt === SyncService.habitUpdatedAtForLocalPayloadChange(carrierVer);
+    return SyncService.isHabitPayloadFreshForCarrier(carrierVer, habitUpdatedAt);
+  }
+
+  static shouldApplyHabitSnapshotByContent(
+    item: HabitSnapshotItem,
+    appliedVer: SnapshotVer | null | undefined,
+    localHabit: HabitLookupResult | null
+  ): boolean {
+    if (SyncService.shouldApplyHabitSnapshot(item.ver, appliedVer)) {
+      return true;
+    }
+
+    if (item.deleted) {
+      return localHabit !== null;
+    }
+
+    const remoteHabit = item.doc?.habit;
+    if (!remoteHabit) {
+      return false;
+    }
+
+    if (localHabit === null) {
+      return true;
+    }
+
+    if (localHabit.status !== remoteHabit.status) {
+      return true;
+    }
+
+    return localHabit.updatedAt !== remoteHabit.updated_at;
   }
 
   private static isVerNewerStatic(aVer: SnapshotVer, bVer: SnapshotVer): boolean {
@@ -691,6 +738,57 @@ export class SyncService {
       status: status,
       created_at: createdAt
     };
+  }
+
+  private static normalizeSnapshotItems(items: SnapshotItem[]): SnapshotItem[] {
+    const normalized: SnapshotItem[] = [];
+    for (const item of items) {
+      try {
+        normalized.push(SyncService.normalizeSnapshotItem(item));
+      } catch (e) {
+        console.warn(`[Sync] Skip malformed DDL snapshot item: ${e}`);
+      }
+    }
+    return normalized;
+  }
+
+  private static normalizeHabitSnapshotItems(items: HabitSnapshotItem[]): HabitSnapshotItem[] {
+    const normalized: HabitSnapshotItem[] = [];
+    for (const item of items) {
+      try {
+        normalized.push(SyncService.normalizeHabitSnapshotItem(item));
+      } catch (e) {
+        console.warn(`[Sync] Skip malformed Habit snapshot item: ${e}`);
+      }
+    }
+    return normalized;
+  }
+
+  private static upgradeV1ItemsToV2(items: SnapshotV1Item[]): SnapshotItem[] {
+    const normalized: SnapshotItem[] = [];
+    for (const item of items) {
+      try {
+        normalized.push(SyncService.upgradeV1ItemToV2(item));
+      } catch (e) {
+        console.warn(`[Sync] Skip malformed v1 snapshot item: ${e}`);
+      }
+    }
+    return normalized;
+  }
+
+  private static isHabitPayloadFreshForCarrier(carrierVer: SnapshotVer, habitUpdatedAt: string): boolean {
+    const expectedUpdatedAt = SyncService.habitUpdatedAtForLocalPayloadChange(carrierVer);
+    if (habitUpdatedAt === expectedUpdatedAt) {
+      return true;
+    }
+
+    const actualMs = Date.parse(habitUpdatedAt);
+    const expectedMs = Date.parse(expectedUpdatedAt);
+    if (!isNaN(actualMs) && !isNaN(expectedMs)) {
+      return actualMs >= expectedMs;
+    }
+
+    return false;
   }
 
   private async buildLocalSnapshot(retentionDays: number, nowTs: string): Promise<SnapshotRoot> {
@@ -972,103 +1070,107 @@ export class SyncService {
 
     try {
       for (const rawItem of merged.items) {
-        const item = SyncService.normalizeSnapshotItem(rawItem);
-        const uid = item.uid;
-        const mergedVer = item.ver;
+        try {
+          const item = SyncService.normalizeSnapshotItem(rawItem);
+          const uid = item.uid;
+          const mergedVer = item.ver;
 
-        const predicates = new relationalStore.RdbPredicates('ddl_items');
-        predicates.equalTo('uid', uid);
-        const resultSet = await store.query(predicates);
-        const exists = resultSet.goToFirstRow();
+          const predicates = new relationalStore.RdbPredicates('ddl_items');
+          predicates.equalTo('uid', uid);
+          const resultSet = await store.query(predicates);
+          const exists = resultSet.goToFirstRow();
 
-        let localId: number | null = null;
-        let currentLocalVer: SnapshotVer | null = null;
+          let localId: number | null = null;
+          let currentLocalVer: SnapshotVer | null = null;
 
-        if (exists) {
-          localId = resultSet.getLong(resultSet.getColumnIndex('id'));
-          currentLocalVer = SyncService.createSnapshotVersion(
-            resultSet.getString(resultSet.getColumnIndex('ver_ts')),
-            resultSet.getLong(resultSet.getColumnIndex('ver_ctr')),
-            resultSet.getString(resultSet.getColumnIndex('ver_dev'))
-          );
-        }
-        resultSet.close();
+          if (exists) {
+            localId = resultSet.getLong(resultSet.getColumnIndex('id'));
+            currentLocalVer = SyncService.createSnapshotVersion(
+              resultSet.getString(resultSet.getColumnIndex('ver_ts')),
+              resultSet.getLong(resultSet.getColumnIndex('ver_ctr')),
+              resultSet.getString(resultSet.getColumnIndex('ver_dev'))
+            );
+          }
+          resultSet.close();
 
-        if (currentLocalVer && this.isVerNewer(currentLocalVer, mergedVer)) {
-          continue;
-        }
+          if (currentLocalVer && this.isVerNewer(currentLocalVer, mergedVer)) {
+            continue;
+          }
 
-        const bucket: ValuesBucket = {
-          ver_ts: mergedVer.ts,
-          ver_ctr: mergedVer.ctr,
-          ver_dev: mergedVer.dev
-        };
+          const bucket: ValuesBucket = {
+            ver_ts: mergedVer.ts,
+            ver_ctr: mergedVer.ctr,
+            ver_dev: mergedVer.dev
+          };
 
-        if (item.deleted) {
-          bucket['deleted'] = 1;
+          if (item.deleted) {
+            bucket['deleted'] = 1;
+            if (exists && localId !== null) {
+              const upPred = new relationalStore.RdbPredicates('ddl_items');
+              upPred.equalTo('id', localId);
+              await store.update(bucket, upPred);
+              await this.markAllSubTasksDeleted(store, localId, mergedVer);
+              changed = true;
+            } else {
+              bucket['uid'] = uid;
+              bucket['name'] = '(deleted)';
+              bucket['start_time'] = '';
+              bucket['end_time'] = '';
+              bucket['state'] = 'archived';
+              bucket['complete_time'] = '';
+              bucket['note'] = '';
+              bucket['type'] = DeadlineType.TASK;
+              bucket['timestamp'] = mergedVer.ts;
+              bucket['is_completed'] = 1;
+              bucket['is_archived'] = 1;
+              bucket['is_stared'] = 0;
+              bucket['habit_count'] = 0;
+              bucket['habit_total_count'] = 0;
+              bucket['calendar_event'] = -1;
+              await store.insert('ddl_items', bucket);
+              changed = true;
+            }
+            continue;
+          }
+
+          const doc = item.doc;
+          if (!doc) {
+            throw new Error(`[Sync] Missing doc for non-deleted item ${uid}`);
+          }
+
+          const legacyState = SyncService.stateToLegacyFlags(doc.state);
+          bucket['deleted'] = 0;
+          bucket['name'] = doc.name;
+          bucket['start_time'] = doc.start_time;
+          bucket['end_time'] = doc.end_time;
+          bucket['state'] = doc.state;
+          bucket['is_completed'] = legacyState.is_completed;
+          bucket['complete_time'] = doc.complete_time;
+          bucket['note'] = doc.note;
+          bucket['is_archived'] = legacyState.is_archived;
+          bucket['is_stared'] = doc.is_stared;
+          bucket['type'] = doc.type;
+          bucket['habit_count'] = doc.habit_count;
+          bucket['habit_total_count'] = doc.habit_total_count;
+          bucket['calendar_event'] = doc.calendar_event;
+          bucket['timestamp'] = doc.timestamp;
+
+          let targetId: number;
           if (exists && localId !== null) {
             const upPred = new relationalStore.RdbPredicates('ddl_items');
             upPred.equalTo('id', localId);
             await store.update(bucket, upPred);
-            await this.markAllSubTasksDeleted(store, localId, mergedVer);
-            changed = true;
+            targetId = localId;
           } else {
             bucket['uid'] = uid;
-            bucket['name'] = '(deleted)';
-            bucket['start_time'] = '';
-            bucket['end_time'] = '';
-            bucket['state'] = 'archived';
-            bucket['complete_time'] = '';
-            bucket['note'] = '';
-            bucket['type'] = DeadlineType.TASK;
-            bucket['timestamp'] = mergedVer.ts;
-            bucket['is_completed'] = 1;
-            bucket['is_archived'] = 1;
-            bucket['is_stared'] = 0;
-            bucket['habit_count'] = 0;
-            bucket['habit_total_count'] = 0;
-            bucket['calendar_event'] = -1;
-            await store.insert('ddl_items', bucket);
-            changed = true;
+            targetId = await store.insert('ddl_items', bucket);
           }
-          continue;
+
+          await this.syncSubTasksForDDL(store, targetId, doc.sub_tasks, mergedVer);
+          changed = true;
+        } catch (e) {
+          console.warn(`[Sync] Skip malformed merged DDL item: ${e}`);
         }
-
-        const doc = item.doc;
-        if (!doc) {
-          throw new Error(`[Sync] Missing doc for non-deleted item ${uid}`);
-        }
-
-        const legacyState = SyncService.stateToLegacyFlags(doc.state);
-        bucket['deleted'] = 0;
-        bucket['name'] = doc.name;
-        bucket['start_time'] = doc.start_time;
-        bucket['end_time'] = doc.end_time;
-        bucket['state'] = doc.state;
-        bucket['is_completed'] = legacyState.is_completed;
-        bucket['complete_time'] = doc.complete_time;
-        bucket['note'] = doc.note;
-        bucket['is_archived'] = legacyState.is_archived;
-        bucket['is_stared'] = doc.is_stared;
-        bucket['type'] = doc.type;
-        bucket['habit_count'] = doc.habit_count;
-        bucket['habit_total_count'] = doc.habit_total_count;
-        bucket['calendar_event'] = doc.calendar_event;
-        bucket['timestamp'] = doc.timestamp;
-
-        let targetId: number;
-        if (exists && localId !== null) {
-          const upPred = new relationalStore.RdbPredicates('ddl_items');
-          upPred.equalTo('id', localId);
-          await store.update(bucket, upPred);
-          targetId = localId;
-        } else {
-          bucket['uid'] = uid;
-          targetId = await store.insert('ddl_items', bucket);
-        }
-
-        await this.syncSubTasksForDDL(store, targetId, doc.sub_tasks, mergedVer);
-        changed = true;
       }
 
       store.commit();
@@ -1091,46 +1193,50 @@ export class SyncService {
 
     try {
       for (const rawItem of merged.items) {
-        const item = SyncService.normalizeHabitSnapshotItem(rawItem);
-        const carrier = await this.findCarrierDDLByUid(store, item.uid);
-        if (!carrier) {
-          if (item.deleted) {
-            console.info(`[Sync] Ignore Habit tombstone for missing carrier=${item.uid} as idempotent no-op.`);
+        try {
+          const item = SyncService.normalizeHabitSnapshotItem(rawItem);
+          const carrier = await this.findCarrierDDLByUid(store, item.uid);
+          if (!carrier) {
+            if (item.deleted) {
+              console.info(`[Sync] Ignore Habit tombstone for missing carrier=${item.uid} as idempotent no-op.`);
+              continue;
+            }
+            throw new Error(`[Sync] Habit carrier DDL missing for ${item.uid}`);
+          }
+          if (carrier.deleted) {
+            if (item.deleted) {
+              continue;
+            }
+            throw new Error(`[Sync] Habit carrier DDL missing for ${item.uid}`);
+          }
+
+          const localHabit = await this.findHabitByDdlId(store, carrier.id);
+          if (!SyncService.shouldApplyHabitSnapshotByContent(item, carrier.habitAppliedVer, localHabit)) {
+            console.info(`[Sync] Skip Habit apply for carrier=${item.uid} because remote payload is already reflected locally.`);
             continue;
           }
-          throw new Error(`[Sync] Habit carrier DDL missing for ${item.uid}`);
-        }
-        if (carrier.deleted) {
+
           if (item.deleted) {
+            await this.deleteLocalHabitByCarrier(store, carrier.id);
+            await this.touchDDLVersion(store, carrier.id, item.ver);
+            await this.touchHabitAppliedVersion(store, carrier.id, SyncService.appliedHabitVersionAfterApply(item.ver));
+            console.info(`[Sync] Applied Habit tombstone for carrier=${item.uid}.`);
+            changed = true;
             continue;
           }
-          throw new Error(`[Sync] Habit carrier DDL missing for ${item.uid}`);
-        }
 
-        if (!SyncService.shouldApplyHabitSnapshot(item.ver, carrier.habitAppliedVer)) {
-          console.info(`[Sync] Skip Habit apply for carrier=${item.uid} because remote version is not newer than habit_applied_ver.`);
-          continue;
-        }
-
-        if (item.deleted) {
-          await this.deleteLocalHabitByCarrier(store, carrier.id);
-          await this.touchDDLVersion(store, carrier.id, item.ver);
+          const doc = item.doc;
+          if (!doc) {
+            throw new Error(`[Sync] Missing habit doc for non-deleted item ${item.uid}`);
+          }
+          const habitId = await this.upsertLocalHabit(store, carrier.id, localHabit?.id ?? null, doc.habit);
+          await this.replaceLocalHabitRecords(store, habitId, doc.records);
           await this.touchHabitAppliedVersion(store, carrier.id, SyncService.appliedHabitVersionAfterApply(item.ver));
-          console.info(`[Sync] Applied Habit tombstone for carrier=${item.uid}.`);
+          console.info(`[Sync] Applied Habit snapshot doc for carrier=${item.uid}.`);
           changed = true;
-          continue;
+        } catch (e) {
+          console.warn(`[Sync] Skip malformed merged Habit item: ${e}`);
         }
-
-        const doc = item.doc;
-        if (!doc) {
-          throw new Error(`[Sync] Missing habit doc for non-deleted item ${item.uid}`);
-        }
-        const localHabit = await this.findHabitByDdlId(store, carrier.id);
-        const habitId = await this.upsertLocalHabit(store, carrier.id, localHabit?.id ?? null, doc.habit);
-        await this.replaceLocalHabitRecords(store, habitId, doc.records);
-        await this.touchHabitAppliedVersion(store, carrier.id, SyncService.appliedHabitVersionAfterApply(item.ver));
-        console.info(`[Sync] Applied Habit snapshot doc for carrier=${item.uid}.`);
-        changed = true;
       }
 
       store.commit();
@@ -1261,7 +1367,11 @@ export class SyncService {
     predicates.equalTo('ddl_id', ddlId);
     const resultSet = await store.query(predicates);
     if (resultSet.goToFirstRow()) {
-      const habit: HabitLookupResult = { id: resultSet.getLong(resultSet.getColumnIndex('id')) };
+      const habit: HabitLookupResult = {
+        id: resultSet.getLong(resultSet.getColumnIndex('id')),
+        status: SyncService.validateHabitStatus(resultSet.getString(resultSet.getColumnIndex('status'))),
+        updatedAt: resultSet.getString(resultSet.getColumnIndex('updated_at'))
+      };
       resultSet.close();
       return habit;
     }

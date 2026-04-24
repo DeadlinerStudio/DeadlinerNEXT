@@ -14,9 +14,9 @@ interface ThemeOption {
 }
 
 const THEME_OPTIONS: ThemeOption[] = [
-  { key: 'classic', name: '莫兰迪 (默认)', previewBg: $r('sys.color.search_container_focus_color') },
+  { key: 'classic', name: '莫兰迪', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'time', name: '时光', previewBg: $r('sys.color.search_container_focus_color') },
-  { key: 'vibrant', name: '生动', previewBg: $r('sys.color.search_container_focus_color') },
+  { key: 'vibrant', name: '生动 (默认)', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'nature', name: '清新', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'sunset', name: '暖阳', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'lavender', name: '极光', previewBg: $r('sys.color.search_container_focus_color') },
@@ -29,7 +29,7 @@ const THEME_OPTIONS: ThemeOption[] = [
 @Component
 export struct ThemeSelectSheet {
   @Provide('navPathStack') navStack: NavPathStack = new NavPathStack();
-  @StorageProp('currentThemeKey') currentKey: string = 'classic';
+  @StorageProp('currentThemeKey') currentKey: string = 'vibrant';
 
   onDone?: () => void;
 

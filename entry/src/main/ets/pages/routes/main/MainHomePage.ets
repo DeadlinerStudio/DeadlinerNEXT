@@ -36,29 +36,6 @@ enum MainTabIndex {
   SUGGESTS = 2
 }
 
-const EXCITEMENT_MESSAGES: Resource[] = [
-  $r('app.string.excitement_deadline_chasing'),
-  $r('app.string.excitement_progress_1_to_99'),
-  $r('app.string.excitement_ddl_bite'),
-  $r('app.string.excitement_submit'),
-  $r('app.string.excitement_get_up'),
-  $r('app.string.excitement_5min_5h'),
-  $r('app.string.excitement_todo_on_fire'),
-  $r('app.string.excitement_today_task'),
-  $r('app.string.excitement_ddl_near'),
-  $r('app.string.excitement_classic_flag'),
-  $r('app.string.excitement_reward_sleep'),
-  $r('app.string.excitement_detect_anxiety'),
-  $r('app.string.excitement_stop_scrolling'),
-  $r('app.string.excitement_last_minute'),
-  $r('app.string.excitement_mountains'),
-  $r('app.string.excitement_ddl_power'),
-  $r('app.string.excitement_im_okay'),
-  $r('app.string.excitement_today_achievement'),
-  $r('app.string.excitement_do_hard_first'),
-  $r('app.string.excitement_next'),
-]
-
 interface MainHomePageButton {
   icon: Resource,
   onClick: () => void
@@ -69,7 +46,6 @@ export struct MainHomePage {
   @Consume('appPathStack') appPathStack: NavPathStack;
 
   @StorageLink(C.KEY_BASIC_MODE) isBasicMode: boolean = false;
-  @StorageLink(C.KEY_EXCITEMENT_TEXT) @Watch('updateNavSubTitle') excitementText: boolean = true;
 
   @State currentIndex: number = MainTabIndex.TASKS
   @State @Watch('onSegmentChange') selectedIndexes: number[] = [MainTabIndex.TASKS]
@@ -123,8 +99,8 @@ export struct MainHomePage {
   // 获取状态栏高度
   @StorageProp('statusBarHeight') statusBarHeight: number = 38;
 
-  // readonly TITLE_BAR_CONTENT_HEIGHT: number = 100 + this.SEGMENT_HEIGHT;
-  @State topContentHeight: number = 100;
+  // readonly TITLE_BAR_CONTENT_HEIGHT: number = 74 + this.SEGMENT_HEIGHT;
+  @State topContentHeight: number = 74;
 
   // 这些 State 由主题驱动
   @State chipSelectedBg: ResourceColor = '#FFFFFF'
@@ -143,52 +119,23 @@ export struct MainHomePage {
     this.fabIconColor = theme.colors.iconEmphasize
   }
 
-  @State navSubtitle: string | undefined = undefined
-
   @StorageProp(C.KEY_STARTUP_PAGE) @Watch('onStartupSettingLoaded') startupPageSetting: number = -1;
 
   onStartupSettingLoaded() {
     console.info(`[Startup] Detect change: ${this.startupPageSetting}`);
 
-    // 1. 如果是 -1，说明 LocalValues 还没加载完成，直接忽略
     if (this.startupPageSetting === -1) {
       return;
     }
 
-    // 2. 数据已加载 (是 0 或 1)，强制应用到 UI
-    // 注意：为了防止用户使用过程中突然跳转，你可以加一个额外的判断，仅在 App 刚启动的前几秒允许跳转
-    // 但通常直接应用也是可以接受的（意味着用户刚改了设置）
     this.currentIndex = this.startupPageSetting;
     this.selectedIndexes = [this.startupPageSetting];
   }
 
   aboutToAppear(): void {
-    this.updateNavSubTitle();
     this.updateButtons();
 
     this.onStartupSettingLoaded();
-  }
-
-  updateNavSubTitle() {
-    if (this.excitementText) {
-      const ctx = this.getUIContext()
-      const idx = Math.floor(Math.random() * EXCITEMENT_MESSAGES.length)
-      const res = EXCITEMENT_MESSAGES[idx]
-      try {
-        this.navSubtitle = ctx.getHostContext()?.resourceManager.getStringSync(res)
-      } catch (error) {
-        console.error('Unable to get String Resource')
-        this.navSubtitle = undefined;
-      }
-    } else {
-      this.navSubtitle = undefined;
-    }
-
-    if (this.navSubtitle) {
-      this.topContentHeight = 100;
-    } else {
-      this.topContentHeight = 74;
-    }
   }
 
   private scroller: Scroller = new Scroller();
@@ -529,11 +476,10 @@ export struct MainHomePage {
         })
     }
     .titleBar({
-      style: getImmersiveTitleBarStyle(false, true),  // 暂时屏蔽新材质
+      style: getImmersiveTitleBarStyle(false, false),  // 暂时屏蔽新材质
       content: {
         title: {
-          mainTitle: 'Deadliner',
-          subTitle: this.navSubtitle
+          mainTitle: '清单'
         },
         stackBuilder: () => {
           this.topSegment();

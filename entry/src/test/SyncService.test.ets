@@ -1,5 +1,11 @@
 import { describe, it, expect } from '@ohos/hypium';
-import { SyncService, SnapshotVer, SnapshotItem } from '../main/ets/common/sync/SyncService';
+import {
+  HabitSnapshotItem,
+  SyncService,
+  SnapshotVer,
+  SnapshotItem
+} from '../main/ets/common/sync/SyncService';
+import { HabitGoalType, HabitPeriod, HabitStatus } from '../main/ets/model/DDLModels';
 
 export default function syncServiceTests() {
   describe('SyncServiceHabitSnapshotRules', () => {
@@ -105,6 +111,26 @@ export default function syncServiceTests() {
       expect(shouldEmit).assertEqual(false);
     });
 
+    it('accepts payload freshness when updated_at is slightly ahead of the derived version timestamp', 0, () => {
+      const carrierVer: SnapshotVer = {
+        ts: '2026-03-25T12:00:03.100Z',
+        ctr: 1,
+        dev: 'REMOTE'
+      };
+      const appliedVer: SnapshotVer = {
+        ts: '2026-03-25T12:00:03.100Z',
+        ctr: 0,
+        dev: 'REMOTE'
+      };
+
+      const shouldEmit = SyncService.shouldEmitActiveLocalHabitDoc(
+        carrierVer,
+        appliedVer,
+        '2026-03-25T12:00:03.101Z'
+      );
+      expect(shouldEmit).assertEqual(true);
+    });
+
     it('local payload changes require new version and updated_at follows that version', 0, () => {
       const beforeVer: SnapshotVer = {
         ts: '2026-03-24T12:00:03.100Z',
@@ -123,6 +149,86 @@ export default function syncServiceTests() {
       expect(SyncService.shouldApplyHabitSnapshot(afterVer, beforeVer)).assertEqual(true);
       expect(beforeUpdatedAt === afterUpdatedAt).assertEqual(false);
       expect(afterUpdatedAt).assertEqual('2026-03-24T12:00:03.100001Z');
+    });
+
+    it('re-applies equal-version habit snapshot when local payload is missing', 0, () => {
+      const item: HabitSnapshotItem = {
+        uid: 'REMOTE:42',
+        ver: {
+          ts: '2026-03-24T12:00:03.100Z',
+          ctr: 1,
+          dev: 'REMOTE'
+        },
+        deleted: false,
+        doc: {
+          ddl_uid: 'REMOTE:42',
+          habit: {
+            name: 'Read',
+            description: null,
+            color: null,
+            icon_key: null,
+            period: HabitPeriod.DAILY,
+            times_per_period: 1,
+            goal_type: HabitGoalType.PER_PERIOD,
+            total_target: null,
+            created_at: '2026-03-24T12:00:03.100Z',
+            updated_at: '2026-03-24T12:00:03.100001Z',
+            status: HabitStatus.ARCHIVED,
+            sort_order: 0,
+            alarm_time: null
+          },
+          records: []
+        }
+      };
+      const appliedVer: SnapshotVer = {
+        ts: '2026-03-24T12:00:03.100Z',
+        ctr: 1,
+        dev: 'REMOTE'
+      };
+
+      expect(SyncService.shouldApplyHabitSnapshotByContent(item, appliedVer, null)).assertEqual(true);
+    });
+
+    it('re-applies equal-version habit snapshot when remote status differs from local status', 0, () => {
+      const item: HabitSnapshotItem = {
+        uid: 'REMOTE:43',
+        ver: {
+          ts: '2026-03-24T12:00:03.100Z',
+          ctr: 1,
+          dev: 'REMOTE'
+        },
+        deleted: false,
+        doc: {
+          ddl_uid: 'REMOTE:43',
+          habit: {
+            name: 'Meditate',
+            description: null,
+            color: null,
+            icon_key: null,
+            period: HabitPeriod.DAILY,
+            times_per_period: 1,
+            goal_type: HabitGoalType.PER_PERIOD,
+            total_target: null,
+            created_at: '2026-03-24T12:00:03.100Z',
+            updated_at: '2026-03-24T12:00:03.100001Z',
+            status: HabitStatus.ARCHIVED,
+            sort_order: 0,
+            alarm_time: null
+          },
+          records: []
+        }
+      };
+      const appliedVer: SnapshotVer = {
+        ts: '2026-03-24T12:00:03.100Z',
+        ctr: 1,
+        dev: 'REMOTE'
+      };
+
+      expect(SyncService.shouldApplyHabitSnapshotByContent(item, appliedVer, {
+        id: 1,
+        status: HabitStatus.ACTIVE,
+        updatedAt: '2026-03-24T12:00:03.100001Z'
+      })).assertEqual(true);
     });
   });
 

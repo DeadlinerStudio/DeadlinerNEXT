@@ -1,5 +1,6 @@
-import { UIThemePalette, IndicatorSet, createUITheme, INDICATORS_MORANDI, INDICATORS_VIBRANT, ITheme, ThemeMap, IndicatorMap,
-  THEME_DEFAULT_INDICATOR_MAP } from "./ThemeModel";
+import { UIThemePalette, IndicatorSet, createUITheme, INDICATORS_IOS, ITheme, ThemeMap, IndicatorMap,
+  THEME_DEFAULT_INDICATOR_MAP,
+  INDICATORS_VIBRANT} from "./ThemeModel";
 import { ThemeControl } from "@kit.ArkUI";
 import { DeadlinerTheme } from "../../AppTheme";
 import { preferences } from '@kit.ArkData';
@@ -46,12 +47,15 @@ export class ThemeManager {
 
       // 1. 读取配置
       let uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_UI, '') as string;
-      // 默认指示器为 morandi
-      let indicatorKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_INDICATOR, 'morandi') as string;
+      let indicatorKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_INDICATOR, '') as string;
 
       // 兼容老数据迁移
       if (!uiKey) {
-        uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_LEGACY, 'classic') as string;
+        uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_LEGACY, 'vibrant') as string;
+      }
+
+      if (!indicatorKey) {
+        indicatorKey = THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'vibrant';
       }
 
       // 2. 初始化 AppStorage
@@ -63,8 +67,8 @@ export class ThemeManager {
 
     } catch (err) {
       console.error('[ThemeManager] Init failed:', err);
-      // 兜底：Classic + Morandi
-      ThemeManager.updateAppState(ThemeManager.mergeTheme(ThemeMap['classic'], INDICATORS_MORANDI));
+      // 兜底：Vibrant + iOS
+      ThemeManager.updateAppState(ThemeManager.mergeTheme(ThemeMap['vibrant'], INDICATORS_VIBRANT));
     }
   }
 
@@ -103,7 +107,7 @@ export class ThemeManager {
     let theme = AppStorage.get<ITheme>('currentTheme');
     if (!theme) {
       // 如果未初始化，返回默认兜底
-      return ThemeManager.mergeTheme(ThemeMap['classic'], INDICATORS_MORANDI);
+      return ThemeManager.mergeTheme(ThemeMap['vibrant'], INDICATORS_VIBRANT);
     }
     return theme;
   }
@@ -158,10 +162,11 @@ export class ThemeManager {
    * 获取自定义配置回显 (供 ColorCustomizer 初始化)
    */
   static async getCustomConfig(): Promise<CustomThemeConfig> {
-    if (!ThemeManager.pref) return { hue: 210, styleStrength: 50, isCustom: false, brand: '', accent: '', indicatorKey: 'morandi' };
+    if (!ThemeManager.pref) return { hue: 210, styleStrength: 50, isCustom: false, brand: '', accent: '', indicatorKey: 'vibrant' };
 
-    const uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_UI, 'classic') as string;
-    const indKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_INDICATOR, 'morandi') as string; // 读取当前指示器
+    const uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_UI, 'vibrant') as string;
+    const indKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_INDICATOR,
+      THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'vibrant') as string;
 
     const hue = await ThemeManager.pref.get(ThemeManager.KEY_PARAM_HUE, 210) as number;
     const style = await ThemeManager.pref.get(ThemeManager.KEY_PARAM_STYLE, 50) as number;
@@ -227,10 +232,10 @@ export class ThemeManager {
     if (uiKey === 'custom') {
       uiPalette = await ThemeManager.loadCustomUIFromDisk();
     } else {
-      uiPalette = ThemeMap[uiKey] || ThemeMap['classic'];
+      uiPalette = ThemeMap[uiKey] || ThemeMap['vibrant'];
     }
 
-    const indicatorSet = IndicatorMap[indicatorKey] || IndicatorMap['morandi'];
+    const indicatorSet = IndicatorMap[indicatorKey] || IndicatorMap['vibrant'];
     const fullTheme = ThemeManager.mergeTheme(uiPalette, indicatorSet);
 
     ThemeManager.updateAppState(fullTheme);
@@ -256,7 +261,7 @@ export class ThemeManager {
   static async switchUITheme(uiKey: string) {
     console.info('[ThemeManager]', `Switching UI to: ${uiKey}`);
 
-    const defaultIndicatorKey = THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'morandi';
+    const defaultIndicatorKey = THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'vibrant';
 
     AppStorage.set('currentThemeKey', uiKey);
     AppStorage.set('currentIndicatorKey', defaultIndicatorKey);
@@ -282,7 +287,7 @@ export class ThemeManager {
     console.info('[ThemeManager]', `Switching Indicators to: ${indicatorKey}`);
     AppStorage.set('currentIndicatorKey', indicatorKey);
 
-    const currentUIKey = AppStorage.get<string>('currentThemeKey') || 'classic';
+    const currentUIKey = AppStorage.get<string>('currentThemeKey') || 'vibrant';
 
     await ThemeManager.combineAndApplyTheme(currentUIKey, indicatorKey);
 
@@ -294,7 +299,7 @@ export class ThemeManager {
 
   // 辅助方法：从磁盘读取自定义 UI 配置
   private static async loadCustomUIFromDisk(): Promise<UIThemePalette> {
-    if (!ThemeManager.pref) return ThemeMap['classic'];
+    if (!ThemeManager.pref) return ThemeMap['vibrant'];
 
     const brand = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_BRAND, '#FF0A59F7') as string;
     const accent = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_ACCENT, '#FF0A59F7') as string;

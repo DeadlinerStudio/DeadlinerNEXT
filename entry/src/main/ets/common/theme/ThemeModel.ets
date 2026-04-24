@@ -210,13 +210,44 @@ export const INDICATORS_RETRO: IndicatorSet = {
   bgCompleted40: $r('app.color.bg_retro_completed_40'),
 };
 
+export const INDICATORS_IOS: IndicatorSet = {
+  chartInfo: $r('app.color.ios_blue'),
+  chartCompleted: $r('app.color.ios_green'),
+  chartTodo: $r('app.color.ios_orange'),
+  chartOverdue: $r('app.color.ios_red'),
+
+  indicatorUndergo: $r('app.color.indicator_ios_undergo'),
+  indicatorUndergo50: $r('app.color.indicator_ios_undergo_50'),
+  indicatorUndergo70: $r('app.color.indicator_ios_undergo_70'),
+  bgUndergo: $r('app.color.bg_ios_undergo'),
+  bgUndergo40: $r('app.color.bg_ios_undergo_40'),
+
+  indicatorNear: $r('app.color.indicator_ios_near'),
+  indicatorNear50: $r('app.color.indicator_ios_near_50'),
+  indicatorNear70: $r('app.color.indicator_ios_near_70'),
+  bgNear: $r('app.color.bg_ios_near'),
+  bgNear40: $r('app.color.bg_ios_near_40'),
+
+  indicatorPassed: $r('app.color.indicator_ios_passed'),
+  indicatorPassed50: $r('app.color.indicator_ios_passed_50'),
+  indicatorPassed70: $r('app.color.indicator_ios_passed_70'),
+  bgPassed: $r('app.color.bg_ios_passed'),
+  bgPassed40: $r('app.color.bg_ios_passed_40'),
+
+  indicatorCompleted: $r('app.color.indicator_ios_completed'),
+  indicatorCompleted50: $r('app.color.indicator_ios_completed_50'),
+  indicatorCompleted70: $r('app.color.indicator_ios_completed_70'),
+  bgCompleted: $r('app.color.bg_ios_completed'),
+  bgCompleted40: $r('app.color.bg_ios_completed_40'),
+};
 
 export const IndicatorMap: Record<string, IndicatorSet> = {
   'morandi': INDICATORS_MORANDI,
   'vibrant': INDICATORS_VIBRANT,
   'nature': INDICATORS_NATURE,
   'ocean': INDICATORS_OCEAN,
-  'retro': INDICATORS_RETRO
+  'retro': INDICATORS_RETRO,
+  'ios': INDICATORS_IOS
 };
 
 export function createUITheme(
@@ -305,7 +336,7 @@ export const ThemeMap: Record<string, UIThemePalette> = {
 export const THEME_DEFAULT_INDICATOR_MAP: Record<string, string> = {
   'classic': 'morandi',
   'time': 'morandi',
-  'vibrant': 'vibrant',
+  'vibrant': 'ios',
   'nature': 'nature',
   'sunset': 'retro',
   'lavender': 'morandi',

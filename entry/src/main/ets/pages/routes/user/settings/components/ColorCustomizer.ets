@@ -20,8 +20,9 @@ export struct ColorCustomizer {
   @State currentBrand: string = '#FF000000';
   @State currentAccent: string = '#FF000000';
 
-  @State selectedChartKey: string = 'morandi';
+  @State selectedChartKey: string = 'ios';
   private chartOptions: ChartOption[] = [
+    { key: 'ios', name: 'iOS', colors: IndicatorMap['ios'] },
     { key: 'morandi', name: '莫兰迪', colors: IndicatorMap['morandi'] },
     { key: 'vibrant', name: '生动', colors: IndicatorMap['vibrant'] },
     { key: 'nature', name: '森系', colors: IndicatorMap['nature'] },

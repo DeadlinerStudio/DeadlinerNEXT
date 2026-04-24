@@ -258,14 +258,14 @@ struct AppearanceSettings {
 
           // --- 视觉反馈 ---
           SettingsSection({ title: '视觉反馈' }) {
-            SubSettingsSwitch({
-              title: "激励语句",
-              subtitle: "在首页标题栏显示随机的名言警句，为您的一天注入动力。",
-              isOn: this.excitementText,
-              onChange: (isOn): Promise<void> => LocalValues.getInstance().setExcitementText(isOn)
-            })
-
-            SubSettingsDivider()
+            // SubSettingsSwitch({
+            //   title: "激励语句",
+            //   subtitle: "在首页标题栏显示随机的名言警句，为您的一天注入动力。",
+            //   isOn: this.excitementText,
+            //   onChange: (isOn): Promise<void> => LocalValues.getInstance().setExcitementText(isOn)
+            // })
+            //
+            // SubSettingsDivider()
 
             SubSettingsSwitch({
               title: "任务完成礼花",
