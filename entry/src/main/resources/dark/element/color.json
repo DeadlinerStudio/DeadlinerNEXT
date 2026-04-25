@@ -32,6 +32,46 @@
     { "name": "brand_tik_50", "value": "#80FF8B00" },
     { "name": "accent_tik", "value": "#FF8B00" },
 
+    { "name": "widget_bg_grad_start_classic", "value": "#FF1A1D21" },
+    { "name": "widget_bg_grad_end_classic", "value": "#FF141619" },
+    { "name": "widget_decor_classic", "value": "#FF7CA6D6" },
+
+    { "name": "widget_bg_grad_start_time", "value": "#FF1A1D21" },
+    { "name": "widget_bg_grad_end_time", "value": "#FF141619" },
+    { "name": "widget_decor_time", "value": "#FF7CA6D6" },
+
+    { "name": "widget_bg_grad_start_vibrant", "value": "#FF1D222B" },
+    { "name": "widget_bg_grad_end_vibrant", "value": "#FF14181E" },
+    { "name": "widget_decor_vibrant", "value": "#FF7A9BC8" },
+
+    { "name": "widget_bg_grad_start_nature", "value": "#FF1B2320" },
+    { "name": "widget_bg_grad_end_nature", "value": "#FF141916" },
+    { "name": "widget_decor_nature", "value": "#FF86A895" },
+
+    { "name": "widget_bg_grad_start_sunset", "value": "#FF241F1D" },
+    { "name": "widget_bg_grad_end_sunset", "value": "#FF191514" },
+    { "name": "widget_decor_sunset", "value": "#FFC4A195" },
+
+    { "name": "widget_bg_grad_start_lavender", "value": "#FF211D26" },
+    { "name": "widget_bg_grad_end_lavender", "value": "#FF171419" },
+    { "name": "widget_decor_lavender", "value": "#FFB19CC9" },
+
+    { "name": "widget_bg_grad_start_harmony", "value": "#FF1C222C" },
+    { "name": "widget_bg_grad_end_harmony", "value": "#FF14181E" },
+    { "name": "widget_decor_harmony", "value": "#FF7A95C7" },
+
+    { "name": "widget_bg_grad_start_galaxy", "value": "#FF1F1C2A" },
+    { "name": "widget_bg_grad_end_galaxy", "value": "#FF14131B" },
+    { "name": "widget_decor_galaxy", "value": "#FF9AA2D4" },
+
+    { "name": "widget_bg_grad_start_glacier", "value": "#FF1A242B" },
+    { "name": "widget_bg_grad_end_glacier", "value": "#FF13191D" },
+    { "name": "widget_decor_glacier", "value": "#FF7CA9C2" },
+
+    { "name": "widget_bg_grad_start_tiktick", "value": "#FF1C212B" },
+    { "name": "widget_bg_grad_end_tiktick", "value": "#FF14171E" },
+    { "name": "widget_decor_tiktick", "value": "#FF8E9DCC" },
+
     { "name": "func_archive", "value": "#FF7CA6D6"},
     { "name": "func_ai", "value": "#B39DDB" },
     { "name": "func_manual", "value": "#80CBC4" },
@@ -217,26 +257,26 @@
     { "name": "indicator_ios_undergo", "value": "#FF0A84FF" },
     { "name": "indicator_ios_undergo_50", "value": "#800A84FF" },
     { "name": "indicator_ios_undergo_70", "value": "#B30A84FF" },
-    { "name": "bg_ios_undergo", "value": "#FF1A2A44" },
-    { "name": "bg_ios_undergo_40", "value": "#661A2A44" },
+    { "name": "bg_ios_undergo", "value": "#FF252B35" },
+    { "name": "bg_ios_undergo_40", "value": "#66252B35" },
 
     { "name": "indicator_ios_near", "value": "#FFFF9F0A" },
     { "name": "indicator_ios_near_50", "value": "#80FF9F0A" },
     { "name": "indicator_ios_near_70", "value": "#B3FF9F0A" },
-    { "name": "bg_ios_near", "value": "#FF4A3418" },
-    { "name": "bg_ios_near_40", "value": "#664A3418" },
+    { "name": "bg_ios_near", "value": "#FF38312A" },
+    { "name": "bg_ios_near_40", "value": "#6638312A" },
 
     { "name": "indicator_ios_passed", "value": "#FFFF453A" },
     { "name": "indicator_ios_passed_50", "value": "#80FF453A" },
     { "name": "indicator_ios_passed_70", "value": "#B3FF453A" },
-    { "name": "bg_ios_passed", "value": "#FF482225" },
-    { "name": "bg_ios_passed_40", "value": "#66482225" },
+    { "name": "bg_ios_passed", "value": "#FF35292B" },
+    { "name": "bg_ios_passed_40", "value": "#6635292B" },
 
     { "name": "indicator_ios_completed", "value": "#FF30D158" },
     { "name": "indicator_ios_completed_50", "value": "#8030D158" },
     { "name": "indicator_ios_completed_70", "value": "#B330D158" },
-    { "name": "bg_ios_completed", "value": "#FF183524" },
-    { "name": "bg_ios_completed_40", "value": "#66183524" },
+    { "name": "bg_ios_completed", "value": "#FF252F28" },
+    { "name": "bg_ios_completed_40", "value": "#66252F28" },
 
     { "name": "widget_bg_grad_start", "value": "#FF1A1D21" },
     { "name": "widget_bg_grad_end", "value": "#FF141619" },

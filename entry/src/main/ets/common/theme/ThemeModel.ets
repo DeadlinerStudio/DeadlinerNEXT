@@ -9,7 +9,11 @@ export interface UIThemePalette {
   brand50: ResourceColor;
   accent: ResourceColor;
   bgPrimary: ResourceColor;
+  widgetBgStart: ResourceColor;
+  widgetBgEnd: ResourceColor;
+  widgetDecor: ResourceColor;
   tabIcon: ResourceColor;
+  useWhiteGlow: boolean;
 }
 
 /**
@@ -255,14 +259,22 @@ export function createUITheme(
   brand50: ResourceColor,
   accent: ResourceColor,
   bgPrimary: ResourceColor,
-  tabIcon?: ResourceColor
+  widgetBgStart?: ResourceColor,
+  widgetBgEnd?: ResourceColor,
+  widgetDecor?: ResourceColor,
+  tabIcon?: ResourceColor,
+  useWhiteGlow?: boolean
 ): UIThemePalette {
   return {
     brand: brand,
     brand50: brand50,
     accent: accent,
     bgPrimary: bgPrimary,
+    widgetBgStart: widgetBgStart ? widgetBgStart : brand50,
+    widgetBgEnd: widgetBgEnd ? widgetBgEnd : bgPrimary,
+    widgetDecor: widgetDecor ? widgetDecor : brand,
     tabIcon: tabIcon ? tabIcon : brand,
+    useWhiteGlow: useWhiteGlow ?? false,
   };
 }
 
@@ -271,77 +283,111 @@ export const ThemeMap: Record<string, UIThemePalette> = {
     $r('app.color.brand'),
     $r('app.color.brand_50'),
     $r('app.color.accent'),
-    $r('app.color.background_primary')
+    $r('app.color.background_primary'),
+    $r('app.color.widget_bg_grad_start_classic'),
+    $r('app.color.widget_bg_grad_end_classic'),
+    $r('app.color.widget_decor_classic')
   ),
   'time': createUITheme(
     $r('app.color.brand'),
     $r('app.color.brand_50'),
     $r('app.color.accent'),
     $r('app.color.background_primary'),
-    $r('app.color.cold')
+    $r('app.color.widget_bg_grad_start_time'),
+    $r('app.color.widget_bg_grad_end_time'),
+    $r('app.color.widget_decor_time'),
+    $r('app.color.cold'),
+    true
   ),
   'vibrant': createUITheme(
     $r('app.color.brand_vibrant'),
     $r('app.color.brand_vibrant_50'),
     $r('app.color.accent_vibrant'),
-    $r('app.color.background_primary')
+    $r('app.color.background_primary'),
+    $r('app.color.widget_bg_grad_start_vibrant'),
+    $r('app.color.widget_bg_grad_end_vibrant'),
+    $r('app.color.widget_decor_vibrant')
   ),
   'nature': createUITheme(
     $r('app.color.brand_nature'),
     $r('app.color.brand_nature_50'),
     $r('app.color.accent_nature'),
-    $r('app.color.background_primary')
+    $r('app.color.background_primary'),
+    $r('app.color.widget_bg_grad_start_nature'),
+    $r('app.color.widget_bg_grad_end_nature'),
+    $r('app.color.widget_decor_nature')
   ),
   'sunset': createUITheme(
     $r('app.color.brand_sunset'),
     $r('app.color.brand_sunset_50'),
     $r('app.color.accent_sunset'),
-    $r('app.color.background_primary')
+    $r('app.color.background_primary'),
+    $r('app.color.widget_bg_grad_start_sunset'),
+    $r('app.color.widget_bg_grad_end_sunset'),
+    $r('app.color.widget_decor_sunset')
   ),
   'lavender': createUITheme(
     $r('app.color.brand_lavender'),
     $r('app.color.brand_lavender_50'),
     $r('app.color.accent_lavender'),
-    $r('app.color.background_primary')
+    $r('app.color.background_primary'),
+    $r('app.color.widget_bg_grad_start_lavender'),
+    $r('app.color.widget_bg_grad_end_lavender'),
+    $r('app.color.widget_decor_lavender')
   ),
   'harmony': createUITheme(
     $r('sys.color.ohos_id_color_emphasize'),
     '#800A59F7',
     $r('sys.color.ohos_id_color_emphasize_contrary'),
-    $r('app.color.background_primary')
+    $r('app.color.background_primary'),
+    $r('app.color.widget_bg_grad_start_harmony'),
+    $r('app.color.widget_bg_grad_end_harmony'),
+    $r('app.color.widget_decor_harmony')
   ),
   'galaxy': createUITheme(
     $r('sys.color.ohos_id_color_emphasize'),
     '#800A59F7',
     $r('sys.color.ohos_id_color_emphasize_contrary'),
     $r('app.color.background_primary'),
-    $r('app.color.cold')
+    $r('app.color.widget_bg_grad_start_galaxy'),
+    $r('app.color.widget_bg_grad_end_galaxy'),
+    $r('app.color.widget_decor_galaxy'),
+    $r('app.color.cold'),
+    true
   ),
   'glacier': createUITheme(
     $r('app.color.brand_glacier'),
     $r('app.color.brand_glacier_50'),
     $r('app.color.accent_glacier'),
     $r('app.color.background_primary'),
-    $r('app.color.cold')
+    $r('app.color.widget_bg_grad_start_glacier'),
+    $r('app.color.widget_bg_grad_end_glacier'),
+    $r('app.color.widget_decor_glacier'),
+    $r('app.color.cold'),
+    true
   ),
   'tiktick': createUITheme(
     $r('app.color.brand_tik'),
     $r('app.color.brand_tik_50'),
     $r('app.color.accent_tik'),
     $r('app.color.background_primary'),
-    $r('app.color.cold')
+    $r('app.color.widget_bg_grad_start_tiktick'),
+    $r('app.color.widget_bg_grad_end_tiktick'),
+    $r('app.color.widget_decor_tiktick'),
+    $r('app.color.cold'),
+    true
   )
 };
 
 export const THEME_DEFAULT_INDICATOR_MAP: Record<string, string> = {
   'classic': 'morandi',
   'time': 'morandi',
-  'vibrant': 'ios',
+  'vibrant': 'vibrant',
   'nature': 'nature',
   'sunset': 'retro',
   'lavender': 'morandi',
   'harmony': 'vibrant',
   'galaxy': 'vibrant',
   'glacier': 'ocean',
-  'tiktick': 'vibrant'
+  'tiktick': 'ios'
 };

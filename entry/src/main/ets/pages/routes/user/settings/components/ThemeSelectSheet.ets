@@ -4,8 +4,9 @@ import { ColorCustomizer } from './ColorCustomizer';
 import { HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigation, HdsNavigationTitleMode, HdsNavigationAttribute, HdsNavDestinationAttribute } from '@kit.UIDesignKit';
 import { TopSafeContainer } from '../../../../components/TopSafeContainer';
 import { FloatUpModifier } from '../../../../../utils/animation/FloatUpModifier';
-import { SettingsItem, SettingsSection } from '../../../../components/SettingsComponents';
+import { SettingsItem, SettingsSection, SettingsDivider, SubSettingsSwitch } from '../../../../components/SettingsComponents';
 import { IndicatorThemeSheet } from './IndicatorThemeSelect';
+import { deviceInfo } from '@kit.BasicServicesKit';
 
 interface ThemeOption {
   key: string;
@@ -14,12 +15,12 @@ interface ThemeOption {
 }
 
 const THEME_OPTIONS: ThemeOption[] = [
-  { key: 'classic', name: '莫兰迪', previewBg: $r('sys.color.search_container_focus_color') },
-  { key: 'time', name: '时光', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'vibrant', name: '生动 (默认)', previewBg: $r('sys.color.search_container_focus_color') },
+  { key: 'classic', name: '莫兰迪', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'nature', name: '清新', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'sunset', name: '暖阳', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'lavender', name: '极光', previewBg: $r('sys.color.search_container_focus_color') },
+  { key: 'time', name: '时光', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'harmony', name: '鸿蒙', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'galaxy', name: '星河', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'glacier', name: '冰川', previewBg: $r('sys.color.search_container_focus_color') },
@@ -30,8 +31,18 @@ const THEME_OPTIONS: ThemeOption[] = [
 export struct ThemeSelectSheet {
   @Provide('navPathStack') navStack: NavPathStack = new NavPathStack();
   @StorageProp('currentThemeKey') currentKey: string = 'vibrant';
+  @StorageProp('currentTheme') @Watch('syncThemeWhiteGlow') theme: ITheme = {} as ITheme;
+  @State themeWhiteGlow: boolean = false;
 
   onDone?: () => void;
+
+  aboutToAppear(): void {
+    this.syncThemeWhiteGlow();
+  }
+
+  syncThemeWhiteGlow() {
+    this.themeWhiteGlow = this.theme.useWhiteGlow ?? false;
+  }
 
   @Builder
   navDestination(name: string) {
@@ -116,6 +127,22 @@ export struct ThemeSelectSheet {
                 this.navStack.pushPath({ name: 'ChartCustomizer' })
               }
             })
+          }
+
+          Column().height(12)
+
+          if (deviceInfo.distributionOSApiVersion >= 60100) {
+            SettingsSection({ bgColor: $r('sys.color.search_container_focus_color') }) {
+              SubSettingsSwitch({
+                title: '白光辉映',
+                subtitle: '控制沉浸光感标签栏是否显示白色高光；该设置跟随当前主题。',
+                isOn: $themeWhiteGlow,
+                onChange: async (isOn): Promise<void> => {
+                  this.themeWhiteGlow = isOn;
+                  await ThemeManager.setCurrentThemeWhiteGlow(isOn);
+                }
+              })
+            }
           }
 
           Column().height(12)

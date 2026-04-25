@@ -1,18 +1,19 @@
-import { BottomBuilderShowType, DividerShowType, HdsNavigation, HdsNavigationTitleMode, ScrollEffectType, HdsNavigationAttribute } from "@kit.UIDesignKit";
+import { BottomBuilderShowType, HdsNavigation, HdsNavigationTitleMode } from "@kit.UIDesignKit";
 import { TopSafeContainer } from "../../components/TopSafeContainer";
-import { ItemRestriction, LengthMetrics, SegmentButton, SegmentButtonOptions, SegmentButtonTextItem, router, promptAction } from "@kit.ArkUI";
+import { ItemRestriction, LengthMetrics, SegmentButtonTextItem, promptAction } from "@kit.ArkUI";
 import { DashboardSection } from "./DashboardSection";
 import { OverviewStatsSection } from "./OverviewStatsSection";
 import { TrendAnalysisSection } from "./TrendAnalysisSection";
-import { OverviewCard, OverviewViewModel } from "./OverviewViewModel";
+import { OverviewViewModel } from "./OverviewViewModel";
 import { SortSheet } from "./SortSheet";
 import { getImmersiveTitleBarStyle } from "../../../common/style/NavStyles";
-import { SettingsConstants } from "../../../common/local/SettingsConstants";
-import { BlurBackgroundModifier } from "../../../utils/animation/BlurBackgroundModifier";
+import { HdsTitleBarMenuButton } from "../../components/HdsTitleBarMenuButton";
+import { HdsTitleBarSegment } from "../../components/HdsTitleBarSegment";
 
 @Component
 export struct OverviewPage {
   @Consume('appPathStack') appPathStack: NavPathStack;
+  @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
 
   readonly SEGMENT_HEIGHT: number = 48;
   @StorageProp('statusBarHeight') statusBarHeight: number = 38;
@@ -24,23 +25,11 @@ export struct OverviewPage {
   @State isLoading: boolean = true;
 
   @State isSortSheetShow: boolean = false;
-
-
-  @StorageProp('customBackgroundImage') customBg: string = '';
-  @StorageProp(SettingsConstants.KEY_ENABLE_API23) api23: boolean = false;
-
-  // --- Tab 配置 ---
-  @State tabOptions: SegmentButtonOptions = SegmentButtonOptions.tab({
-    buttons: [
-      { text: '总览' },
-      { text: '趋势' },
-      { text: '上月' }
-    ] as ItemRestriction<SegmentButtonTextItem>,
-    backgroundBlurStyle: (!!this.customBg && this.api23) ? BlurStyle.Thin : BlurStyle.NONE,
-    selectedBackgroundColor: $r('sys.color.segment_button_v2_tab_selected_item_background'),
-    backgroundColor: $r('sys.color.comp_background_tertiary'),
-    buttonPadding: 10
-  })
+  readonly tabButtons: ItemRestriction<SegmentButtonTextItem> = [
+    { text: '总览' },
+    { text: '趋势' },
+    { text: '上月' }
+  ] as ItemRestriction<SegmentButtonTextItem>;
 
   aboutToAppear(): void {
     this.viewModel.loadData().then(() => {
@@ -66,14 +55,18 @@ export struct OverviewPage {
 
   @Builder tabSegment() {
     Column() {
-      SegmentButton({
-        options: this.tabOptions,
+      HdsTitleBarSegment({
+        buttons: this.tabButtons,
         selectedIndexes: $selectedIndexes,
-        maxFontScale: 2
+        maxFontScale: 2,
+        segmentHeight: this.SEGMENT_HEIGHT,
+        normalWidth: '100%',
+        experimentalWidth: '100%',
+        experimentalHeight: 52
       })
-        .width('100%')
-        .height('100%')
+        .align(Alignment.Center)
     }
+    .id(`overview_tabsegment_${this.currentThemeKey}`)
     .width('100%')
     .height('100%')
     .padding({ start: LengthMetrics.vp(16), end: LengthMetrics.vp(16) })
@@ -174,33 +167,23 @@ export struct OverviewPage {
     Stack({ alignContent: Alignment.Center }) {
       Row({ space: 10 }) {
         if (this.selectedIndexes.length > 0 && this.selectedIndexes[0] !== 2) {
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.text_and_arrow_down'))
-              .fontSize(24)
-              .fontColor([$r('sys.color.ohos_id_color_text_primary')])
-          }
-          .width(40)
-          .height(40)
-          .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.api23), $r('sys.color.comp_background_tertiary')))
-          .onClick(() => {
-            if (this.selectedIndexes[0] <= 1) {
-              this.isSortSheetShow = true;
-            } else {
-              promptAction.showToast({ message: '当前页面暂不支持排序' });
+          HdsTitleBarMenuButton({
+            icon: $r('sys.symbol.text_and_arrow_down'),
+            onButtonClick: () => {
+              if (this.selectedIndexes[0] <= 1) {
+                this.isSortSheetShow = true;
+              } else {
+                promptAction.showToast({ message: '当前页面暂不支持排序' });
+              }
             }
           })
         }
 
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.questionmark_circle'))
-            .fontSize(24)
-            .fontColor([$r('sys.color.ohos_id_color_text_primary')])
-        }
-        .width(40)
-        .height(40)
-        .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.api23), $r('sys.color.comp_background_tertiary')))
-        .onClick(() => {
-          this.isHelpPopupShow = true;
+        HdsTitleBarMenuButton({
+          icon: $r('sys.symbol.questionmark_circle'),
+          onButtonClick: () => {
+            this.isHelpPopupShow = true;
+          }
         })
         .bindPopup(this.isHelpPopupShow, {
           builder: this.helpPopupBuilder,
@@ -221,6 +204,7 @@ export struct OverviewPage {
       .padding({ right: 16 })
       .hitTestBehavior(HitTestMode.Transparent)
     }
+    .id(`overview_titlemenu_${this.currentThemeKey}`)
     .height('100%')
     .width('100%')
   }
@@ -275,6 +259,7 @@ export struct OverviewPage {
         }
       }
     }
+    .id(`overview_navigation_${this.currentThemeKey}`)
     .titleBar({
       style: getImmersiveTitleBarStyle(false),
       content: {

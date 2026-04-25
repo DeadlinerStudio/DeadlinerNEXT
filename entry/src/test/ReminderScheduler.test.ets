@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@ohos/hypium';
 import { buildActiveReminderScopeKey } from '../main/ets/model/ActiveReminder';
-import { ReminderScheduler } from '../main/ets/utils/notification/ReminderScheduler';
+import { ReminderScheduler, collectDDLReminderCancelIds } from '../main/ets/utils/notification/ReminderScheduler';
 import { DDLItem, DeadlineType } from '../main/ets/model/DDLModels';
 import { TaskState } from '../main/ets/model/TaskStateMachine';
 
@@ -47,6 +47,17 @@ export default function reminderSchedulerTests() {
       expect(ReminderScheduler.shouldScheduleDDLReminder(makeTask(TaskState.ABANDONED))).assertFalse();
       expect(ReminderScheduler.shouldScheduleDDLReminder(makeTask(TaskState.ABANDONED_ARCHIVED))).assertFalse();
       expect(ReminderScheduler.shouldScheduleDDLReminder(makeTask(TaskState.ACTIVE, true))).assertFalse();
+    });
+
+    it('should cancel both task id and stored reminder id for ddl reminders', 0, () => {
+      const sameId = collectDDLReminderCancelIds(42, 42);
+      expect(sameId.length).assertEqual(1);
+      expect(sameId[0]).assertEqual(42);
+
+      const differentIds = collectDDLReminderCancelIds(42, 4200).sort((a, b) => a - b);
+      expect(differentIds.length).assertEqual(2);
+      expect(differentIds[0]).assertEqual(42);
+      expect(differentIds[1]).assertEqual(4200);
     });
   });
 }

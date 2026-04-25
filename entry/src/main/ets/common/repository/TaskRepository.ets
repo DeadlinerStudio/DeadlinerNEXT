@@ -214,12 +214,16 @@ export class TaskRepository {
   async updateDDL(item: DDLItem): Promise<void> {
     await this.ensureDbReady();
     await this.db.updateDDL(item);
+    if (!ReminderScheduler.shouldScheduleDDLReminder(item)) {
+      await ReminderScheduler.cancelDDLReminder(item.id);
+    }
     this.triggerUpdates();
   }
 
   async deleteDDL(id: number): Promise<void> {
     await this.ensureDbReady();
     await this.db.deleteDDL(id);
+    await ReminderScheduler.cancelDDLReminder(id);
     this.triggerUpdates();
   }
 
@@ -251,6 +255,9 @@ export class TaskRepository {
   async transitionDDL(id: number, action: TaskStateAction): Promise<DDLItem> {
     await this.ensureDbReady();
     const item = await this.db.transitionDDLState(id, action);
+    if (!ReminderScheduler.shouldScheduleDDLReminder(item)) {
+      await ReminderScheduler.cancelDDLReminder(item.id);
+    }
     this.triggerUpdates();
     return item;
   }

@@ -25,29 +25,6 @@ import { SideDashboard } from '../../components/SideDashboard'
 import { SearchPage } from './search/SearchPage'
 import { AddDialogTablet } from '../../components/AddDialogTablet'
 
-const EXCITEMENT_MESSAGES: Resource[] = [
-  $r('app.string.excitement_deadline_chasing'),
-  $r('app.string.excitement_progress_1_to_99'),
-  $r('app.string.excitement_ddl_bite'),
-  $r('app.string.excitement_submit'),
-  $r('app.string.excitement_get_up'),
-  $r('app.string.excitement_5min_5h'),
-  $r('app.string.excitement_todo_on_fire'),
-  $r('app.string.excitement_today_task'),
-  $r('app.string.excitement_ddl_near'),
-  $r('app.string.excitement_classic_flag'),
-  $r('app.string.excitement_reward_sleep'),
-  $r('app.string.excitement_detect_anxiety'),
-  $r('app.string.excitement_stop_scrolling'),
-  $r('app.string.excitement_last_minute'),
-  $r('app.string.excitement_mountains'),
-  $r('app.string.excitement_ddl_power'),
-  $r('app.string.excitement_im_okay'),
-  $r('app.string.excitement_today_achievement'),
-  $r('app.string.excitement_do_hard_first'),
-  $r('app.string.excitement_next'),
-]
-
 interface MainHomePageButton {
   icon: Resource,
   onClick: () => void
@@ -58,7 +35,6 @@ export struct MainHomePageTablet {
   @Consume('appPathStack') appPathStack: NavPathStack;
 
   @StorageLink(C.KEY_BASIC_MODE) isBasicMode: boolean = false;
-  @StorageLink(C.KEY_EXCITEMENT_TEXT) @Watch('updateNavSubTitle') excitementText: boolean = true;
   @StorageLink(C.KEY_TABLET_SIDE_DASHBOARD) sdEnabled: boolean = true;
 
   // --- Controllers ---
@@ -108,33 +84,8 @@ export struct MainHomePageTablet {
     this.pageBackground = theme.colors.backgroundPrimary
   }
 
-  @State navSubtitle: string | undefined = undefined
-
   aboutToAppear(): void {
-    this.updateNavSubTitle();
     this.updateButtons();
-  }
-
-  updateNavSubTitle() {
-    if (this.excitementText) {
-      const ctx = this.getUIContext()
-      const idx = Math.floor(Math.random() * EXCITEMENT_MESSAGES.length)
-      const res = EXCITEMENT_MESSAGES[idx]
-      try {
-        this.navSubtitle = ctx.getHostContext()?.resourceManager.getStringSync(res)
-      } catch (error) {
-        console.error('Unable to get String Resource')
-        this.navSubtitle = undefined;
-      }
-    } else {
-      this.navSubtitle = undefined;
-    }
-
-    if (this.navSubtitle) {
-      this.topContentHeight = 24;
-    } else {
-      this.topContentHeight = 18;
-    }
   }
 
   private scrollerTask: Scroller = new Scroller();
@@ -434,8 +385,7 @@ export struct MainHomePageTablet {
       style: getImmersiveTitleBarStyle(true),
       content: {
         title: {
-          mainTitle: 'Deadliner',
-          subTitle: this.navSubtitle
+          mainTitle: '清单',
         },
         menu: {
           value: [

@@ -23,3 +23,24 @@ export function getHdsMaterialLevel(level?: string): hdsMaterial.MaterialLevel {
       return hdsMaterial.MaterialLevel.ADAPTIVE
   }
 }
+
+export function getHdsMaterialLevelRaw(level?: string): number {
+  if (!level) {
+    level = LocalValues.getInstance().getMaterialLevel()
+  }
+
+  console.log(`Material Level ${level}`)
+
+  switch (level) {
+    case 'ADAPTIVE':
+      return 10
+    case 'SMOOTH':
+      return 2
+    case 'GENTLE':
+      return 1
+    case 'EXQUISITE':
+      return 0
+    default:
+      return 10
+  }
+}

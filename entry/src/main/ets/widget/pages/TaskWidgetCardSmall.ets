@@ -6,11 +6,6 @@ struct TaskWidgetCardSmall {
   @LocalStorageProp('widgetData') data: WidgetData = new WidgetData();
 
   // --- 颜色资源 ---
-  readonly COLOR_ACCENT: Resource = $r('app.color.accent');
-  readonly COLOR_BRAND: Resource = $r('app.color.brand');
-  readonly COLOR_WIDGET_BG_START: Resource = $r('app.color.widget_bg_grad_start');
-  readonly COLOR_WIDGET_BG_END: Resource = $r('app.color.widget_bg_grad_end');
-
   readonly COLOR_ITEM_BG: Resource = $r('app.color.widget_item_bg');
   // 自定义背景下的半透明 Item 背景
   readonly COLOR_SEMI_ITEM_BG: ResourceColor = '#99000000';
@@ -18,6 +13,96 @@ struct TaskWidgetCardSmall {
 
   readonly FONT_PRIMARY: Resource = $r('app.color.font_primary');
   readonly FONT_SECONDARY: Resource = $r('app.color.font_secondary');
+
+  private getThemeKey(): string {
+    switch (this.data.themeKey) {
+      case 'classic':
+      case 'time':
+      case 'vibrant':
+      case 'nature':
+      case 'sunset':
+      case 'lavender':
+      case 'harmony':
+      case 'galaxy':
+      case 'glacier':
+      case 'tiktick':
+        return this.data.themeKey;
+      default:
+        return 'classic';
+    }
+  }
+
+  getAccentColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'vibrant': return $r('app.color.accent_vibrant');
+      case 'nature': return $r('app.color.accent_nature');
+      case 'sunset': return $r('app.color.accent_sunset');
+      case 'lavender': return $r('app.color.accent_lavender');
+      case 'glacier': return $r('app.color.accent_glacier');
+      case 'tiktick': return $r('app.color.accent_tik');
+      default: return $r('app.color.accent');
+    }
+  }
+
+  getBrandColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'vibrant': return $r('app.color.brand_vibrant');
+      case 'nature': return $r('app.color.brand_nature');
+      case 'sunset': return $r('app.color.brand_sunset');
+      case 'lavender': return $r('app.color.brand_lavender');
+      case 'glacier': return $r('app.color.brand_glacier');
+      case 'tiktick': return $r('app.color.brand_tik');
+      case 'harmony':
+      case 'galaxy':
+        return $r('sys.color.ohos_id_color_emphasize');
+      default: return $r('app.color.brand');
+    }
+  }
+
+  getWidgetBgStartColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'time': return $r('app.color.widget_bg_grad_start_time');
+      case 'vibrant': return $r('app.color.widget_bg_grad_start_vibrant');
+      case 'nature': return $r('app.color.widget_bg_grad_start_nature');
+      case 'sunset': return $r('app.color.widget_bg_grad_start_sunset');
+      case 'lavender': return $r('app.color.widget_bg_grad_start_lavender');
+      case 'harmony': return $r('app.color.widget_bg_grad_start_harmony');
+      case 'galaxy': return $r('app.color.widget_bg_grad_start_galaxy');
+      case 'glacier': return $r('app.color.widget_bg_grad_start_glacier');
+      case 'tiktick': return $r('app.color.widget_bg_grad_start_tiktick');
+      default: return $r('app.color.widget_bg_grad_start_classic');
+    }
+  }
+
+  getWidgetBgEndColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'time': return $r('app.color.widget_bg_grad_end_time');
+      case 'vibrant': return $r('app.color.widget_bg_grad_end_vibrant');
+      case 'nature': return $r('app.color.widget_bg_grad_end_nature');
+      case 'sunset': return $r('app.color.widget_bg_grad_end_sunset');
+      case 'lavender': return $r('app.color.widget_bg_grad_end_lavender');
+      case 'harmony': return $r('app.color.widget_bg_grad_end_harmony');
+      case 'galaxy': return $r('app.color.widget_bg_grad_end_galaxy');
+      case 'glacier': return $r('app.color.widget_bg_grad_end_glacier');
+      case 'tiktick': return $r('app.color.widget_bg_grad_end_tiktick');
+      default: return $r('app.color.widget_bg_grad_end_classic');
+    }
+  }
+
+  getWidgetDecorColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'time': return $r('app.color.widget_decor_time');
+      case 'vibrant': return $r('app.color.widget_decor_vibrant');
+      case 'nature': return $r('app.color.widget_decor_nature');
+      case 'sunset': return $r('app.color.widget_decor_sunset');
+      case 'lavender': return $r('app.color.widget_decor_lavender');
+      case 'harmony': return $r('app.color.widget_decor_harmony');
+      case 'galaxy': return $r('app.color.widget_decor_galaxy');
+      case 'glacier': return $r('app.color.widget_decor_glacier');
+      case 'tiktick': return $r('app.color.widget_decor_tiktick');
+      default: return $r('app.color.widget_decor_classic');
+    }
+  }
 
   /**
    * 判断是否使用了自定义背景
@@ -88,12 +173,12 @@ struct TaskWidgetCardSmall {
           Rect()
             .width('100%')
             .height('100%')
-            .fill(this.COLOR_WIDGET_BG_START)
+            .fill(this.getWidgetBgStartColor())
             .linearGradient({
               angle: 135,
               colors: [
-                [this.COLOR_WIDGET_BG_START, 0.0],
-                [this.COLOR_WIDGET_BG_END, 1.0]
+                [this.getWidgetBgStartColor(), 0.0],
+                [this.getWidgetBgEndColor(), 1.0]
               ]
             })
 
@@ -101,7 +186,7 @@ struct TaskWidgetCardSmall {
           Circle()
             .width(200) // 2x2 尺寸较大，圆圈可以画大一点
             .height(200)
-            .fill(this.COLOR_BRAND)
+            .fill(this.getWidgetDecorColor())
             .opacity(0.03) // 非常淡，作为背景氛围
             .position({ x: '30%', y: '-20%' }) // 从右上角晕开
 
@@ -109,7 +194,7 @@ struct TaskWidgetCardSmall {
           Circle()
             .width(140)
             .height(140)
-            .fill(this.COLOR_BRAND)
+            .fill(this.getWidgetDecorColor())
             .opacity(0.06)
             .position({ x: '55%', y: '-5%' })
         }
@@ -139,7 +224,7 @@ struct TaskWidgetCardSmall {
             Text(`${this.data.totalCount}`)
               .fontSize(10)
               .fontWeight(FontWeight.Bold)
-              .fontColor(this.data.totalCount > 3 ? this.COLOR_ACCENT : this.COLOR_BRAND)
+              .fontColor(this.data.totalCount > 3 ? this.getAccentColor() : this.getBrandColor())
               .backgroundColor(this.getItemBgColor())
               .padding({ left: 5, right: 5, top: 1, bottom: 1 })
               .borderRadius(6)
@@ -186,7 +271,7 @@ struct TaskWidgetCardSmall {
       Column()
         .width(3)
         .height(12)
-        .backgroundColor(item.isUrgent ? this.COLOR_ACCENT : this.COLOR_BRAND)
+        .backgroundColor(item.isUrgent ? this.getAccentColor() : this.getBrandColor())
         .borderRadius(1.5)
         .margin({ right: 6 })
 
@@ -202,7 +287,7 @@ struct TaskWidgetCardSmall {
       // 时间
       Text(item.timeDesc)
         .fontSize(10)
-        .fontColor(item.isUrgent ? this.COLOR_ACCENT : this.getSecondaryFontColor())
+        .fontColor(item.isUrgent ? this.getAccentColor() : this.getSecondaryFontColor())
         .fontWeight(item.isUrgent ? FontWeight.Medium : FontWeight.Normal)
         .margin({ left: 4 })
         .maxLines(1)
@@ -216,7 +301,7 @@ struct TaskWidgetCardSmall {
     .alignItems(VerticalAlign.Center)
     .border({
       width: (item.isUrgent && !this.data.backgroundImage) ? 1 : 0,
-      color: this.COLOR_ACCENT
+      color: this.getAccentColor()
     })
   }
 

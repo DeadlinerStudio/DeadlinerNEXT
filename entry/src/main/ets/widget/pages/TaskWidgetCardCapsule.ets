@@ -5,6 +5,108 @@ import { CapsuleWidgetData } from '../model/CapsuleWidgetData';
 struct TaskWidgetCardCapsule {
   @LocalStorageProp('widgetData') widgetData: CapsuleWidgetData = new CapsuleWidgetData();
 
+  private getThemeKey(): string {
+    switch (this.widgetData.themeKey) {
+      case 'classic':
+      case 'time':
+      case 'vibrant':
+      case 'nature':
+      case 'sunset':
+      case 'lavender':
+      case 'harmony':
+      case 'galaxy':
+      case 'glacier':
+      case 'tiktick':
+        return this.widgetData.themeKey;
+      default:
+        return 'classic';
+    }
+  }
+
+  getBrandColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'vibrant': return $r('app.color.brand_vibrant');
+      case 'nature': return $r('app.color.brand_nature');
+      case 'sunset': return $r('app.color.brand_sunset');
+      case 'lavender': return $r('app.color.brand_lavender');
+      case 'glacier': return $r('app.color.brand_glacier');
+      case 'tiktick': return $r('app.color.brand_tik');
+      case 'harmony':
+      case 'galaxy':
+        return $r('sys.color.ohos_id_color_emphasize');
+      default: return $r('app.color.brand');
+    }
+  }
+
+  getAccentColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'vibrant': return $r('app.color.accent_vibrant');
+      case 'nature': return $r('app.color.accent_nature');
+      case 'sunset': return $r('app.color.accent_sunset');
+      case 'lavender': return $r('app.color.accent_lavender');
+      case 'glacier': return $r('app.color.accent_glacier');
+      case 'tiktick': return $r('app.color.accent_tik');
+      default: return $r('app.color.accent');
+    }
+  }
+
+  getBrandSoftColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'vibrant': return $r('app.color.brand_vibrant_50');
+      case 'nature': return $r('app.color.brand_nature_50');
+      case 'sunset': return $r('app.color.brand_sunset_50');
+      case 'lavender': return $r('app.color.brand_lavender_50');
+      case 'glacier': return $r('app.color.brand_glacier_50');
+      case 'tiktick': return $r('app.color.brand_tik_50');
+      default: return $r('app.color.brand_50');
+    }
+  }
+
+  getWidgetBgStartColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'time': return $r('app.color.widget_bg_grad_start_time');
+      case 'vibrant': return $r('app.color.widget_bg_grad_start_vibrant');
+      case 'nature': return $r('app.color.widget_bg_grad_start_nature');
+      case 'sunset': return $r('app.color.widget_bg_grad_start_sunset');
+      case 'lavender': return $r('app.color.widget_bg_grad_start_lavender');
+      case 'harmony': return $r('app.color.widget_bg_grad_start_harmony');
+      case 'galaxy': return $r('app.color.widget_bg_grad_start_galaxy');
+      case 'glacier': return $r('app.color.widget_bg_grad_start_glacier');
+      case 'tiktick': return $r('app.color.widget_bg_grad_start_tiktick');
+      default: return $r('app.color.widget_bg_grad_start_classic');
+    }
+  }
+
+  getWidgetBgEndColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'time': return $r('app.color.widget_bg_grad_end_time');
+      case 'vibrant': return $r('app.color.widget_bg_grad_end_vibrant');
+      case 'nature': return $r('app.color.widget_bg_grad_end_nature');
+      case 'sunset': return $r('app.color.widget_bg_grad_end_sunset');
+      case 'lavender': return $r('app.color.widget_bg_grad_end_lavender');
+      case 'harmony': return $r('app.color.widget_bg_grad_end_harmony');
+      case 'galaxy': return $r('app.color.widget_bg_grad_end_galaxy');
+      case 'glacier': return $r('app.color.widget_bg_grad_end_glacier');
+      case 'tiktick': return $r('app.color.widget_bg_grad_end_tiktick');
+      default: return $r('app.color.widget_bg_grad_end_classic');
+    }
+  }
+
+  getWidgetDecorColor(): ResourceColor {
+    switch (this.getThemeKey()) {
+      case 'time': return $r('app.color.widget_decor_time');
+      case 'vibrant': return $r('app.color.widget_decor_vibrant');
+      case 'nature': return $r('app.color.widget_decor_nature');
+      case 'sunset': return $r('app.color.widget_decor_sunset');
+      case 'lavender': return $r('app.color.widget_decor_lavender');
+      case 'harmony': return $r('app.color.widget_decor_harmony');
+      case 'galaxy': return $r('app.color.widget_decor_galaxy');
+      case 'glacier': return $r('app.color.widget_decor_glacier');
+      case 'tiktick': return $r('app.color.widget_decor_tiktick');
+      default: return $r('app.color.widget_decor_classic');
+    }
+  }
+
   build() {
     Stack({ alignContent: Alignment.Center }) {
 
@@ -19,8 +121,8 @@ struct TaskWidgetCardCapsule {
           .linearGradient({
             direction: GradientDirection.RightBottom,
             colors: [
-              [$r('app.color.widget_bg_grad_start'), 0.0],
-              [$r('app.color.widget_bg_grad_end'), 1.0]
+              [this.getWidgetBgStartColor(), 0.0],
+              [this.getWidgetBgEndColor(), 1.0]
             ]
           })
 
@@ -28,14 +130,14 @@ struct TaskWidgetCardCapsule {
         Circle()
           .width(140)
           .height(140)
-          .fill($r('app.color.brand'))
+          .fill(this.getWidgetDecorColor())
           .opacity(0.05)
           .position({ x: '60%', y: '-15%' })
 
         Circle()
           .width(90)
           .height(90)
-          .fill($r('app.color.brand'))
+          .fill(this.getWidgetDecorColor())
           .opacity(0.08)
           .position({ x: '75%', y: '10%' })
 
@@ -44,7 +146,7 @@ struct TaskWidgetCardCapsule {
           Circle()
             .width(10)
             .height(10)
-            .fill($r('app.color.accent'))
+            .fill(this.getAccentColor())
             .opacity(0.8)
             .position({ x: '90%', y: '15%' })
         }
@@ -69,7 +171,7 @@ struct TaskWidgetCardCapsule {
           if (this.widgetData.remainingCount > 0) {
             Text('Keep going')
               .fontSize('11vp')
-              .fontColor($r('app.color.brand_50'))
+              .fontColor(this.getBrandSoftColor())
               .margin({ top: 4 }) // 稍微拉开一点间距，平衡去掉了顶部文字后的空旷感
           }
         }
@@ -85,7 +187,7 @@ struct TaskWidgetCardCapsule {
             Text(this.widgetData.remainingCount.toString())
               .fontSize('40vp')
               .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.brand'))
+              .fontColor(this.getBrandColor())
               .lineHeight('40vp')
               .textAlign(TextAlign.End)
               .height('35vp')

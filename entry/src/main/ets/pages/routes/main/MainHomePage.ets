@@ -1,20 +1,10 @@
-import { ItemRestriction, LengthMetrics,
-  promptAction,
-  SegmentButton,
-  SegmentButtonItemTuple,
-  SegmentButtonOptions,
+import { ItemRestriction,
   SegmentButtonTextItem,
   Theme } from '@kit.ArkUI'
 import { HomeFloatingToolbar } from '../../components/HomeFloatingToolbar'
 import { HabitListSection } from './HabitListSection'
 import { TaskListSection } from './TaskListSection'
-import { BottomBuilderShowType,
-  DividerShowType,
-  HdsNavDestination,
-  HdsNavigation, HdsNavigationAttribute,
-  HdsNavigationTitleMode,
-  ScrollEffectType,
-  TextStyleMode} from '@kit.UIDesignKit'
+import { DividerShowType, HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit'
 import { TaskListController } from './TaskListController'
 import { ConfettiController } from '../../components/confetti/ConfettiController'
 import { ConfettiView } from '../../components/confetti/ConfettiView'
@@ -28,7 +18,8 @@ import { AddHabitSheet } from './modify/habit/AddHabitSheet'
 import { LocalValues } from '../../../common/local/LocalValues'
 import { MainButtonType } from '../../../common/local/LocalModels'
 import { getImmersiveTitleBarStyle } from '../../../common/style/NavStyles'
-import { BlurBackgroundModifier } from '../../../utils/animation/BlurBackgroundModifier'
+import { HdsTitleBarMenuButton } from '../../components/HdsTitleBarMenuButton'
+import { HdsTitleBarSegment } from '../../components/HdsTitleBarSegment'
 
 enum MainTabIndex {
   TASKS = 0,
@@ -46,6 +37,7 @@ export struct MainHomePage {
   @Consume('appPathStack') appPathStack: NavPathStack;
 
   @StorageLink(C.KEY_BASIC_MODE) isBasicMode: boolean = false;
+  @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
 
   @State currentIndex: number = MainTabIndex.TASKS
   @State @Watch('onSegmentChange') selectedIndexes: number[] = [MainTabIndex.TASKS]
@@ -59,8 +51,6 @@ export struct MainHomePage {
   @State confettiController: ConfettiController = new ConfettiController();
 
   @StorageLink('QuickAddTaskTrigger') @Watch('onQuickAddTaskChange') quickAddTrigger: boolean = false;
-  @StorageProp('customBackgroundImage') customBg: string = '';
-  @StorageProp(C.KEY_ENABLE_API23) api23: boolean = false;
 
   /**
    * 监听回调函数
@@ -160,26 +150,10 @@ export struct MainHomePage {
     }
   }
 
-  @State tabOptions: SegmentButtonOptions = SegmentButtonOptions.tab({
-    buttons: [{ text: '任务' }, { text: '习惯' }] as ItemRestriction<SegmentButtonTextItem>,
-    backgroundBlurStyle: (!!this.customBg && this.api23) ? BlurStyle.Thin : BlurStyle.NONE,
-    selectedBackgroundColor: $r('sys.color.segment_button_v2_tab_selected_item_background'),
-    backgroundColor: $r('sys.color.comp_background_tertiary'),
-    buttonPadding: 10
-  })
-
-  updateTabOptions() {
-    this.tabOptions = SegmentButtonOptions.tab({
-      buttons: [
-        { text: '任务' },
-        { text: '习惯' }
-      ] as ItemRestriction<SegmentButtonTextItem>,
-      backgroundBlurStyle: BlurStyle.NONE,
-      selectedBackgroundColor: $r('sys.color.segment_button_v2_tab_selected_item_background'),
-      backgroundColor: $r('sys.color.comp_background_tertiary'),
-      buttonPadding: 10
-    });
-  }
+  readonly tabButtons: ItemRestriction<SegmentButtonTextItem> = [
+    { text: '任务' },
+    { text: '习惯' }
+  ] as ItemRestriction<SegmentButtonTextItem>;
 
   readonly mainHomePageButtons: MainHomePageButton[] = [
     {
@@ -224,18 +198,11 @@ export struct MainHomePage {
   @Builder topSegment() {
     Stack({ alignContent: Alignment.Center }) {
       Row() {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph(this.leftBtn.icon)
-            .fontSize(24)
-            .fontColor([$r('sys.color.ohos_id_color_text_primary')])
-        }
-        .width(40)
-        .height(40)
-        .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.api23), $r('sys.color.comp_background_tertiary')))
-        .onClick(() => {
-          this.leftBtn.onClick();
+        HdsTitleBarMenuButton({
+          icon: this.leftBtn.icon,
+          onButtonClick: this.leftBtn.onClick,
+          isEnabled: ((this.leftBtnType === MainButtonType.AI) && !this.isBasicMode) || (this.leftBtnType !== MainButtonType.AI)
         })
-        .enabled(((this.leftBtnType === MainButtonType.AI) && !this.isBasicMode) || (this.leftBtnType !== MainButtonType.AI))
       }
       .width('100%')
       .height('100%')
@@ -244,32 +211,27 @@ export struct MainHomePage {
       .hitTestBehavior(HitTestMode.Transparent)
 
       Column() {
-        SegmentButton({
-          options: this.tabOptions,
+        HdsTitleBarSegment({
+          buttons: this.tabButtons,
           selectedIndexes: $selectedIndexes,
-          maxFontScale: 2
+          maxFontScale: 2,
+          segmentHeight: this.SEGMENT_HEIGHT,
+          normalWidth: '50%',
+          experimentalWidth: 196,
+          experimentalHeight: 52
         })
-          .width('50%')
-          .height(this.SEGMENT_HEIGHT)
           .align(Alignment.Center)
-          // .padding({ top: 6 })
+          .margin({ top: 8 })
       }
       .justifyContent(FlexAlign.Center)
       .hitTestBehavior(HitTestMode.None)
 
       Row() {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph(this.rightBtn.icon)
-            .fontSize(24)
-            .fontColor([$r('sys.color.ohos_id_color_text_primary')])
-        }
-        .width(40)
-        .height(40)
-        .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.api23), $r('sys.color.comp_background_tertiary')))
-        .onClick(() => {
-          this.rightBtn.onClick();
+        HdsTitleBarMenuButton({
+          icon: this.rightBtn.icon,
+          onButtonClick: this.rightBtn.onClick,
+          isEnabled: ((this.rightBtnType === MainButtonType.AI) && !this.isBasicMode) || (this.rightBtnType !== MainButtonType.AI)
         })
-        .enabled(((this.rightBtnType === MainButtonType.AI) && !this.isBasicMode) || (this.rightBtnType !== MainButtonType.AI))
       }
       .width('100%')
       .height('100%')
@@ -277,6 +239,7 @@ export struct MainHomePage {
       .padding({ right: 16 })
       .hitTestBehavior(HitTestMode.Transparent)
     }
+    .id(`main_titlebar_${this.currentThemeKey}`)
     .height('100%')
     .width('100%')
   }
@@ -475,6 +438,7 @@ export struct MainHomePage {
           },
         })
     }
+    .id(`main_navigation_${this.currentThemeKey}`)
     .titleBar({
       style: getImmersiveTitleBarStyle(false, false),  // 暂时屏蔽新材质
       content: {

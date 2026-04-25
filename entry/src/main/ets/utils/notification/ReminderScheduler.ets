@@ -13,6 +13,14 @@ interface DDLReminderCandidate {
   item: DDLItem;
 }
 
+export function collectDDLReminderCancelIds(taskId: number, reminderId?: number): number[] {
+  const ids = new Set<number>([taskId]);
+  if (reminderId !== undefined) {
+    ids.add(reminderId);
+  }
+  return Array.from(ids);
+}
+
 export class ReminderScheduler {
   private static ddlRefreshQueue: Promise<void> = Promise.resolve();
 
@@ -64,6 +72,18 @@ export class ReminderScheduler {
 
     ReminderScheduler.ddlRefreshQueue = task.catch(() => {});
     return task;
+  }
+
+  static async cancelDDLReminder(taskId: number): Promise<void> {
+    const targetId = taskId.toString();
+    const manager = ReminderDataManager.getInstance();
+    const existingRecord = manager.getByScopedTarget('DDL', targetId);
+    const idsToCancel = collectDDLReminderCancelIds(taskId, existingRecord?.reminderId);
+
+    for (const reminderId of idsToCancel) {
+      await ReminderUtils.cancel(reminderId);
+    }
+    await manager.removeScoped('DDL', targetId);
   }
 
   private static async performDDLRefresh(allDDLs: DDLItem[]) {

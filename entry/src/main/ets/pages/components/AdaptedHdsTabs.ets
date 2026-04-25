@@ -61,39 +61,67 @@ export struct AdaptedHdsTabs {
             maskColor: $r('app.color.background_primary_50'),
             maskHeight: 42
           },
-          lightColor: (this.theme.tabIcon),
+          lightColor: this.theme.useWhiteGlow ? Color.White : this.theme.brand50,
           adaptToHandedness: this.isWideScreen
         })
     } else {
-      HdsTabs({
-        barPosition: (this.isWideScreen && this.tabletUi) ? BarPosition.Start : BarPosition.End,
-        index: this.currentIndex,
-        controller: this.controller
-      }) {
-        this.content()
-      }
-      .vertical(this.isWideScreen && this.tabletUi)
-      .barMode(BarMode.Fixed)
-      .barOverlap(true)
-      // .background(this.theme.bgPrimary)
-      .animationDuration(300)
-      .scrollable(false)
-      .height('100%')
-      .width('100%')
-      .onChange((index: number) => {
-        this.currentIndex = index;
-      })
-      .onTabBarClick((index: number) => {
-        if (this.onTabClick) {
-          this.onTabClick(index);
+      if (this.isWideScreen && this.tabletUi) {
+        HdsTabs({
+          barPosition: BarPosition.Start,
+          index: this.currentIndex,
+          controller: this.controller
+        }) {
+          this.content()
         }
-      })
-      .clip(false)
-      .divider({ mode: DividerMode.NONE })
-      .barBackgroundEffect((this.tabletUi && this.isWideScreen) ? {
-        radius: 0,
-        color: this.theme.bgPrimary
-      } : { radius: 0 })
+        .vertical(true)
+        .barMode(BarMode.Fixed)
+        .barOverlap(true)
+        // .background(this.theme.bgPrimary)
+        .animationDuration(300)
+        .scrollable(false)
+        .height('100%')
+        .width('100%')
+        .onChange((index: number) => {
+          this.currentIndex = index;
+        })
+        .onTabBarClick((index: number) => {
+          if (this.onTabClick) {
+            this.onTabClick(index);
+          }
+        })
+        .clip(false)
+        .divider({ mode: DividerMode.NONE })
+        .barBackgroundEffect({
+          radius: 0,
+          color: this.theme.bgPrimary
+        })
+      } else {
+        HdsTabs({
+          barPosition: BarPosition.End,
+          index: this.currentIndex,
+          controller: this.controller
+        }) {
+          this.content()
+        }
+        .vertical(false)
+        .barMode(BarMode.Fixed)
+        .barOverlap(true)
+        // .background(this.theme.bgPrimary)
+        .animationDuration(300)
+        .scrollable(false)
+        .height('100%')
+        .width('100%')
+        .onChange((index: number) => {
+          this.currentIndex = index;
+        })
+        .onTabBarClick((index: number) => {
+          if (this.onTabClick) {
+            this.onTabClick(index);
+          }
+        })
+        .clip(false)
+        .divider({ mode: DividerMode.NONE })
+      }
     }
   }
 }

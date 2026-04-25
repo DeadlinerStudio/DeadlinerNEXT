@@ -7,13 +7,14 @@ import { SettingsDivider, SettingsSection, SettingsItem, SubSettingsSwitch,
   SettingsSelect} from '../../../components/SettingsComponents';
 import { HdsNavDestination, HdsNavDestinationAttribute } from '@kit.UIDesignKit';
 import { TopSafeContainer } from '../../../components/TopSafeContainer';
-import { common } from '@kit.AbilityKit';
+import { common, Want } from '@kit.AbilityKit';
 import { getImmersiveTitleBarStyle } from '../../../../common/style/NavStyles';
 import { promptAction, window } from '@kit.ArkUI';
 import { ThemeSelectSheet } from './components/ThemeSelectSheet';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { ThemeManager } from '../../../../common/theme/ThemeManager';
+import { ITheme } from '../../../../common/theme/ThemeModel';
 import { ImageCropSheet } from './components/ImageCropSheet';
 
 @Builder
@@ -27,6 +28,10 @@ struct AppearanceSettings {
   @Consume('userLocalPathStack') userLocalPathStack: NavPathStack = new NavPathStack();
 
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
+  @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
+  @StorageProp('currentTheme') currentTheme: ITheme = {} as ITheme;
+  @State initialThemeSnapshot: string = '';
+  @State restartRequested: boolean = false;
 
   private navigateTo(name: string) {
     if (this.isWideScreen) {
@@ -45,6 +50,7 @@ struct AppearanceSettings {
   @StorageLink(C.KEY_ENGLISH_SOMEWHERE) english: boolean = true;
   @StorageLink(C.KEY_ADD_SYMBOL_WEIGHT) weight: number = 600;
   @StorageLink(C.KEY_ENABLE_API23) api23: boolean = true;
+  @StorageLink(C.KEY_EXPERIMENTAL_COMPONENTS) experimentalComponents: boolean = true;
 
   @StorageLink(C.KEY_ENABLE_TABLET_UI) tabletUi: boolean = true;
   @StorageLink(C.KEY_TABLET_SIDE_DASHBOARD) tabletSd: boolean = true;
@@ -119,9 +125,54 @@ struct AppearanceSettings {
 
   MATERIAL_LEVELS = ['ADAPTIVE', 'SMOOTH', 'GENTLE', 'EXQUISITE']
 
+  private buildThemeSnapshot(): string {
+    return JSON.stringify({
+      key: this.currentThemeKey,
+      brand: this.currentTheme.brand,
+      accent: this.currentTheme.accent,
+      bgPrimary: this.currentTheme.bgPrimary,
+      tabIcon: this.currentTheme.tabIcon,
+      useWhiteGlow: this.currentTheme.useWhiteGlow
+    });
+  }
+
+  private restartAppForThemeChange() {
+    if (this.restartRequested) {
+      return;
+    }
+
+    this.restartRequested = true;
+    const context = getContext(this) as common.UIAbilityContext;
+    const want: Want = {
+      bundleName: 'com.aritxonly.deadliner',
+      moduleName: 'entry',
+      abilityName: 'EntryAbility'
+    };
+
+    context.startAbility(want)
+      .then(() => {
+        context.terminateSelf().catch((err: BusinessError) => {
+          console.error('[AppearanceSettings] terminateSelf failed:', JSON.stringify(err));
+        });
+      })
+      .catch((err: BusinessError) => {
+        console.error('[AppearanceSettings] restart startAbility failed:', JSON.stringify(err));
+      });
+  }
+
   aboutToAppear(): void {
     const level = LocalValues.getInstance().getMaterialLevel()
     this.currentSelectIndex = this.MATERIAL_LEVELS.indexOf(level);
+    this.initialThemeSnapshot = this.buildThemeSnapshot();
+  }
+
+  aboutToDisappear(): void {
+    if (this.isWideScreen && this.tabletUi) {
+      return;
+    }
+    if (this.initialThemeSnapshot !== this.buildThemeSnapshot()) {
+      this.restartAppForThemeChange();
+    }
   }
 
   build() {
@@ -173,6 +224,15 @@ struct AppearanceSettings {
                   const level = this.MATERIAL_LEVELS[index];
                   LocalValues.getInstance().setMaterialLevel(level)
                 }
+              })
+
+              SubSettingsDivider()
+
+              SubSettingsSwitch({
+                title: '实验性组件',
+                subtitle: '开启后，主页顶部按钮将优先使用实验性的沉浸光感组件。',
+                isOn: this.experimentalComponents,
+                onChange: (isOn): Promise<void> => LocalValues.getInstance().setExperimentalComponents(isOn)
               })
             }
           }

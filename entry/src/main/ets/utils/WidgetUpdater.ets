@@ -44,6 +44,8 @@ export class WidgetUpdater {
         .sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime());
 
       const capsuleData = new CapsuleWidgetData();
+      const currentThemeKey = AppStorage.get<string>('currentThemeKey') ?? 'vibrant';
+      capsuleData.themeKey = currentThemeKey;
 
       // 1. activeCount: 所有活跃任务数 (即 validTasks 的总数)
       capsuleData.activeCount = activeTasks.length;
@@ -127,6 +129,7 @@ export class WidgetUpdater {
       // --- B. 构建列表组件数据 (WidgetData) ---
       // 只有当存在列表组件时，才真正需要去处理图片（为了性能，其实可以先判断一下是否有 'widget' 类型的卡片，但这里为了逻辑清晰先直接构建）
       const widgetData = new WidgetData();
+      widgetData.themeKey = currentThemeKey;
       widgetData.totalCount = validTasks.length;
       widgetData.updateTime = new Date().toLocaleTimeString();
 

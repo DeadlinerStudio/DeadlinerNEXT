@@ -31,6 +31,7 @@ export class ThemeManager {
   private static readonly KEY_CUSTOM_TAB_ICON = 'key_custom_tab_icon';
   private static readonly KEY_PARAM_HUE = 'key_param_hue';
   private static readonly KEY_PARAM_STYLE = 'key_param_style';
+  private static readonly KEY_THEME_WHITE_GLOW_PREFIX = 'key_theme_white_glow_';
 
   // 兼容旧 Key
   private static readonly KEY_THEME_LEGACY = 'key_current_theme';
@@ -124,7 +125,10 @@ export class ThemeManager {
     saveToDisk: boolean = true
   ) {
     // 1. 创建 UI 部分 (内存中)
-    const customUI = ThemeManager.createCustomUITheme(brand, accent, tabIcon);
+    const customUI = await ThemeManager.resolveThemeGlow(
+      'custom',
+      ThemeManager.createCustomUITheme(brand, accent, tabIcon, hue)
+    );
 
     const targetIndicatorKey = indicatorKey;
     const indicatorSet = IndicatorMap[targetIndicatorKey];
@@ -193,7 +197,11 @@ export class ThemeManager {
       brand50: ui.brand50,
       accent: ui.accent,
       bgPrimary: ui.bgPrimary,
+      widgetBgStart: ui.widgetBgStart,
+      widgetBgEnd: ui.widgetBgEnd,
+      widgetDecor: ui.widgetDecor,
       tabIcon: ui.tabIcon,
+      useWhiteGlow: ui.useWhiteGlow,
 
       chartInfo: ind.chartInfo,
       chartCompleted: ind.chartCompleted,
@@ -234,6 +242,8 @@ export class ThemeManager {
     } else {
       uiPalette = ThemeMap[uiKey] || ThemeMap['vibrant'];
     }
+
+    uiPalette = await ThemeManager.resolveThemeGlow(uiKey, uiPalette);
 
     const indicatorSet = IndicatorMap[indicatorKey] || IndicatorMap['vibrant'];
     const fullTheme = ThemeManager.mergeTheme(uiPalette, indicatorSet);
@@ -304,22 +314,70 @@ export class ThemeManager {
     const brand = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_BRAND, '#FF0A59F7') as string;
     const accent = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_ACCENT, '#FF0A59F7') as string;
     const tabIcon = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_TAB_ICON, '') as string;
+    const hue = await ThemeManager.pref.get(ThemeManager.KEY_PARAM_HUE, 210) as number;
 
-    return ThemeManager.createCustomUITheme(brand, accent, tabIcon || undefined);
+    return ThemeManager.createCustomUITheme(brand, accent, tabIcon || undefined, hue);
   }
 
   // 纯内存操作：创建 UI 部分
-  private static createCustomUITheme(brand: string, accent: string, tabIcon?: string | ResourceColor): UIThemePalette {
+  private static createCustomUITheme(
+    brand: string,
+    accent: string,
+    tabIcon?: string | ResourceColor,
+    hue?: number
+  ): UIThemePalette {
     const withAlpha = (hex: string, alpha: string) => {
       if (hex.length === 9) return hex;
       return hex.replace('#', '#' + alpha);
     };
+
+    const resolvedHue = hue ?? 210;
     return createUITheme(
       brand,
       withAlpha(brand, "80"),
       accent,
       $r('app.color.background_primary'),
-      tabIcon
+      withAlpha(brand, "33"),
+      $r('app.color.background_primary'),
+      brand,
+      tabIcon,
+      ThemeManager.isCoolHue(resolvedHue)
     );
+  }
+
+  private static isCoolHue(hue: number): boolean {
+    return hue >= 160 && hue <= 260;
+  }
+
+  private static async resolveThemeGlow(uiKey: string, uiPalette: UIThemePalette): Promise<UIThemePalette> {
+    if (!ThemeManager.pref) {
+      return uiPalette;
+    }
+
+    const prefKey = `${ThemeManager.KEY_THEME_WHITE_GLOW_PREFIX}${uiKey}`;
+    const storedValue = await ThemeManager.pref.get(prefKey, uiPalette.useWhiteGlow) as boolean;
+    return {
+      brand: uiPalette.brand,
+      brand50: uiPalette.brand50,
+      accent: uiPalette.accent,
+      bgPrimary: uiPalette.bgPrimary,
+      widgetBgStart: uiPalette.widgetBgStart,
+      widgetBgEnd: uiPalette.widgetBgEnd,
+      widgetDecor: uiPalette.widgetDecor,
+      tabIcon: uiPalette.tabIcon,
+      useWhiteGlow: storedValue
+    };
+  }
+
+  static async setCurrentThemeWhiteGlow(enable: boolean) {
+    const currentUIKey = AppStorage.get<string>('currentThemeKey') || 'vibrant';
+    const currentIndicatorKey = AppStorage.get<string>('currentIndicatorKey') || (THEME_DEFAULT_INDICATOR_MAP[currentUIKey] || 'vibrant');
+
+    if (ThemeManager.pref) {
+      await ThemeManager.pref.put(`${ThemeManager.KEY_THEME_WHITE_GLOW_PREFIX}${currentUIKey}`, enable);
+      await ThemeManager.pref.flush();
+    }
+
+    await ThemeManager.combineAndApplyTheme(currentUIKey, currentIndicatorKey);
   }
 }

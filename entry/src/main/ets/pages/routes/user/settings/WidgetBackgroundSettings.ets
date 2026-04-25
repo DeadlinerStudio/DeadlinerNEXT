@@ -37,6 +37,7 @@ struct WidgetBackgroundSettings {
 
   async aboutToAppear() {
     // 初始化模拟数据
+    this.widgetData.themeKey = AppStorage.get<string>('currentThemeKey') ?? 'vibrant';
     this.widgetData.totalCount = 3;
     this.widgetData.tasks = [
       { title: '完成图形学作业', timeDesc: '2小时', isUrgent: true },
