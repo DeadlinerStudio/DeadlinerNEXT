@@ -41,8 +41,10 @@ struct InteractionSettings {
   @StorageLink(C.KEY_FULL_SCREEN_ADD) fullScreenAdd: boolean = false;
 
   @StorageLink(C.KEY_STARTUP_PAGE) startupPageType: number = 0;
+  @StorageLink(C.KEY_SHOW_GUIDE_NEXT_LAUNCH) showGuideNextLaunch: boolean = false;
   @StorageLink(C.KEY_SHOW_AI_INPUT) showAiInput: boolean = true;
   @StorageLink(C.KEY_DIRECT_ADD_ON_AI) directAdd: boolean = true;
+  @StorageLink(C.KEY_SHOW_PAPERTALK_SHARE) showPaperTalkShare: boolean = true;
 
   @StorageLink(C.KEY_AUTO_ARCHIVE_DAYS) autoArchiveDays: number = 3;
 
@@ -80,6 +82,15 @@ struct InteractionSettings {
             })
           }
 
+          SettingsSection() {
+            SubSettingsSwitch({
+              title: "下次启动显示功能引导",
+              subtitle: "仅在下一次开屏时弹出一次，展示后会自动关闭这个选项。",
+              isOn: this.showGuideNextLaunch,
+              onChange: (isOn): Promise<void> => LocalValues.getInstance().setShowGuideNextLaunch(isOn)
+            })
+          }
+
           // --- 操作体验 ---
           if (!LocalValues.getInstance().getBasicMode()) {
             SettingsSection({ title: '操作体验' }) {
@@ -109,6 +120,15 @@ struct InteractionSettings {
                 }
               })
             }
+          }
+
+          SettingsSection() {
+            SubSettingsSwitch({
+              title: "显示纸语分享按钮",
+              subtitle: "在上月数据汇总右上角显示纸语打印入口，可用于体验推广联动。",
+              isOn: this.showPaperTalkShare,
+              onChange: (isOn): Promise<void> => LocalValues.getInstance().setShowPaperTalkShare(isOn)
+            })
           }
 
           SettingsSection({ title: "AI 交互" }) {

@@ -7,6 +7,7 @@ import { FloatUpModifier } from '../../../../../utils/animation/FloatUpModifier'
 import { SettingsItem, SettingsSection, SettingsDivider, SubSettingsSwitch } from '../../../../components/SettingsComponents';
 import { IndicatorThemeSheet } from './IndicatorThemeSelect';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { WidgetUpdater } from '../../../../../utils/WidgetUpdater';
 
 interface ThemeOption {
   key: string;
@@ -311,8 +312,12 @@ export struct ThemeSelectSheet {
         // 选中时边框变色，未选中透明
         color: this.currentKey === item.key ? ThemeMap[item.key].brand : Color.Transparent
       })
-      .onClick(() => {
-        ThemeManager.switchUITheme(item.key);
+      .onClick(async () => {
+        await ThemeManager.switchUITheme(item.key);
+        const context = this.getUIContext().getHostContext();
+        if (context) {
+          await WidgetUpdater.updateAllWidgets(context);
+        }
       })
 
       // 2. 选中态：右上角悬浮旗标 (Floating Circle)

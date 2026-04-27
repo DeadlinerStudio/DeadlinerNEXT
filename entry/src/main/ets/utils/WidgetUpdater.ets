@@ -9,6 +9,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { HudWidgetData } from '../widget/model/HudWidgetData';
 import { HabitRepository } from '../common/repository/HabitRepository';
 import { Habit, HabitRecordStatus, HabitStatus } from '../model/DDLModels';
+import { ThemeManager } from '../common/theme/ThemeManager';
 
 export class WidgetUpdater {
 
@@ -44,7 +45,7 @@ export class WidgetUpdater {
         .sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime());
 
       const capsuleData = new CapsuleWidgetData();
-      const currentThemeKey = AppStorage.get<string>('currentThemeKey') ?? 'vibrant';
+      const currentThemeKey = await ThemeManager.getPersistedUIThemeKey(context);
       capsuleData.themeKey = currentThemeKey;
 
       // 1. activeCount: 所有活跃任务数 (即 validTasks 的总数)

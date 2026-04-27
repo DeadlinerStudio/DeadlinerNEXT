@@ -9,14 +9,19 @@ import { SortSheet } from "./SortSheet";
 import { getImmersiveTitleBarStyle } from "../../../common/style/NavStyles";
 import { HdsTitleBarMenuButton } from "../../components/HdsTitleBarMenuButton";
 import { HdsTitleBarSegment } from "../../components/HdsTitleBarSegment";
+import { SettingsConstants as C } from "../../../common/local/SettingsConstants";
+import { common } from "@kit.AbilityKit";
+import { PaperTalkUtils } from "../../../utils/PaperTalkUtils";
 
 @Component
 export struct OverviewPage {
   @Consume('appPathStack') appPathStack: NavPathStack;
   @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
+  @StorageLink(C.KEY_SHOW_PAPERTALK_SHARE) showPaperTalkShare: boolean = true;
 
   readonly SEGMENT_HEIGHT: number = 48;
   @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  private context = getContext(this) as common.UIAbilityContext;
 
   @State viewModel: OverviewViewModel = new OverviewViewModel();
 
@@ -126,6 +131,11 @@ export struct OverviewPage {
           Span("对比最近4周的周完成量，直观查看短期内的效率波动。").fontColor($r('sys.color.ohos_id_color_text_secondary'))
         }.fontSize(14).lineHeight(20)
 
+        Text() {
+          Span("• 活跃热力图：").fontWeight(FontWeight.Medium)
+          Span("按天展示最近一段时间的活跃程度，颜色越深表示当天完成任务越多，可快速识别持续投入和断档区间。").fontColor($r('sys.color.ohos_id_color_text_secondary'))
+        }.fontSize(14).lineHeight(20)
+
       } else if (this.selectedIndexes[0] === 2) {
         // === 2: DashboardSection (看板) ===
         Text("看板说明")
@@ -179,6 +189,15 @@ export struct OverviewPage {
           })
         }
 
+        if (this.selectedIndexes.length > 0 && this.selectedIndexes[0] === 2 && this.showPaperTalkShare) {
+          HdsTitleBarMenuButton({
+            icon: $r('sys.symbol.share'),
+            onButtonClick: () => {
+              this.shareMonthlySummary();
+            }
+          })
+        }
+
         HdsTitleBarMenuButton({
           icon: $r('sys.symbol.questionmark_circle'),
           onButtonClick: () => {
@@ -209,6 +228,19 @@ export struct OverviewPage {
     .width('100%')
   }
 
+  private shareMonthlySummary(): void {
+    const payload = PaperTalkUtils.buildOverviewPayload(
+      this.viewModel.lastMonthName,
+      this.viewModel.monthlyAnalysis,
+      this.viewModel.isAnalyzing,
+      this.viewModel.metrics
+    );
+    PaperTalkUtils.openPrintOrStore(this.context, payload).catch((error: Error) => {
+      console.error(`[OverviewPage] Share monthly summary failed: ${error}`);
+      promptAction.showToast({ message: '暂时无法打开纸语或应用商店' });
+    });
+  }
+
   build() {
     HdsNavigation() {
       Stack() {
@@ -222,6 +254,7 @@ export struct OverviewPage {
                 todayCompleted: this.viewModel.todayCompleted,
                 todayTodo: this.viewModel.todayTodo,
                 todayOverdue: this.viewModel.todayOverdue,
+                activeAbandoned: this.viewModel.activeAbandoned,
                 historyStats: this.viewModel.historyStats,
                 completionTimeStats: this.viewModel.completionTimeStats,
                 overdueItems: this.viewModel.overdueItems,
@@ -233,11 +266,16 @@ export struct OverviewPage {
                 dailyStats: this.viewModel.dailyStats,
                 monthlyStats: this.viewModel.monthlyStats,
                 weeklyStats: this.viewModel.weeklyStats,
+                contributionStats: this.viewModel.contributionStats,
                 cardOrder: this.viewModel.trendCardOrder
               })
             } else if (this.selectedIndexes[0] === 2) {
               DashboardSection({
-                items: this.viewModel.allItems
+                metrics: this.viewModel.metrics,
+                dailyStats: this.viewModel.lastMonthDailyStats,
+                lastMonthName: this.viewModel.lastMonthName,
+                analysis: this.viewModel.monthlyAnalysis,
+                isAnalyzing: this.viewModel.isAnalyzing
               })
             }
           }

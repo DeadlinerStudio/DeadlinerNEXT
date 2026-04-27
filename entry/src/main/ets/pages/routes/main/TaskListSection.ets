@@ -94,6 +94,7 @@ export struct TaskListSection {
 
       this.taskList = dbItems
         .filter((item) => !item.deleted && item.type !== DeadlineType.HABIT)
+        .sort((lhs, rhs) => this.compareTaskOrder(lhs, rhs))
         .map((item) => {
         return this.mapToUI(item, now);
       });
@@ -112,6 +113,27 @@ export struct TaskListSection {
         }, 750)
       }
     }
+  }
+
+  private compareTaskOrder(lhs: DDLItem, rhs: DDLItem): number {
+    if (lhs.isCompleted !== rhs.isCompleted) {
+      return lhs.isCompleted ? 1 : -1;
+    }
+    if (lhs.isStared !== rhs.isStared) {
+      return lhs.isStared ? -1 : 1;
+    }
+
+    const remainingDiff = this.parseTaskSortTime(lhs.endTime) - this.parseTaskSortTime(rhs.endTime);
+    if (remainingDiff !== 0) {
+      return remainingDiff;
+    }
+
+    return lhs.id - rhs.id;
+  }
+
+  private parseTaskSortTime(time: string): number {
+    const parsed = new Date(time).getTime();
+    return isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
   }
 
   // 核心逻辑：数据映射 (DB Model -> UI Model)

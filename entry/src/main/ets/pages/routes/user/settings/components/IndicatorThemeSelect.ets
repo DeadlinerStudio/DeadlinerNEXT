@@ -9,7 +9,7 @@ interface IndicatorOption {
 }
 
 const INDICATOR_OPTIONS: IndicatorOption[] = [
-  { key: 'ios', name: 'iOS', desc: '系统蓝绿橙红，清爽直接' },
+  { key: 'ios', name: '经典', desc: '系统蓝绿橙红，清爽直接' },
   { key: 'morandi', name: '莫兰迪', desc: '低饱和度，柔和护眼' },
   { key: 'vibrant', name: '生动', desc: '现代扁平，清晰明了' },
   { key: 'nature', name: '森系', desc: '自然大地，清新舒适' },

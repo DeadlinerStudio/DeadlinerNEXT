@@ -73,6 +73,22 @@ export class ThemeManager {
     }
   }
 
+  static async getPersistedUIThemeKey(context: Context): Promise<string> {
+    try {
+      const pref = ThemeManager.pref ?? await preferences.getPreferences(context, ThemeManager.STORE_NAME);
+      let uiKey = await pref.get(ThemeManager.KEY_THEME_UI, '') as string;
+
+      if (!uiKey) {
+        uiKey = await pref.get(ThemeManager.KEY_THEME_LEGACY, 'vibrant') as string;
+      }
+
+      return uiKey || 'vibrant';
+    } catch (err) {
+      console.error('[ThemeManager] Failed to read persisted UI theme key', err);
+      return AppStorage.get<string>('currentThemeKey') || 'vibrant';
+    }
+  }
+
   static async setCustomBackground(uri: string, isBlur: boolean) {
     console.info('[ThemeManager] Setting custom background:', uri);
     // 立即更新内存，触发 UI 刷新

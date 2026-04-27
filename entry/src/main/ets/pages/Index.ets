@@ -18,6 +18,7 @@ import { hdsMaterial, HdsNavigation, HdsTabs, HdsTabsController } from '@kit.UID
 import { AdaptedHdsTabs } from './components/AdaptedHdsTabs';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { CapturePage } from './routes/capture/CapturePage';
+import { LottieOnboardingSheet } from './common/LottieOnboardingSheet';
 
 interface TabData {
   title: string,
@@ -40,6 +41,7 @@ struct Index {
 
   @StorageProp('IsAppDataReady') @Watch('onDataReady') isAppDataReady: boolean = false;
   @StorageProp(C.KEY_PRIVACY_AGREE) privacyAgreed: boolean = false;
+  @StorageLink(C.KEY_SHOW_GUIDE_NEXT_LAUNCH) showGuideNextLaunch: boolean = false;
   @State isShowUI: boolean = false;
 
   @StorageLink('isLoggedIn') @Watch('onLoginStatusChange') isLoggedIn: boolean = false;
@@ -71,16 +73,20 @@ struct Index {
   private privacyUrl: string = 'resource://rawfile/privacy_agreement.html';
 
   @State isBlocking: boolean = false;
+  @State isGuideSheetShow: boolean = false;
   private isDialogOpened: boolean = false;
   private isCheckingPrivacyDialog: boolean = false;
+  private hasPresentedGuideSheet: boolean = false;
 
   dialogController: CustomDialogController | null = new CustomDialogController({
     builder: PrivacyDialog({
       onConfirm: async () => {
         await LocalValues.getInstance().setPrivacyAgreed();
+        this.privacyAgreed = true;
         this.isBlocking = false;
         this.isDialogOpened = false;
         console.info('User agreed to privacy policy.');
+        void this.maybeShowGuideSheet();
       },
       onCancel: () => {
         this.context.terminateSelf().catch(() => {
@@ -110,6 +116,7 @@ struct Index {
       });
 
       this.checkAndShowDialog();
+      void this.maybeShowGuideSheet();
     }
   }
 
@@ -131,6 +138,7 @@ struct Index {
 
     if (this.isAppDataReady) {
       this.checkAndShowDialog();
+      void this.maybeShowGuideSheet();
     }
   }
 
@@ -207,10 +215,43 @@ struct Index {
         this.dialogController?.open();
       } else if (isAgreed) {
         this.isBlocking = false;
+        this.privacyAgreed = true;
+        void this.maybeShowGuideSheet();
       }
     } finally {
       this.isCheckingPrivacyDialog = false;
     }
+  }
+
+  private async maybeShowGuideSheet(): Promise<void> {
+    if (!this.isAppDataReady || this.hasPresentedGuideSheet || this.isGuideSheetShow) {
+      return;
+    }
+
+    if (!this.showGuideNextLaunch) {
+      return;
+    }
+
+    if (!this.privacyAgreed || this.isBlocking || this.isDialogOpened || this.appPathStack.size() > 0) {
+      return;
+    }
+
+    this.hasPresentedGuideSheet = true;
+    await LocalValues.getInstance().setShowGuideNextLaunch(false);
+    setTimeout(() => {
+      if (!this.isBlocking && this.privacyAgreed && this.appPathStack.size() === 0) {
+        this.isGuideSheetShow = true;
+      }
+    }, 300);
+  }
+
+  @Builder
+  onboardingSheet() {
+    LottieOnboardingSheet({
+      onClose: () => {
+        this.isGuideSheetShow = false;
+      }
+    })
   }
 
   openPrivacyWeb() {
@@ -421,5 +462,15 @@ struct Index {
     .width('100%')
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .backgroundColor(this.theme.bgPrimary)
+    .bindSheet($$this.isGuideSheetShow, this.onboardingSheet(), {
+      height: SheetSize.LARGE,
+      dragBar: true,
+      showClose: false,
+      blurStyle: BlurStyle.Regular,
+      backgroundColor: Color.Transparent,
+      onDisappear: () => {
+        this.isGuideSheetShow = false;
+      }
+    })
   }
 }

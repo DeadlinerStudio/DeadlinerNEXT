@@ -1,4 +1,5 @@
-import { HdsNavigation, HdsNavigationTitleMode, HdsNavigationAttribute } from "@kit.UIDesignKit";
+import { HdsNavigation, HdsNavigationTitleMode, HdsNavigationAttribute,
+  HdsNavigationMenuItemOptions } from "@kit.UIDesignKit";
 import { DashboardSection } from "./DashboardSection";
 import { OverviewStatsSection } from "./OverviewStatsSection";
 import { TrendAnalysisSection } from "./TrendAnalysisSection";
@@ -6,11 +7,17 @@ import { getImmersiveTitleBarStyle } from "../../../common/style/NavStyles";
 import { OverviewViewModel } from "./OverviewViewModel";
 import { SortSheet } from "./SortSheet";
 import { SortSheetTablet } from "./SortSheetTablet";
+import { SettingsConstants as C } from "../../../common/local/SettingsConstants";
+import { promptAction } from "@kit.ArkUI";
+import { common } from "@kit.AbilityKit";
+import { PaperTalkUtils } from "../../../utils/PaperTalkUtils";
 
 @Component
 export struct OverviewPageTablet {
   @Consume('appPathStack') appPathStack: NavPathStack;
+  @StorageLink(C.KEY_SHOW_PAPERTALK_SHARE) showPaperTalkShare: boolean = true;
   @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  private context = getContext(this) as common.UIAbilityContext;
 
   // --- 状态控制 ---
   @State isLoading: boolean = true;
@@ -78,6 +85,10 @@ export struct OverviewPageTablet {
         Span("• 每月趋势：").fontWeight(FontWeight.Medium)
         Span("展示近12个月的任务总量、完成量及逾期量走势。").fontColor($r('sys.color.ohos_id_color_text_secondary'))
       }.fontSize(14).lineHeight(20)
+      Text() {
+        Span("• 活跃热力图：").fontWeight(FontWeight.Medium)
+        Span("按天展示最近一段时间的任务活跃度，颜色越深表示当天完成任务越多。").fontColor($r('sys.color.ohos_id_color_text_secondary'))
+      }.fontSize(14).lineHeight(20)
     }
     .alignItems(HorizontalAlign.Start)
     .padding(16)
@@ -109,6 +120,45 @@ export struct OverviewPageTablet {
     .padding(16)
     .borderRadius(12)
     .width(280)
+  }
+
+  private shareMonthlySummary(): void {
+    const payload = PaperTalkUtils.buildOverviewPayload(
+      this.viewModel.lastMonthName,
+      this.viewModel.monthlyAnalysis,
+      this.viewModel.isAnalyzing,
+      this.viewModel.metrics
+    );
+    PaperTalkUtils.openPrintOrStore(this.context, payload).catch((error: Error) => {
+      console.error(`[OverviewPageTablet] Share monthly summary failed: ${error}`);
+      promptAction.showToast({ message: '暂时无法打开纸语或应用商店' });
+    });
+  }
+
+  private buildTitleMenus(): HdsNavigationMenuItemOptions[] {
+    const menuItems: HdsNavigationMenuItemOptions[] = [
+      {
+        content: {
+          icon: $r('sys.symbol.text_and_arrow_down'),
+          action: () => {
+            this.isSortSheetShow = true;
+          }
+        }
+      }
+    ];
+
+    if (this.showPaperTalkShare) {
+      menuItems.push({
+        content: {
+          icon: $r('sys.symbol.share'),
+          action: () => {
+            this.shareMonthlySummary();
+          }
+        }
+      });
+    }
+
+    return menuItems;
   }
 
   build() {
@@ -160,6 +210,7 @@ export struct OverviewPageTablet {
                     todayCompleted: this.viewModel.todayCompleted,
                     todayTodo: this.viewModel.todayTodo,
                     todayOverdue: this.viewModel.todayOverdue,
+                    activeAbandoned: this.viewModel.activeAbandoned,
                     historyStats: this.viewModel.historyStats,
                     completionTimeStats: this.viewModel.completionTimeStats,
                     overdueItems: this.viewModel.overdueItems,
@@ -227,6 +278,7 @@ export struct OverviewPageTablet {
                     dailyStats: this.viewModel.dailyStats,
                     monthlyStats: this.viewModel.monthlyStats,
                     weeklyStats: this.viewModel.weeklyStats,
+                    contributionStats: this.viewModel.contributionStats,
                     cardOrder: this.viewModel.trendCardOrder
                   })
                 }
@@ -288,7 +340,11 @@ export struct OverviewPageTablet {
               Scroll() {
                 Column() {
                   DashboardSection({
-                    items: this.viewModel.allItems
+                    metrics: this.viewModel.metrics,
+                    dailyStats: this.viewModel.lastMonthDailyStats,
+                    lastMonthName: this.viewModel.lastMonthName,
+                    analysis: this.viewModel.monthlyAnalysis,
+                    isAnalyzing: this.viewModel.isAnalyzing
                   })
                 }
                 .padding({ bottom: 24 })
@@ -327,16 +383,7 @@ export struct OverviewPageTablet {
       content: {
         title: { mainTitle: '概览' },
         menu: {
-          value: [
-            {
-              content: {
-                icon: $r('sys.symbol.text_and_arrow_down'),
-                action: () => {
-                  this.isSortSheetShow = true;
-                }
-              }
-            }
-          ]
+          value: this.buildTitleMenus()
         }
       }
     })

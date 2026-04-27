@@ -3,6 +3,7 @@ import { ThemeManager } from '../../../../../common/theme/ThemeManager';
 import { SettingsSection, SubSettingsSwitch } from '../../../../components/SettingsComponents';
 import { promptAction } from '@kit.ArkUI';
 import { IndicatorMap, IndicatorSet } from '../../../../../common/theme/ThemeModel';
+import { WidgetUpdater } from '../../../../../utils/WidgetUpdater';
 
 interface ChartOption {
   key: string;
@@ -277,13 +278,17 @@ export struct ColorCustomizer {
         .buttonStyle(ButtonStyleMode.EMPHASIZED)
         .controlSize(ControlSize.NORMAL)
         .backgroundColor(this.currentBrand)
-        .onClick(() => {
-          ThemeManager.applyCustomColors(
+        .onClick(async () => {
+          await ThemeManager.applyCustomColors(
             this.currentBrand, this.currentAccent,
             this.enableColdTab ? $r('app.color.cold') : this.currentBrand,
             this.selectedChartKey,
             this.hue, this.styleStrength
           );
+          const context = this.getUIContext().getHostContext();
+          if (context) {
+            await WidgetUpdater.updateAllWidgets(context);
+          }
           promptAction.showToast({
             message: '主题设置成功！'
           })

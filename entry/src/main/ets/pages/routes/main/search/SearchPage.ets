@@ -20,6 +20,10 @@ import { TaskState, TaskStateAction } from '../../../../model/TaskStateMachine';
 import { InspirationEditSheet, InspirationSearchCard } from '../../capture/CaptureComponents';
 import { AddTaskSheet } from '../modify/task/AddTaskSheet';
 import { AddHabitSheet } from '../modify/habit/AddHabitSheet';
+import { getImmersiveTitleBarStyle } from '../../../../common/style/NavStyles';
+import { SettingsConstants as C } from '../../../../common/local/SettingsConstants';
+import { getHdsMaterialLevelRaw } from '../../../../common/style/MaterialLevel';
+import { HdsMiniBarButton } from '../../../components/infra/HdsMiniBarButton';
 
 @Builder
 export function SearchPageBuilder() {
@@ -63,8 +67,12 @@ export struct SearchPage {
   @State directTaskName: string = '';
   @State directTaskNote: string = '';
   @State directHabitName: string = '';
+  @State searchBarMeasuredWidth: number = 0;
 
   readonly SEARCH_INPUT_ID = 'search_input';
+  @StorageLink(C.KEY_EXPERIMENTAL_COMPONENTS) experimentalComponents: boolean = true;
+  @StorageProp(C.KEY_ENABLE_API23) api23: boolean = false;
+  @StorageProp(C.KEY_API23_MATERIAL_LEVEL) materialLevel: string = 'EXQUISITE';
 
   async aboutToAppear() {
     await this.logic.preloadData();
@@ -278,8 +286,24 @@ export struct SearchPage {
     this.isAddHabitSheetShow = true;
   }
 
-  @Builder searchBuilder() {
-    Row() {
+  private resolveSearchBarWidth(): number {
+    return this.searchBarMeasuredWidth > 0 ? this.searchBarMeasuredWidth : 320;
+  }
+
+  @Builder
+  private searchInputContent(isTransparentBg: boolean = false) {
+    if (isTransparentBg) {
+      Search({ value: this.searchText, placeholder: '搜索任务、习惯或灵感...' })
+        .searchButton('搜索', { fontColor: this.theme.brand })
+        .id('search_input')
+        .defaultFocus(true)
+        .width('100%')
+        .height(40)
+        .backgroundColor(Color.Transparent)
+        .placeholderColor($r('sys.color.ohos_id_color_text_secondary'))
+        .onChange((value: string) => this.handleSearch(value))
+        .margin({ top: 0 })
+    } else {
       Search({ value: this.searchText, placeholder: '搜索任务、习惯或灵感...' })
         .searchButton('搜索', { fontColor: this.theme.brand })
         .id('search_input')
@@ -289,7 +313,35 @@ export struct SearchPage {
         .placeholderColor($r('sys.color.ohos_id_color_text_secondary'))
         .onChange((value: string) => this.handleSearch(value))
     }
-    .padding({ left: 64, right: 16 })
+  }
+
+  @Builder searchBuilder() {
+    if (this.experimentalComponents && this.api23) {
+      Row() {
+        Stack({ alignContent: Alignment.Center }) {
+          HdsMiniBarButton({
+            barWidth: this.resolveSearchBarWidth(),
+            barHeight: 52,
+            materialLevel: getHdsMaterialLevelRaw(this.materialLevel)
+          }) {
+            this.searchInputContent(true)
+          }
+        }
+        .width('100%')
+        .height(52)
+        .onAreaChange((_, area) => {
+          if (typeof area.width === 'number' && area.width > 0) {
+            this.searchBarMeasuredWidth = area.width;
+          }
+        })
+      }
+      .padding({ left: 64, right: 16 })
+    } else {
+      Row() {
+        this.searchInputContent()
+      }
+      .padding({ left: 64, right: 16 })
+    }
   }
 
   @Builder buildEmptyPlaceholder() {
@@ -380,15 +432,13 @@ export struct SearchPage {
     HdsNavDestination() {
       TopSafeContainer({
         topAvoidHeight: this.statusBarHeight,
-        scrollable: false,
         bgColor: this.bgColor
       }) {
-        Column() {
-          if (!this.hasSearchTerm) {
-            this.buildEmptyPlaceholder()
-          } else {
-            List({ scroller: this.scroller, space: 10 }) {
-              ListItem() { Column().height(8) }
+        if (!this.hasSearchTerm) {
+          this.buildEmptyPlaceholder()
+        } else {
+          List({ scroller: this.scroller, space: 10 }) {
+            ListItem() { Column().height(8) }
 
               // A. 任务组
               if (this.taskResults.length > 0) {
@@ -510,61 +560,58 @@ export struct SearchPage {
                 }
               }
 
-              ListItem().height(100)
-            }
-            .width('100%')
-            .layoutWeight(1)
-            .scrollBar(BarState.Off)
-            .padding({ left: 12, right: 12 })
-            .transition(TransitionEffect.OPACITY.animation({ duration: 200 }))
+            ListItem().height(100)
           }
-
-          Blank()
-            .width(0)
-            .height(0)
-            .bindSheet($$this.isInspirationSheetShow, this.inspirationSheetBuilder(), {
-              height: SheetSize.LARGE,
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
-              showClose: false,
-              onDisappear: () => {
-                this.isInspirationSheetShow = false;
-                this.editingInspiration = null;
-              },
-              title: {
-                title: '编辑灵感',
-                subtitle: '保留它的原始样子，之后再整理'
-              }
-            })
-
-          Blank()
-            .width(0)
-            .height(0)
-            .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), {
-              height: SheetSize.LARGE,
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
-              showClose: false,
-              onDisappear: () => {
-                this.isAddTaskSheetShow = false;
-              }
-            })
-
-          Blank()
-            .width(0)
-            .height(0)
-            .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), {
-              height: SheetSize.LARGE,
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
-              showClose: false,
-              onDisappear: () => {
-                this.isAddHabitSheetShow = false;
-              }
-            })
+          .width('100%')
+          .scrollBar(BarState.Off)
+          .padding({ left: 12, right: 12 })
+          .transition(TransitionEffect.OPACITY.animation({ duration: 200 }))
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         }
-        .width('100%')
-        .height('100%')
+
+        Blank()
+          .width(0)
+          .height(0)
+          .bindSheet($$this.isInspirationSheetShow, this.inspirationSheetBuilder(), {
+            height: SheetSize.LARGE,
+            blurStyle: BlurStyle.Regular,
+            backgroundColor: Color.Transparent,
+            showClose: false,
+            onDisappear: () => {
+              this.isInspirationSheetShow = false;
+              this.editingInspiration = null;
+            },
+            title: {
+              title: '编辑灵感',
+              subtitle: '保留它的原始样子，之后再整理'
+            }
+          })
+
+        Blank()
+          .width(0)
+          .height(0)
+          .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), {
+            height: SheetSize.LARGE,
+            blurStyle: BlurStyle.Regular,
+            backgroundColor: Color.Transparent,
+            showClose: false,
+            onDisappear: () => {
+              this.isAddTaskSheetShow = false;
+            }
+          })
+
+        Blank()
+          .width(0)
+          .height(0)
+          .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), {
+            height: SheetSize.LARGE,
+            blurStyle: BlurStyle.Regular,
+            backgroundColor: Color.Transparent,
+            showClose: false,
+            onDisappear: () => {
+              this.isAddHabitSheetShow = false;
+            }
+          })
       }
     }
     .backgroundColor(this.bgColor)
@@ -576,8 +623,9 @@ export struct SearchPage {
         },
         backIcon: {
           action: this.backAction
-        }
-      }
+        },
+      },
+      style: getImmersiveTitleBarStyle(false, false)
     })
   }
 }

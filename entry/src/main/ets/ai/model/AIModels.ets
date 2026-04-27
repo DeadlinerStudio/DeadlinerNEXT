@@ -145,6 +145,13 @@ export interface TaskSummary {
   dueSoon24h: number;
 }
 
+export interface MonthlyAnalysisResult {
+  month: string;
+  summary: string;
+  keywords: string[];
+  generatedAt?: string;
+}
+
 // ==========================================
 // 5. 错误定义及其他工具模型
 // ==========================================

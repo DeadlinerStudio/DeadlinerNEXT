@@ -1,5 +1,4 @@
 import { DDLItem } from '../model/DDLModels';
-import { List } from '@kit.ArkTS';
 
 export function hashColor(key: string): ResourceColor {
   if (key.includes('今日') || key.includes('完成')) return $r('app.color.chart_green'); // Green
@@ -9,15 +8,29 @@ export function hashColor(key: string): ResourceColor {
 }
 
 export function safeParseDate(dateStr: string): Date {
+  const parsed = safeParseOptionalDate(dateStr);
+  if (parsed !== null) {
+    return parsed;
+  }
+  return new Date();
+}
+
+export function safeParseOptionalDate(dateStr: string): Date | null {
+  if (!dateStr || dateStr.length === 0) {
+    return null;
+  }
   try {
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      return new Date(dateStr.replace(/-/g, '/'));
+    if (!isNaN(date.getTime())) {
+      return date;
     }
-    return date;
+    const fallback = new Date(dateStr.replace(/-/g, '/'));
+    if (!isNaN(fallback.getTime())) {
+      return fallback;
+    }
   } catch (e) {
-    return new Date();
   }
+  return null;
 }
 
 export function isOverdue(item: DDLItem): boolean {
@@ -80,26 +93,9 @@ export interface WeeklyStat {
   completed: number;
 }
 
-// 检查是否同一天
-function isSameDay(d1: Date, d2: Date): boolean {
-  return d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
-}
-
-// 检查是否同一月
-function isSameMonth(d1: Date, d2: Date): boolean {
-  return d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth();
-}
-
-// 获取 ISO 周号 (简化版)
-function getWeekNumber(d: Date): number {
-  const date = new Date(d.getTime());
-  date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-  const week1 = new Date(date.getFullYear(), 0, 4);
-  return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+export interface ContributionDay {
+  date: Date;
+  count: number;
 }
 
 // --- 3. 核心统计逻辑 (移植自 Android) ---
@@ -110,36 +106,39 @@ function getWeekNumber(d: Date): number {
 export function computeDailyCompletedCounts(items: DDLItem[], days: number = 7): DailyStat[] {
   const result: DailyStat[] = [];
   const today = new Date();
+  const now = new Date();
+  const completedMap = new Map<string, number>();
+  const overdueMap = new Map<string, number>();
 
-  // 预处理数据：只处理已完成的任务
-  const completedTasks = items.filter(it => it.isCompleted && it.completeTime);
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    const completedDate = safeParseOptionalDate(item.completeTime);
+    if (item.isCompleted && completedDate !== null) {
+      const completedKey = dayKey(completedDate);
+      const completedCount = completedMap.get(completedKey) || 0;
+      completedMap.set(completedKey, completedCount + 1);
+    }
+
+    const endDate = safeParseOptionalDate(item.endTime);
+    if (!item.isCompleted && endDate !== null && endDate.getTime() < now.getTime()) {
+      const overdueKey = dayKey(endDate);
+      const overdueCount = overdueMap.get(overdueKey) || 0;
+      overdueMap.set(overdueKey, overdueCount + 1);
+    }
+    index += 1;
+  }
 
   for (let i = days - 1; i >= 0; i--) {
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() - i);
-
-    // 1. 当天完成数
-    const completedCount = completedTasks.filter(it => {
-      const doneDate = safeParseDate(it.completeTime);
-      return isSameDay(doneDate, targetDate);
-    }).length;
-
-    // 2. 当天逾期完成数 (完成时间 > 截止时间 且 完成时间是当天)
-    const overdueCount = completedTasks.filter(it => {
-      const doneDate = safeParseDate(it.completeTime);
-      const endDate = safeParseDate(it.endTime);
-
-      // 必须是当天完成
-      if (!isSameDay(doneDate, targetDate)) return false;
-      // 必须实际逾期 (完成时间 晚于 截止时间)
-      return doneDate.getTime() > endDate.getTime();
-    }).length;
+    const key = dayKey(targetDate);
 
     result.push({
-      dateStr: targetDate.getDate().toString(), // UI只显示日期 "12"
+      dateStr: `${targetDate.getMonth() + 1}`.padStart(2, '0') + '-' + `${targetDate.getDate()}`.padStart(2, '0'),
       fullDate: targetDate.toDateString(),
-      completed: completedCount,
-      overdue: overdueCount
+      completed: completedMap.get(key) || 0,
+      overdue: overdueMap.get(key) || 0
     });
   }
   return result;
@@ -151,42 +150,42 @@ export function computeDailyCompletedCounts(items: DDLItem[], days: number = 7):
 export function computeMonthlyTaskStats(items: DDLItem[], months: number = 6): MonthlyStat[] {
   const result: MonthlyStat[] = [];
   const today = new Date();
+  const totalMap = new Map<string, number>();
+  const completedMap = new Map<string, number>();
+  const overdueCompletedMap = new Map<string, number>();
+
+  let itemIndex = 0;
+  while (itemIndex < items.length) {
+    const item = items[itemIndex];
+    const endDate = safeParseOptionalDate(item.endTime);
+    if (endDate !== null) {
+      const key = monthKey(endDate);
+      totalMap.set(key, (totalMap.get(key) || 0) + 1);
+
+      if (item.isCompleted) {
+        completedMap.set(key, (completedMap.get(key) || 0) + 1);
+
+        const completeDate = safeParseOptionalDate(item.completeTime);
+        if (completeDate !== null && completeDate.getTime() > endDate.getTime()) {
+          overdueCompletedMap.set(key, (overdueCompletedMap.get(key) || 0) + 1);
+        }
+      }
+    }
+    itemIndex += 1;
+  }
 
   for (let i = months - 1; i >= 0; i--) {
     const targetDate = new Date(today);
-    targetDate.setMonth(today.getMonth() - i); // 倒推月份
-
-    const year = targetDate.getFullYear();
-    const month = targetDate.getMonth() + 1; // 1-12
-    const monthStr = `${year}-${month.toString().padStart(2, '0')}`;
-
-    // 1. 当月任务总数 (截止日期在当月)
-    const total = items.filter(it => {
-      const endDate = safeParseDate(it.endTime);
-      return isSameMonth(endDate, targetDate);
-    }).length;
-
-    // 2. 当月完成数 (完成日期在当月)
-    const completed = items.filter(it => {
-      if (!it.isCompleted || !it.completeTime) return false;
-      const doneDate = safeParseDate(it.completeTime);
-      return isSameMonth(doneDate, targetDate);
-    }).length;
-
-    // 3. 当月逾期完成数 (完成日期在当月 且 完成时间 > 截止时间)
-    const overdue = items.filter(it => {
-      if (!it.isCompleted || !it.completeTime) return false;
-      const doneDate = safeParseDate(it.completeTime);
-      const endDate = safeParseDate(it.endTime);
-
-      return isSameMonth(doneDate, targetDate) && (doneDate.getTime() > endDate.getTime());
-    }).length;
+    targetDate.setDate(1);
+    targetDate.setMonth(today.getMonth() - i);
+    const key = monthKey(targetDate);
+    const month = targetDate.getMonth() + 1;
 
     result.push({
-      monthStr: monthStr,
-      total: total,
-      completed: completed,
-      overdue: overdue
+      monthStr: `${month}月`,
+      total: totalMap.get(key) || 0,
+      completed: completedMap.get(key) || 0,
+      overdue: overdueCompletedMap.get(key) || 0
     });
   }
   return result;
@@ -198,33 +197,109 @@ export function computeMonthlyTaskStats(items: DDLItem[], months: number = 6): M
 export function computeWeeklyCompletedCounts(items: DDLItem[], weeks: number = 4): WeeklyStat[] {
   const result: WeeklyStat[] = [];
   const today = new Date();
-
-  // 简单起见，按 ISO 周号统计不太直观，我们这里模拟安卓逻辑：
-  // 倒推周数，每周作为一个 bucket
-
   for (let i = weeks - 1; i >= 0; i--) {
-    const targetDate = new Date(today);
-    targetDate.setDate(today.getDate() - (i * 7)); // 每一周的基准点
-    const weekNum = getWeekNumber(targetDate);
-    const label = `第${weekNum}周`;
+    const endOfWeek = new Date(today);
+    endOfWeek.setDate(today.getDate() - i * 7);
+    const startOfWeek = new Date(endOfWeek);
+    startOfWeek.setDate(endOfWeek.getDate() - 6);
+    setStartOfDay(startOfWeek);
+    setEndOfDay(endOfWeek);
 
-    // 筛选这一周内的完成数据 (注意：跨年周可能需要更严谨的判断，这里简化处理)
-    // 更好的方式是判断日期是否在 [StartOfWeek, EndOfWeek] 区间
-    // 这里为了性能，我们假设 "第X周" 的统计是聚合该周号的所有数据 (同年)
+    let count = 0;
+    let itemIndex = 0;
+    while (itemIndex < items.length) {
+      const item = items[itemIndex];
+      if (item.isCompleted) {
+        const completeDate = safeParseOptionalDate(item.completeTime);
+        if (completeDate !== null &&
+          completeDate.getTime() >= startOfWeek.getTime() &&
+          completeDate.getTime() <= endOfWeek.getTime()) {
+          count += 1;
+        }
+      }
+      itemIndex += 1;
+    }
 
-    const year = targetDate.getFullYear();
-
-    const count = items.filter(it => {
-      if (!it.isCompleted || !it.completeTime) return false;
-      const doneDate = safeParseDate(it.completeTime);
-      return doneDate.getFullYear() === year && getWeekNumber(doneDate) === weekNum;
-    }).length;
+    let label = '本周';
+    if (i > 0) {
+      label = `${i}周前`;
+    }
 
     result.push({
       weekLabel: label,
       completed: count
     });
   }
+  return result;
+}
+
+export function computeContributionStats(items: DDLItem[], days: number = 150): ContributionDay[] {
+  const result: ContributionDay[] = [];
+  const today = new Date();
+  const completedMap = new Map<string, number>();
+
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    if (item.isCompleted) {
+      const completeDate = safeParseOptionalDate(item.completeTime);
+      if (completeDate !== null) {
+        const key = dayKey(completeDate);
+        completedMap.set(key, (completedMap.get(key) || 0) + 1);
+      }
+    }
+    index += 1;
+  }
+
+  for (let i = days - 1; i >= 0; i--) {
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() - i);
+    const key = dayKey(targetDate);
+    result.push({
+      date: targetDate,
+      count: completedMap.get(key) || 0
+    });
+  }
+  return result;
+}
+
+export function computeLastMonthDailyStats(items: DDLItem[]): DailyStat[] {
+  const result: DailyStat[] = [];
+  const now = new Date();
+  const firstDayOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const completedMap = new Map<string, number>();
+  const overdueMap = new Map<string, number>();
+
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    const completedDate = safeParseOptionalDate(item.completeTime);
+    if (item.isCompleted && completedDate !== null) {
+      const completedKey = dayKey(completedDate);
+      completedMap.set(completedKey, (completedMap.get(completedKey) || 0) + 1);
+    }
+
+    const endDate = safeParseOptionalDate(item.endTime);
+    if (!item.isCompleted && endDate !== null && endDate.getTime() < now.getTime()) {
+      const overdueKey = dayKey(endDate);
+      overdueMap.set(overdueKey, (overdueMap.get(overdueKey) || 0) + 1);
+    }
+    index += 1;
+  }
+
+  const cursor = new Date(firstDayOfLastMonth);
+  while (cursor.getTime() < firstDayOfThisMonth.getTime()) {
+    const key = dayKey(cursor);
+    result.push({
+      dateStr: `${cursor.getDate()}`,
+      fullDate: cursor.toDateString(),
+      completed: completedMap.get(key) || 0,
+      overdue: overdueMap.get(key) || 0
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
   return result;
 }
 
@@ -240,8 +315,8 @@ export interface Metric {
 interface MonthStats {
   total: number;
   completed: number;
+  rate: number;
   overdue: number;
-  avgCompletionTimeMs: number; // 平均完成耗时 (毫秒)
 }
 
 // 获取上个月的起始和结束时间
@@ -264,79 +339,120 @@ export function getPrevMonthRange(): [Date, Date] {
 
 // 统计特定时间段的数据
 function collectStatsInRange(items: DDLItem[], start: Date, end: Date): MonthStats {
-  const filtered = items.filter(item => {
-    if (!item.completeTime) return false;
-    const ct = safeParseDate(item.completeTime);
-    return ct >= start && ct <= end;
-  });
+  let total = 0;
+  let completed = 0;
+  let overdue = 0;
 
-  const total = filtered.length;
-  const completed = filtered.filter(it => it.isCompleted).length;
-  // 这里 isOverdue 需要 item, 我们复用之前的函数
-  const overdue = filtered.filter(it => isOverdue(it)).length;
-
-  let totalDuration = 0;
-  let countWithDuration = 0;
-
-  filtered.forEach(item => {
-    if (item.startTime && item.completeTime) {
-      const st = safeParseDate(item.startTime);
-      const ct = safeParseDate(item.completeTime);
-      const diff = ct.getTime() - st.getTime();
-      if (diff > 0) {
-        totalDuration += diff;
-        countWithDuration++;
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    const endDate = safeParseOptionalDate(item.endTime);
+    if (endDate !== null &&
+      endDate.getTime() >= start.getTime() &&
+      endDate.getTime() <= end.getTime()) {
+      total += 1;
+      if (item.isCompleted) {
+        completed += 1;
+      } else {
+        overdue += 1;
       }
     }
-  });
+    index += 1;
+  }
 
-  const avg = countWithDuration > 0 ? totalDuration / countWithDuration : 0;
+  let rate = 0;
+  if (total > 0) {
+    rate = completed / total * 100;
+  }
 
-  return { total, completed, overdue, avgCompletionTimeMs: avg };
+  return { total, completed, rate, overdue };
 }
 
-// 计算数值变化
-function computeChange(current: number, previous: number): [string | undefined, boolean | undefined] {
-  if (previous === 0) {
-    return current > 0 ? ["", undefined] : [undefined, undefined];
+function computePercentageChange(current: number, previous: number): [string | undefined, boolean | undefined] {
+  if (previous <= 0) {
+    return [undefined, undefined];
   }
   const diff = current - previous;
-  if (diff === 0) return [undefined, undefined];
-
-  const isDown = diff < 0;
-  return [Math.abs(diff).toString(), isDown];
+  if (diff === 0) {
+    return [undefined, undefined];
+  }
+  const percent = Math.abs(diff) / previous * 100;
+  return [`${percent.toFixed(1)}%`, diff < 0];
 }
 
-// 格式化百分比
-function formatRate(part: number, total: number): string {
-  return total > 0 ? Math.round((part * 100) / total) + "%" : "--";
+function formatRate(rate: number): string {
+  return `${rate.toFixed(1)}%`;
 }
 
-// 计算百分比变化
-function formatRateChange(
-  part: number, total: number,
-  prevPart: number, prevTotal: number
-): [string | undefined, boolean | undefined] {
-  if (total === 0 || prevTotal === 0) return [undefined, undefined];
+function formatAverageDuration(items: DDLItem[], start: Date, end: Date): string | null {
+  let totalSeconds = 0;
+  let count = 0;
 
-  const rateNow = Math.round((part * 100) / total);
-  const ratePrev = Math.round((prevPart * 100) / prevTotal);
-  const diff = rateNow - ratePrev;
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    const endDate = safeParseOptionalDate(item.endTime);
+    if (endDate !== null &&
+      endDate.getTime() >= start.getTime() &&
+      endDate.getTime() <= end.getTime() &&
+      item.isCompleted) {
+      const startDate = safeParseOptionalDate(item.startTime);
+      const completeDate = safeParseOptionalDate(item.completeTime);
+      if (startDate !== null && completeDate !== null && completeDate.getTime() >= startDate.getTime()) {
+        totalSeconds += (completeDate.getTime() - startDate.getTime()) / 1000;
+        count += 1;
+      }
+    }
+    index += 1;
+  }
 
-  if (diff === 0) return ["", undefined];
-  const isDown = diff < 0;
-  return [Math.abs(diff) + "%", isDown];
+  if (count === 0) {
+    return null;
+  }
+
+  const averageSeconds = totalSeconds / count;
+  const minutes = Math.floor(averageSeconds / 60);
+  if (minutes < 60) {
+    return `${minutes} 分钟`;
+  }
+  return `${(minutes / 60).toFixed(1)} 小时`;
 }
 
-// 格式化时长 (毫秒 -> 天/小时)
-function formatDuration(ms: number): string {
-  const hours = Math.floor(ms / (1000 * 60 * 60));
-  const days = Math.floor(hours / 24);
-  const remainHours = hours % 24;
+function findTopCompletionBucket(items: DDLItem[], start: Date, end: Date): string | null {
+  const bucketMap = new Map<string, number>();
 
-  if (days > 0) return `${days}天 ${remainHours}小时`;
-  if (hours > 0) return `${hours}小时`;
-  return "小于1小时";
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    const endDate = safeParseOptionalDate(item.endTime);
+    if (item.isCompleted &&
+      endDate !== null &&
+      endDate.getTime() >= start.getTime() &&
+      endDate.getTime() <= end.getTime()) {
+      const completeDate = safeParseOptionalDate(item.completeTime);
+      if (completeDate !== null) {
+        const bucket = extractTimeBucket(item.completeTime);
+        bucketMap.set(bucket, (bucketMap.get(bucket) || 0) + 1);
+      }
+    }
+    index += 1;
+  }
+
+  const bucketNames = ['深夜', '上午', '下午', '晚上'];
+  let bestBucket: string | null = null;
+  let bestCount = 0;
+  let bucketIndex = 0;
+  while (bucketIndex < bucketNames.length) {
+    const bucketName = bucketNames[bucketIndex];
+    const bucketCount = bucketMap.get(bucketName) || 0;
+    if (bucketCount > bestCount) {
+      bestCount = bucketCount;
+      bestBucket = bucketName;
+    }
+    bucketIndex += 1;
+  }
+
+  return bestBucket;
 }
 
 // --- 核心入口：生成 Dashboard 指标列表 ---
@@ -351,57 +467,91 @@ export function generateDashboardMetrics(items: DDLItem[]): Metric[] {
   const lastStats = collectStatsInRange(items, lastStart, lastEnd);
   const prevStats = collectStatsInRange(items, prevStart, prevEnd);
 
-  // 1. 月份标题
-  const monthName = `${lastStart.getFullYear()}年${lastStart.getMonth() + 1}月`;
+  const totalChange = computePercentageChange(lastStats.total, prevStats.total);
+  const completedChange = computePercentageChange(lastStats.completed, prevStats.completed);
+  const rateChange = computePercentageChange(lastStats.rate, prevStats.rate);
+  const overdueChange = computePercentageChange(lastStats.overdue, prevStats.overdue);
+  const activeBucket = findTopCompletionBucket(items, lastStart, lastEnd);
+  const averageDuration = formatAverageDuration(items, lastStart, lastEnd);
 
-  // 2. 各项指标
-  const GeneratedDestructArray_1 = computeChange(lastStats.total, prevStats.total);
-  const totalChange = GeneratedDestructArray_1[0];
-  const totalDown = GeneratedDestructArray_1[1];
-  const GeneratedDestructArray_2 = computeChange(lastStats.completed, prevStats.completed);
-  const completedChange = GeneratedDestructArray_2[0];
-  const completedDown = GeneratedDestructArray_2[1];
-  const GeneratedDestructArray_3 = computeChange(lastStats.overdue, prevStats.overdue);
-  const overdueChange = GeneratedDestructArray_3[0];
-  const overdueDown = GeneratedDestructArray_3[1];
+  const metrics: Metric[] = [];
+  metrics.push({
+    label: '上月任务数',
+    value: `${lastStats.total}`,
+    change: totalChange[0],
+    isDown: totalChange[1]
+  });
+  metrics.push({
+    label: '上月完成',
+    value: `${lastStats.completed}`,
+    change: completedChange[0],
+    isDown: completedChange[1]
+  });
+  metrics.push({
+    label: '上月完成率',
+    value: formatRate(lastStats.rate),
+    change: rateChange[0],
+    isDown: rateChange[1]
+  });
+  metrics.push({
+    label: '上月逾期数',
+    value: `${lastStats.overdue}`,
+    change: overdueChange[0],
+    isDown: overdueChange[1]
+  });
+  if (activeBucket !== null) {
+    const bucketCount = countCompletedTasksInBucket(items, lastStart, lastEnd, activeBucket);
+    metrics.push({
+      label: '最活跃时段',
+      value: activeBucket,
+      change: `完成 ${bucketCount} 个`
+    });
+  }
+  if (averageDuration !== null) {
+    metrics.push({
+      label: '平均耗时',
+      value: averageDuration
+    });
+  }
+  return metrics;
+}
 
-  const GeneratedDestructArray_4 = formatRateChange(
-    lastStats.completed, lastStats.total,
-    prevStats.completed, prevStats.total
-  );
-  const rateChange = GeneratedDestructArray_4[0];
-  const rateDown = GeneratedDestructArray_4[1];
-  const GeneratedDestructArray_5 = formatRateChange(
-    lastStats.overdue, lastStats.total,
-    prevStats.overdue, prevStats.total
-  );
-  const overdueRateChange = GeneratedDestructArray_5[0];
-  const overdueRateDown = GeneratedDestructArray_5[1];
-
-  return [
-    { label: "统计月份", value: monthName },
-    {
-      label: "总任务数", value: lastStats.total.toString(),
-      change: totalChange, isDown: totalDown
-    },
-    {
-      label: "完成数", value: lastStats.completed.toString(),
-      change: completedChange, isDown: completedDown
-    },
-    {
-      label: "逾期数", value: lastStats.overdue.toString(),
-      change: overdueChange, isDown: overdueDown
-    },
-    {
-      label: "完成率", value: formatRate(lastStats.completed, lastStats.total),
-      change: rateChange, isDown: rateDown
-    },
-    {
-      label: "逾期率", value: formatRate(lastStats.overdue, lastStats.total),
-      change: overdueRateChange, isDown: overdueRateDown
-    },
-    {
-      label: "平均耗时", value: formatDuration(lastStats.avgCompletionTimeMs)
+function countCompletedTasksInBucket(items: DDLItem[], start: Date, end: Date, bucket: string): number {
+  let count = 0;
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    if (item.isCompleted) {
+      const endDate = safeParseOptionalDate(item.endTime);
+      if (endDate !== null &&
+        endDate.getTime() >= start.getTime() &&
+        endDate.getTime() <= end.getTime() &&
+        extractTimeBucket(item.completeTime) === bucket) {
+        count += 1;
+      }
     }
-  ];
+    index += 1;
+  }
+  return count;
+}
+
+function dayKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function monthKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function setStartOfDay(date: Date): void {
+  date.setHours(0, 0, 0, 0);
+}
+
+function setEndOfDay(date: Date): void {
+  date.setHours(23, 59, 59, 999);
 }

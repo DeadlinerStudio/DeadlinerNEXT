@@ -1,7 +1,7 @@
 import { LocalValues } from '../common/local/LocalValues';
 import { DirectProvider } from './core/DirectProvider';
 import { LLMProvider } from './core/LLMProvider';
-import { ChatRequest, Message, MixedResult, AITask, AIHabit, AIToolResult } from './model/AIModels';
+import { ChatRequest, Message, MixedResult, AITask, AIHabit, AIToolResult, MonthlyAnalysisResult } from './model/AIModels';
 import { MemoryBank } from './model/MemoryModels';
 
 export class AIService {
@@ -164,6 +164,55 @@ export class AIService {
     const jsonString = this.extractJsonData(content);
     const resultObj = JSON.parse(jsonString) as MixedResult;
     return resultObj.habits ?? [];
+  }
+
+  public async generateMonthlyAnalysis(
+    monthName: string,
+    metricsSummary: string,
+    completedTaskNames: string[]
+  ): Promise<MonthlyAnalysisResult> {
+    const tasksStr = completedTaskNames.slice(0, 50).join(', ');
+    const systemPrompt = `
+你是 Deadliner AI 数据分析专家。请根据用户上个月（${monthName}）的任务完成数据，生成一份简短的月度总结和一组关键词标签。
+
+要求：
+1. 总结要口语化、温暖且有洞察力。
+2. 总结字数在 80-120 字左右。
+3. 提取 5-10 个关键词标签，并尽量深度结合“上月完成任务名”体现的主题。
+4. 关键词要有代表性，适合用于词云或标签展示。
+
+必须输出纯 JSON：
+{
+  "month": "${monthName}",
+  "summary": "...",
+  "keywords": ["标签1", "标签2", "标签3", "标签4", "标签5"]
+}
+`;
+
+    const userContent = `
+指标数据：
+${metricsSummary}
+
+上月完成的部分任务名：
+${tasksStr}
+`;
+
+    const messages: Message[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent }
+    ];
+
+    const content = await this.fetchFromProvider(messages);
+    console.info('[AIService] Monthly Analysis Raw Response:', content);
+
+    const jsonString = this.extractJsonData(content);
+    const result = JSON.parse(jsonString) as MonthlyAnalysisResult;
+    return {
+      month: result.month || monthName,
+      summary: result.summary || '',
+      keywords: result.keywords || [],
+      generatedAt: result.generatedAt || new Date().toISOString()
+    };
   }
 
   // ==========================================

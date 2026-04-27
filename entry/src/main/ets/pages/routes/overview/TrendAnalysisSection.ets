@@ -1,6 +1,6 @@
 import { ChartOptions, UCharts, UChartsController } from '@ibestservices/ucharts';
 import { StatsCardContainer } from '../../components/OverviewComponents'
-import { DailyStat, MonthlyStat, WeeklyStat } from '../../../utils/OverviewUtils'
+import { ContributionDay, DailyStat, MonthlyStat, WeeklyStat } from '../../../utils/OverviewUtils'
 import {
   BarChart,
   BarChartModel,
@@ -38,6 +38,7 @@ export struct TrendAnalysisSection {
   @Prop dailyStats: DailyStat[];
   @Prop monthlyStats: MonthlyStat[];
   @Prop weeklyStats: WeeklyStat[];
+  @Prop contributionStats: ContributionDay[];
 
   @Prop cardOrder: TrendCard[];
 
@@ -53,11 +54,14 @@ export struct TrendAnalysisSection {
         } else if (cardId === TrendCard.WEEKLY_TREND) {
           PrevWeeksCard({ weeklyStats: $weeklyStats })
             .attributeModifier(new FloatUpModifier(idx))
+        } else if (cardId === TrendCard.CONTRIBUTION_HEATMAP) {
+          ContributionHeatmapCard({ stats: this.contributionStats })
+            .attributeModifier(new FloatUpModifier(idx))
         }
       }, (item: string) => item)
 
       // 底部留白
-      Blank().height(48)
+      Blank().height(72)
     }
     .justifyContent(FlexAlign.Start)
     .constraintSize({ minHeight: '100%' })
@@ -445,9 +449,9 @@ struct MonthlyTrendCard {
 
     const dataSets = new JArrayList<ILineDataSet>();
     // 添加顺序：总计(最底层) -> 完成 -> 逾期(最上层)
-    dataSets.add(setupSet(totalEntries, "总计", blueColor, blueHex));
-    dataSets.add(setupSet(completedEntries, "完成", greenColor, greenHex));
-    dataSets.add(setupSet(overdueEntries, "逾期", redColor, redHex));
+    dataSets.add(setupSet(totalEntries, "总任务", blueColor, blueHex));
+    dataSets.add(setupSet(completedEntries, "已完成", greenColor, greenHex));
+    dataSets.add(setupSet(overdueEntries, "逾期完成", redColor, redHex));
 
     const data = new LineData(dataSets);
 
@@ -635,5 +639,149 @@ struct PrevWeeksCard {
       .height(100)
       .width('100%')
       .textAlign(TextAlign.Center)
+  }
+}
+
+@Component
+struct ContributionHeatmapCard {
+  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop stats: ContributionDay[] = [];
+
+  build() {
+    StatsCardContainer() {
+      Column({ space: 14 }) {
+        Row() {
+          Text('活跃热力图')
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.font_primary'))
+
+          Blank()
+
+          Text(`${this.stats.length}天内`)
+            .fontSize(12)
+            .fontColor($r('app.color.font_secondary'))
+        }
+        .width('100%')
+
+        if (this.stats.length > 0) {
+          Scroll() {
+            Row({ space: 4 }) {
+              ForEach(this.chunkWeeks(), (week: ContributionDay[], weekIndex: number) => {
+                Column({ space: 4 }) {
+                  ForEach(week, (day: ContributionDay) => {
+                    this.HeatmapCell(day)
+                  }, (day: ContributionDay) => `${day.date.getTime()}`)
+
+                  if (week.length < 7) {
+                    ForEach(this.placeholderIndexes(7 - week.length), (placeholder: number) => {
+                      Blank()
+                        .width(12)
+                        .height(12)
+                    }, (item: number) => `${weekIndex}_${item}`)
+                  }
+                }
+              }, (_week: ContributionDay[], index: number) => `week_${index}`)
+            }
+            .padding({ top: 4, bottom: 4 })
+          }
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+          .width('100%')
+
+          Row({ space: 4 }) {
+            Text('少')
+              .fontSize(10)
+              .fontColor($r('app.color.font_secondary'))
+
+            ForEach(this.legendLevels(), (level: number) => {
+              Stack() {}
+                .width(8)
+                .height(8)
+                .backgroundColor(this.cellColor(level))
+                .opacity(this.cellOpacity(level))
+                .borderRadius(2)
+            }, (item: number) => `${item}`)
+
+            Text('多')
+              .fontSize(10)
+              .fontColor($r('app.color.font_secondary'))
+          }
+        } else {
+          this.EmptyView()
+        }
+      }
+      .alignItems(HorizontalAlign.Start)
+    }
+  }
+
+  @Builder
+  private HeatmapCell(day: ContributionDay) {
+    Stack() {}
+      .width(12)
+      .height(12)
+      .backgroundColor(this.cellColor(day.count))
+      .opacity(this.cellOpacity(day.count))
+      .borderRadius(2)
+      .border({
+        width: 0.5,
+        color: $r('sys.color.ohos_id_color_list_separator')
+      })
+  }
+
+  @Builder
+  private EmptyView() {
+    Text('暂无数据')
+      .fontColor($r('sys.color.ohos_id_color_text_tertiary'))
+      .height(80)
+      .width('100%')
+      .textAlign(TextAlign.Center)
+  }
+
+  private chunkWeeks(): ContributionDay[][] {
+    const weeks: ContributionDay[][] = [];
+    let index = 0;
+    while (index < this.stats.length) {
+      weeks.push(this.stats.slice(index, index + 7));
+      index += 7;
+    }
+    return weeks;
+  }
+
+  private placeholderIndexes(count: number): number[] {
+    const indexes: number[] = [];
+    let index = 0;
+    while (index < count) {
+      indexes.push(index);
+      index += 1;
+    }
+    return indexes;
+  }
+
+  private legendLevels(): number[] {
+    return [0, 1, 3, 5, 7];
+  }
+
+  private cellColor(count: number): ResourceColor {
+    if (count <= 0) {
+      return $r('sys.color.ohos_id_color_list_separator');
+    }
+    return this.theme.chartCompleted;
+  }
+
+  private cellOpacity(count: number): number {
+    if (count <= 0) {
+      return 0.2;
+    }
+    if (count < 2) {
+      return 0.28;
+    }
+    if (count < 4) {
+      return 0.46;
+    }
+    if (count < 6) {
+      return 0.68;
+    }
+    return 0.9;
   }
 }
