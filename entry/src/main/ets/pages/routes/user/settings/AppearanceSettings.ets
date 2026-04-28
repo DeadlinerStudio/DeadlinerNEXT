@@ -16,6 +16,7 @@ import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { ThemeManager } from '../../../../common/theme/ThemeManager';
 import { ITheme } from '../../../../common/theme/ThemeModel';
 import { ImageCropSheet } from './components/ImageCropSheet';
+import { IconSelectSheet } from './components/IconSelectSheet';
 
 @Builder
 export function AppearanceSettingsBuilder() {
@@ -115,6 +116,12 @@ struct AppearanceSettings {
     })
   }
 
+  @State isIconSelectShow: boolean = false;
+  @Builder
+  iconSelectSheet() {
+    IconSelectSheet()
+  }
+
   @State menuOptions: SelectOption[] = [
     { value: '自适应' },
     { value: '流畅' },
@@ -180,7 +187,7 @@ struct AppearanceSettings {
       TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
         Column({ space: 16 }) {
 
-          SettingsSection({ title: '界面显示' }) {
+          SettingsSection({ title: '个性化' }) {
             SettingsItem({
               title: "个性化主题",
               subtitle: "自定义应用配色方案",
@@ -203,6 +210,17 @@ struct AppearanceSettings {
           }
 
           SettingsSection() {
+            SettingsItem({
+              title: "自定义图标",
+              subtitle: "自定义应用图标，季节图标可选",
+              icon: $r('sys.symbol.square'),
+              onItemClick: () => {
+                this.isIconSelectShow = true;
+              }
+            })
+          }
+
+          SettingsSection({ title: '界面显示' }) {
             SubSettingsSwitch({
               title: "沉浸光感视效",
               subtitle: "API23以上可以打开该选项获得最佳的视觉体验 (需重启生效)。",
@@ -334,6 +352,14 @@ struct AppearanceSettings {
               onChange: (isOn): Promise<void> => LocalValues.getInstance().setConfettiAfterFinished(isOn)
             })
           }
+
+          Blank().height(0)
+            .bindSheet($$this.isIconSelectShow, this.iconSelectSheet(), {
+              blurStyle: BlurStyle.Regular,
+              backgroundColor: Color.Transparent,
+              detents: [SheetSize.MEDIUM],
+              title: { title: '自定义图标' }
+            })
         }
         .width('100%')
         .padding(16)

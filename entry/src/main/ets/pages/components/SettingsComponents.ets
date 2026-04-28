@@ -20,6 +20,7 @@ export struct SettingsSection {
 
   @State bgColor: ResourceColor = $r('app.color.background_secondary');
   @Prop mainUserPage: boolean = false;
+  marginHorizontal?: number = 16;
 
   build() {
     Column() {
@@ -41,7 +42,7 @@ export struct SettingsSection {
       .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.mainUserPage), this.bgColor, BlurStyle.Regular))
       .borderRadius(24)
       .padding(4) // 让内部 Item 离边缘有间隙 (对应 Android 的 container padding)
-      .margin({ left: 16, right: 16 }) // 卡片离屏幕两边的距离
+      .margin({ left: this.marginHorizontal, right: this.marginHorizontal }) // 卡片离屏幕两边的距离
     }
     .width('100%')
   }
@@ -545,6 +546,7 @@ export struct SettingsCheckItem {
 
   title: string | Resource = '';
   icon?: Resource;
+  image?: ResourceStr;
   @Prop isSelected: boolean = false;
   onItemClick?: () => void;
 
@@ -558,6 +560,12 @@ export struct SettingsCheckItem {
           .fontSize(24)
           .fontColor([$r('app.color.font_primary')])
           .margin({ right: 16 })
+      } else if (this.image) {
+        Image(this.image)
+          .size({ height: 40, width: 40 })
+          .margin({ right: 16 })
+          .borderRadius(10)
+          .clip(true)
       }
 
       // 2. 标题

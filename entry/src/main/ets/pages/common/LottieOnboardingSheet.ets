@@ -1,220 +1,132 @@
-import lottie, { AnimationItem } from '@ohos/lottie';
-import { common } from '@kit.AbilityKit';
-import { util } from '@kit.ArkTS';
+import { DividerShowType, HdsNavigation, HdsNavigationMenuItemOptions, HdsNavigationTitleMode } from '@kit.UIDesignKit';
+import { promptAction } from '@kit.ArkUI';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { ITheme } from '../../common/theme/ThemeModel';
-
-interface LottieSceneMeta {
-  id: string;
-  fileName: string;
-  title: string;
-  subtitle: string;
-  detail: string;
-}
-
-const LOTTIE_SCENES: LottieSceneMeta[] = [
-  {
-    id: 'guide_scene_1',
-    fileName: 'Scene-1-Harmony.json',
-    title: '滑动任务，快捷处理',
-    subtitle: '在任务卡片上左右滑动，就能快速完成常用操作。',
-    detail: '像完成、归档这类高频动作，不必点进详情页，在列表里就能顺手处理。'
-  },
-  {
-    id: 'guide_scene_2',
-    fileName: 'Scene-2-Harmony.json',
-    title: '点一下 Lifi AI，唤起智能体',
-    subtitle: '遇到临时想法、碎片信息或模糊需求，都可以先交给它整理。',
-    detail: 'Lifi AI 能帮你提炼任务意图、补齐结构，再决定是否加入清单。'
-  },
-  {
-    id: 'guide_scene_4',
-    fileName: 'Scene-4-Harmony.json',
-    title: '长按任务，进入多选',
-    subtitle: '想批量完成、归档或删除时，长按任意任务即可开始选择。',
-    detail: '连续处理一组任务会更高效，适合做每日清单收尾或集中整理。'
-  },
-  {
-    id: 'guide_scene_5',
-    fileName: 'Scene-5-Harmony.json',
-    title: '轻点任务，查看详情与子任务',
-    subtitle: '短按任务可以进入详情页，继续补充信息或拆分子任务。',
-    detail: '当一件事需要更多上下文时，详情页就是你继续展开和整理的地方。'
-  },
-  {
-    id: 'guide_scene_6',
-    fileName: 'Scene-6-Harmony.json',
-    title: '点击 Tab 顶部按钮，快速导航',
-    subtitle: '每个 Tab 上方的按钮都可以带你进入对应功能入口。',
-    detail: '把常用入口放在手边，切页之外也能更快抵达你要用的能力。'
-  }
-];
-
-@Component
-struct LottieSceneCard {
-  @Prop scene: LottieSceneMeta;
-  @Prop @Watch('onActiveChanged') isActive: boolean;
-  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
-
-  @State private animationData: Object | null = null;
-  @State private isCanvasReady: boolean = false;
-  @State private hasLoadFailed: boolean = false;
-
-  private readonly renderingSettings: RenderingContextSettings = new RenderingContextSettings(true);
-  private readonly canvasRenderingContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.renderingSettings);
-  private readonly context = getContext(this) as common.UIAbilityContext;
-  private readonly textDecoder = new util.TextDecoder('utf-8', { ignoreBOM: true });
-
-  private animationItem: AnimationItem | null = null;
-  private removeDomLoadedListener?: () => void;
-
-  aboutToAppear(): void {
-    this.loadSceneData();
-  }
-
-  aboutToDisappear(): void {
-    this.destroyAnimation();
-  }
-
-  onActiveChanged(): void {
-    if (this.isActive) {
-      this.animationItem?.play();
-    } else {
-      this.animationItem?.pause();
-    }
-  }
-
-  private async loadSceneData(): Promise<void> {
-    if (this.animationData !== null || this.hasLoadFailed) {
-      this.tryLoadAnimation();
-      return;
-    }
-
-    try {
-      const fileData = await this.context.resourceManager.getRawFileContent(`lottie/${this.scene.fileName}`);
-      const jsonString = this.textDecoder.decodeWithStream(fileData);
-      this.animationData = JSON.parse(jsonString) as Object;
-      this.tryLoadAnimation();
-    } catch (error) {
-      this.hasLoadFailed = true;
-      console.error(`[LottieSceneCard] Failed to load ${this.scene.fileName}`, error);
-    }
-  }
-
-  private handleCanvasReady(): void {
-    this.canvasRenderingContext.imageSmoothingEnabled = true;
-    this.canvasRenderingContext.imageSmoothingQuality = 'medium';
-    this.isCanvasReady = true;
-    this.tryLoadAnimation();
-  }
-
-  private tryLoadAnimation(): void {
-    if (!this.isCanvasReady || this.animationData === null || this.animationItem !== null) {
-      return;
-    }
-
-    lottie.destroy(this.scene.id);
-    this.animationItem = lottie.loadAnimation({
-      container: this.canvasRenderingContext,
-      renderer: 'canvas',
-      loop: true,
-      autoplay: false,
-      name: this.scene.id,
-      context: this.context,
-      contentMode: 'Contain',
-      animationData: this.animationData
-    });
-
-    this.removeDomLoadedListener = this.animationItem.addEventListener('DOMLoaded', () => {
-      this.animationItem?.resize();
-      if (this.isActive) {
-        this.animationItem?.play();
-      } else {
-        this.animationItem?.pause();
-      }
-    });
-  }
-
-  private destroyAnimation(): void {
-    this.removeDomLoadedListener?.();
-    this.removeDomLoadedListener = undefined;
-    lottie.destroy(this.scene.id);
-    this.animationItem = null;
-  }
-
-  build() {
-    Column({ space: 16 }) {
-      Stack({ alignContent: Alignment.Center }) {
-        // Column()
-        //   .width('100%')
-        //   .height('100%')
-        //   .borderRadius(28)
-        //   .backgroundColor($r('sys.color.search_container_focus_color'))
-
-        Canvas(this.canvasRenderingContext)
-          .width('100%')
-          .height('100%')
-          .onReady(() => {
-            this.handleCanvasReady();
-          })
-
-        if (this.hasLoadFailed) {
-          Text('动画资源加载失败')
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.warning'))
-            .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-            .borderRadius(999)
-        }
-      }
-      .width('100%')
-      .height(320)
-      .borderRadius(28)
-      .clip(true)
-
-      Column({ space: 8 }) {
-        Text(this.scene.title)
-          .fontSize(26)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('sys.color.ohos_id_color_text_primary'))
-          .textAlign(TextAlign.Center)
-
-        Text(this.scene.subtitle)
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(this.theme.tabIcon)
-          .textAlign(TextAlign.Center)
-
-        Text(this.scene.detail)
-          .fontSize(14)
-          .lineHeight(22)
-          .fontColor($r('app.color.font_secondary'))
-          .textAlign(TextAlign.Center)
-      }
-      .width('100%')
-      .padding({ left: 8, right: 8 })
-    }
-    .width('100%')
-    .padding({ left: 20, right: 20, top: 8, bottom: 8 })
-  }
-}
+import { getImmersiveTitleBarStyle } from '../../common/style/NavStyles';
+import { ManualDataManager } from '../../common/manual/ManualModel';
+import { WebBrowserPageBuilder, WebParams } from './WebBrowserPage';
+import { DEFAULT_LOTTIE_SCENES, buildGuidePageIds, loadGuideSceneConfigs } from './onboarding/OnboardingConfig';
+import { IntroHeroPage, LottieScenePage, PrivacyAgreementPage } from './onboarding/OnboardingCorePages';
+import { AiPage, ImmersiveEffectPage, NotificationPage, PersonalizationPage, SyncPage } from './onboarding/OnboardingSetupPages';
+import { GuidePageId, LottieSceneMeta, PANEL_BG, RawFileResourceManager } from './onboarding/OnboardingTypes';
+import { HelpDetailSheet } from '../routes/user/manual/HelpDetailSheet';
 
 @Component
 export struct LottieOnboardingSheet {
   onClose: () => void = () => {};
+  onAgreePrivacy: () => void = () => {};
+  onDeclinePrivacy: () => void = () => {};
+  privacyRequired: boolean = false;
+  privacyUrl: string = 'resource://rawfile/privacy_agreement.html';
 
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Provide('onboardingLocalPathStack') onboardingNavStack: NavPathStack = new NavPathStack();
   @State private currentIndex: number = 0;
+  @State private privacyAccepted: boolean = false;
+  @State private lottieScenes: LottieSceneMeta[] = DEFAULT_LOTTIE_SCENES;
+  @State private isHelpSheetShow: boolean = false;
 
-  private readonly sceneList: LottieSceneMeta[] = LOTTIE_SCENES;
+  aboutToAppear(): void {
+    this.privacyAccepted = this.privacyRequired ? false : true;
+    void this.loadScenes();
+  }
 
-  private goPrev(): void {
-    if (this.currentIndex > 0) {
-      this.currentIndex -= 1;
+  private async loadScenes(): Promise<void> {
+    const resourceManager: RawFileResourceManager = getContext(this).resourceManager as RawFileResourceManager;
+    this.lottieScenes = await loadGuideSceneConfigs(resourceManager);
+  }
+
+  private pageIds(): GuidePageId[] {
+    return buildGuidePageIds(deviceInfo.distributionOSApiVersion >= 60100);
+  }
+
+  private currentPageId(): GuidePageId {
+    return this.pageIds()[this.currentIndex];
+  }
+
+  private lottieSceneById(id: GuidePageId): LottieSceneMeta {
+    const scene: LottieSceneMeta | undefined = this.lottieScenes.find((item: LottieSceneMeta) => item.id === id);
+    return scene ? scene : this.lottieScenes[0];
+  }
+
+  private canGoNext(): boolean {
+    return this.currentIndex < this.pageIds().length - 1;
+  }
+
+  private canGoPrev(): boolean {
+    return this.currentIndex > 0;
+  }
+
+  private openPrivacyWeb(): void {
+    const params: WebParams = {
+      url: this.privacyUrl,
+      title: '隐私协议'
+    };
+    this.onboardingNavStack.pushPath({
+      name: 'webBrowser',
+      param: params
+    });
+  }
+
+  private currentHelpManualId(): string {
+    const pageId: GuidePageId = this.currentPageId();
+    if (pageId === 'sync') {
+      return 'webdav_config';
+    }
+    if (pageId === 'ai') {
+      return 'ai_config';
+    }
+    return '';
+  }
+
+  private shouldShowHelpMenu(): boolean {
+    return this.currentHelpManualId().length > 0;
+  }
+
+  private buildTitleMenus(): HdsNavigationMenuItemOptions[] {
+    if (!this.shouldShowHelpMenu()) {
+      return [];
+    }
+    return [
+      {
+        content: {
+          icon: $r('sys.symbol.questionmark_circle'),
+          action: (): void => {
+            this.isHelpSheetShow = true;
+          }
+        }
+      }
+    ];
+  }
+
+  @Builder
+  private helpSheetBuilder() {
+    HelpDetailSheet({
+      item: ManualDataManager.getInstance().getItemById(this.currentHelpManualId())
+    })
+  }
+
+  @Builder
+  private navDestination(name: string) {
+    if (name === 'webBrowser') {
+      WebBrowserPageBuilder();
     }
   }
 
-  private goNext(): void {
-    if (this.currentIndex < this.sceneList.length - 1) {
+  private handleNext(): void {
+    const pageId: GuidePageId = this.currentPageId();
+
+    if (pageId === 'privacy') {
+      if (!this.privacyAccepted) {
+        promptAction.showToast({ message: '请先勾选同意隐私协议' });
+        return;
+      }
+      if (this.privacyRequired) {
+        this.onAgreePrivacy();
+      }
+    }
+
+    if (this.canGoNext()) {
       this.currentIndex += 1;
       return;
     }
@@ -222,91 +134,154 @@ export struct LottieOnboardingSheet {
     this.onClose();
   }
 
+  private handlePrev(): void {
+    if (this.canGoPrev()) {
+      this.currentIndex -= 1;
+    }
+  }
+
+  @Builder
+  private pageBuilder(pageId: GuidePageId) {
+    if (pageId === 'intro_welcome') {
+      IntroHeroPage({
+        icon: $r('sys.symbol.hand_tap_wave_2'),
+        title: '欢迎使用 Deadliner',
+        subtitle: '这是一段完整的新用户引导演示。我们会先完成基础确认，再做几项必要设置，最后介绍核心交互。'
+      })
+    } else if (pageId === 'privacy') {
+      PrivacyAgreementPage({
+        accepted: $privacyAccepted,
+        onJumpToWeb: () => this.openPrivacyWeb()
+      })
+    } else if (pageId === 'intro_setup') {
+      IntroHeroPage({
+        icon: $r('sys.symbol.slider_horizontal_2'),
+        title: '下面，我们来做一些必要的设置',
+        subtitle: '这几步都尽量保持轻量，你可以先完成最关键的部分，后面也能随时在设置里继续调整。'
+      })
+    } else if (pageId === 'notifications') {
+      NotificationPage()
+    } else if (pageId === 'immersive') {
+      ImmersiveEffectPage()
+    } else if (pageId === 'sync') {
+      SyncPage()
+    } else if (pageId === 'ai') {
+      AiPage()
+    } else if (pageId === 'personalization') {
+      PersonalizationPage()
+    } else if (pageId === 'intro_interaction') {
+      IntroHeroPage({
+        icon: $r('sys.symbol.rectangle_on_rectangle'),
+        title: '在开始您的任务管理体验之前，容许我为您介绍我们的交互',
+        subtitle: '接下来这 5 个场景，覆盖了你最常用的进入方式和几个最高频的快捷操作。'
+      })
+    } else {
+      LottieScenePage({
+        scene: this.lottieSceneById(pageId),
+        isActive: this.currentPageId() === pageId
+      })
+    }
+  }
+
   build() {
-    Column({ space: 20 }) {
-      Column({ space: 8 }) {
-        Row() {
-          Text('功能引导')
-            .fontSize(24)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('sys.color.ohos_id_color_text_primary'))
+    HdsNavigation(this.onboardingNavStack) {
+      Column({ space: 18 }) {
+        Swiper() {
+          ForEach(this.pageIds(), (pageId: GuidePageId) => {
+            this.pageBuilder(pageId)
+          }, (pageId: GuidePageId) => pageId)
+        }
+        .index(this.currentIndex)
+        .indicator(false)
+        .itemSpace(0)
+        .cachedCount(1)
+        .loop(false)
+        .curve(Curve.EaseInOut)
+        .onChange((index: number) => {
+          this.currentIndex = index;
+        })
+        .width('100%')
+        .height(640)
 
-          Blank()
+        Row({ space: 10 }) {
+          ForEach(this.pageIds(), (_pageId: GuidePageId, index: number) => {
+            Row()
+              .width(this.currentIndex === index ? 28 : 8)
+              .height(8)
+              .borderRadius(999)
+              .backgroundColor(this.currentIndex === index ? this.theme.tabIcon : '#D6DCE8')
+              .animation({ duration: 200, curve: Curve.EaseInOut })
+          }, (_pageId: GuidePageId, index: number) => index.toString())
+        }
 
-          Button('跳过')
+        Row({ space: 12 }) {
+          Button(this.currentPageId() === 'privacy' ? '不同意并退出' : '上一步')
             .type(ButtonType.Normal)
-            .fontSize(14)
-            .fontColor(this.theme.tabIcon)
-            .backgroundColor('#EEF4FF')
-            .borderRadius(999)
-            .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-            .onClick(() => this.onClose())
+            .layoutWeight(1)
+            .height(48)
+            .enabled(this.currentPageId() === 'privacy' || this.canGoPrev())
+            .fontSize(16)
+            .backgroundColor(PANEL_BG)
+            .fontColor(this.currentPageId() === 'privacy' ? $r('app.color.warning') : $r('app.color.font_secondary'))
+            .borderRadius(24)
+            .onClick(() => {
+              if (this.currentPageId() === 'privacy') {
+                this.onDeclinePrivacy();
+                return;
+              }
+              this.handlePrev();
+            })
+
+          Button(this.canGoNext() ? '下一步' : '开始体验')
+            .layoutWeight(1)
+            .height(48)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .backgroundColor(this.theme.tabIcon)
+            .fontColor(Color.White)
+            .borderRadius(24)
+            .onClick(() => this.handleNext())
         }
         .width('100%')
 
-        Text('快速看一遍 Deadliner 里最常用的几个操作。')
-          .fontSize(14)
-          .lineHeight(22)
-          .fontColor($r('app.color.font_secondary'))
-      }
-      .width('100%')
-
-      Swiper() {
-        ForEach(this.sceneList, (scene: LottieSceneMeta, index: number) => {
-          LottieSceneCard({
-            scene,
-            isActive: this.currentIndex === index
+        Blank()
+          .width(0)
+          .height(0)
+          .bindSheet($$this.isHelpSheetShow, this.helpSheetBuilder(), {
+            title: {
+              title: this.currentPageId() === 'sync' ? '同步配置指南' : '如何配置 DeepSeek API？'
+            },
+            detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
+            height: SheetSize.FIT_CONTENT,
+            enableOutsideInteractive: false,
+            dragBar: true,
+            backgroundColor: Color.Transparent,
+            blurStyle: BlurStyle.Regular,
+            onDisappear: () => {
+              this.isHelpSheetShow = false;
+            }
           })
-        }, (scene: LottieSceneMeta) => scene.id)
-      }
-      .index(this.currentIndex)
-      .indicator(false)
-      .itemSpace(0)
-      .cachedCount(1)
-      .curve(Curve.EaseInOut)
-      .loop(false)
-      .onChange((index: number) => {
-        this.currentIndex = index;
-      })
-      .width('100%')
-      .layoutWeight(1)
-
-      Row({ space: 10 }) {
-        ForEach(this.sceneList, (_scene: LottieSceneMeta, index: number) => {
-          Row()
-            .width(this.currentIndex === index ? 28 : 8)
-            .height(8)
-            .borderRadius(999)
-            .backgroundColor(this.currentIndex === index ? this.theme.tabIcon : '#D6DCE8')
-            .animation({ duration: 200, curve: Curve.EaseInOut })
-        })
-      }
-
-      Row({ space: 12 }) {
-        Button('上一页')
-          .type(ButtonType.Normal)
-          .layoutWeight(1)
-          .height(48)
-          .enabled(this.currentIndex > 0)
-          .fontSize(16)
-          .backgroundColor($r('sys.color.search_container_focus_color'))
-          .fontColor($r('app.color.font_secondary'))
-          .borderRadius(24)
-          .onClick(() => this.goPrev())
-
-        Button(this.currentIndex === this.sceneList.length - 1 ? '开始体验' : '下一页')
-          .layoutWeight(1)
-          .height(48)
-          .fontSize(16)
-          .fontWeight(FontWeight.Bold)
-          .backgroundColor(this.theme.tabIcon)
-          .fontColor(Color.White)
-          .borderRadius(24)
-          .onClick(() => this.goNext())
       }
       .width('100%')
+      .padding({ left: 20, right: 20, top: 18, bottom: 26 })
+      .backgroundColor(Color.Transparent)
     }
-    .width('100%')
-    .padding({ left: 20, right: 20, top: 18, bottom: 20 })
+    .titleBar({
+      style: getImmersiveTitleBarStyle(false, false),
+      content: {
+        title: {
+          mainTitle: '功能引导'
+        },
+        menu: {
+          value: this.buildTitleMenus()
+        },
+        divider: { showType: DividerShowType.OFF }
+      }
+    })
+    .titleMode(HdsNavigationTitleMode.MODAL)
+    .navDestination(this.navDestination)
+    .hideBackButton(true)
+    .backgroundColor(Color.Transparent)
+    .mode(NavigationMode.Stack)
   }
 }

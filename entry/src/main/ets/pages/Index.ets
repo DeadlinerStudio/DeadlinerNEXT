@@ -1,11 +1,9 @@
 import { LengthMetrics, mediaquery, promptAction, SymbolGlyphModifier } from '@kit.ArkUI';
 import { LocalValues } from '../common/local/LocalValues';
-import { PrivacyDialog } from './components/PrivacyDialog';
 import { MainHomePage } from './routes/main/MainHomePage';
 import { OverviewPage } from './routes/overview/OverviewPage';
 import { UserPage } from './routes/user/UserPage';
 import { common } from '@kit.AbilityKit';
-import { WebParams } from './common/WebBrowserPage';
 import { TabAnimModifier } from '../utils/animation/TabAnimModifier';
 import { AiFlowBackground } from './common/AIFlowBackground';
 import { HuaweiAccountUtils } from '../utils/account/HuaweiAccountUtils';
@@ -77,37 +75,6 @@ struct Index {
   private isDialogOpened: boolean = false;
   private isCheckingPrivacyDialog: boolean = false;
   private hasPresentedGuideSheet: boolean = false;
-
-  dialogController: CustomDialogController | null = new CustomDialogController({
-    builder: PrivacyDialog({
-      onConfirm: async () => {
-        await LocalValues.getInstance().setPrivacyAgreed();
-        this.privacyAgreed = true;
-        this.isBlocking = false;
-        this.isDialogOpened = false;
-        console.info('User agreed to privacy policy.');
-        void this.maybeShowGuideSheet();
-      },
-      onCancel: () => {
-        this.context.terminateSelf().catch(() => {
-          console.error('Terminate failed');
-        });
-      },
-      onJumpToWeb: () => {
-        this.isDialogOpened = false;
-        this.openPrivacyWeb();
-      },
-    }),
-    autoCancel: false,
-    alignment: DialogAlignment.Center,
-    cancel: () => {
-      if (this.isBlocking) {
-        this.context.terminateSelf().catch(() => {
-          console.error('Terminate failed');
-        });
-      }
-    }
-  })
 
   onDataReady() {
     if (this.isAppDataReady) {
@@ -209,10 +176,10 @@ struct Index {
 
     try {
       const isAgreed = await LocalValues.getInstance().getIsPrivacyAgreed();
-      if (!isAgreed && !this.isDialogOpened) {
+      if (!isAgreed) {
         this.isBlocking = true;
-        this.isDialogOpened = true;
-        this.dialogController?.open();
+        this.isDialogOpened = false;
+        void this.maybeShowGuideSheet();
       } else if (isAgreed) {
         this.isBlocking = false;
         this.privacyAgreed = true;
@@ -228,18 +195,27 @@ struct Index {
       return;
     }
 
-    if (!this.showGuideNextLaunch) {
+    const shouldShowForPrivacy = !this.privacyAgreed;
+    const shouldShowForGuide = this.showGuideNextLaunch;
+
+    if (!shouldShowForPrivacy && !shouldShowForGuide) {
       return;
     }
 
     if (!this.privacyAgreed || this.isBlocking || this.isDialogOpened || this.appPathStack.size() > 0) {
+      if (!shouldShowForPrivacy) {
+        return;
+      }
+    } else if (!shouldShowForPrivacy && this.appPathStack.size() > 0) {
       return;
     }
 
     this.hasPresentedGuideSheet = true;
-    await LocalValues.getInstance().setShowGuideNextLaunch(false);
+    if (shouldShowForGuide) {
+      await LocalValues.getInstance().setShowGuideNextLaunch(false);
+    }
     setTimeout(() => {
-      if (!this.isBlocking && this.privacyAgreed && this.appPathStack.size() === 0) {
+      if ((shouldShowForPrivacy || (!this.isBlocking && this.privacyAgreed)) && this.appPathStack.size() === 0) {
         this.isGuideSheetShow = true;
       }
     }, 300);
@@ -248,28 +224,23 @@ struct Index {
   @Builder
   onboardingSheet() {
     LottieOnboardingSheet({
+      privacyRequired: !this.privacyAgreed,
+      onAgreePrivacy: async () => {
+        await LocalValues.getInstance().setPrivacyAgreed();
+        this.privacyAgreed = true;
+        this.isBlocking = false;
+      },
+      onDeclinePrivacy: () => {
+        this.context.terminateSelf().catch(() => {
+          console.error('Terminate failed');
+        });
+      },
+      privacyUrl: this.privacyUrl,
       onClose: () => {
         this.isGuideSheetShow = false;
+        this.isBlocking = false;
       }
     })
-  }
-
-  openPrivacyWeb() {
-    const params: WebParams = {
-      url: this.privacyUrl,
-      title: '隐私协议',
-      onClose: () => {
-        console.info('WebBrowserPage is closing, re-checking privacy...');
-        setTimeout(() => {
-          this.checkAndShowDialog();
-        }, 100);
-      }
-    };
-
-    this.appPathStack.pushPath({
-      name: 'webBrowser',
-      param: params,
-    });
   }
 
   onBackPress() {
@@ -464,11 +435,19 @@ struct Index {
     .backgroundColor(this.theme.bgPrimary)
     .bindSheet($$this.isGuideSheetShow, this.onboardingSheet(), {
       height: SheetSize.LARGE,
-      dragBar: true,
+      dragBar: false,
       showClose: false,
+      enableOutsideInteractive: false,
+      shouldDismiss: (_sheetDismiss: SheetDismiss) => {
+      },
       blurStyle: BlurStyle.Regular,
       backgroundColor: Color.Transparent,
       onDisappear: () => {
+        if (!this.privacyAgreed) {
+          this.isGuideSheetShow = true;
+          this.isBlocking = true;
+          return;
+        }
         this.isGuideSheetShow = false;
       }
     })
