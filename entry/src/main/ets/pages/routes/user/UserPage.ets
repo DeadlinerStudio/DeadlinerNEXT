@@ -256,9 +256,10 @@ export struct UserPage {
               SettingsVerticalDivider()
 
               SettingsGridItem({
-                title: "AI 助理",
-                icon: $r('sys.symbol.wand_and_stars_fill'),
+                title: "Lifi AI",
+                icon: $r('app.media.lifi'),
                 iconColor: $r('app.color.func_ai'),
+                isImage: true,
                 onItemClick: () => {
                   this.isAISheetShow = true;
                 }
@@ -325,9 +326,10 @@ export struct UserPage {
               SettingsDivider()
 
               SettingsItem({
-                title: "AI 智能服务",
+                title: "Lifi AI 设置",
                 subtitle: "模型配置 · API Key",
-                icon: $r('sys.symbol.AI'),
+                icon: $r('app.media.lifi'),
+                isImage: true,
                 onItemClick: () => {
                   this.navigateTo('settingsAI')
                 }

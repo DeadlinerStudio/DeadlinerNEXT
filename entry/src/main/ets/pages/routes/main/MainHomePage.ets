@@ -29,7 +29,8 @@ enum MainTabIndex {
 
 interface MainHomePageButton {
   icon: Resource,
-  onClick: () => void
+  onClick: () => void,
+  isImage?: boolean
 }
 
 @Component
@@ -165,8 +166,9 @@ export struct MainHomePage {
       onClick: () => { this.appPathStack.pushPath({ name: "search" }) }
     },
     {
-      icon: $r('sys.symbol.wand_and_stars'),
-      onClick: () => { this.openAiPanel() }
+      icon: $r('app.media.lifi'),
+      onClick: () => { this.openAiPanel() },
+      isImage: true
     },
     {
       icon: $r('sys.symbol.square'),
@@ -201,6 +203,7 @@ export struct MainHomePage {
         HdsTitleBarMenuButton({
           icon: this.leftBtn.icon,
           onButtonClick: this.leftBtn.onClick,
+          isImage: this.leftBtn.isImage,
           isEnabled: ((this.leftBtnType === MainButtonType.AI) && !this.isBasicMode) || (this.leftBtnType !== MainButtonType.AI)
         })
       }
@@ -230,6 +233,7 @@ export struct MainHomePage {
         HdsTitleBarMenuButton({
           icon: this.rightBtn.icon,
           onButtonClick: this.rightBtn.onClick,
+          isImage: this.rightBtn.isImage,
           isEnabled: ((this.rightBtnType === MainButtonType.AI) && !this.isBasicMode) || (this.rightBtnType !== MainButtonType.AI)
         })
       }

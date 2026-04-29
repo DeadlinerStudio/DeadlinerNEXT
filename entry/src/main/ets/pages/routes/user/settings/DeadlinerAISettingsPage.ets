@@ -6,6 +6,8 @@ import { Theme } from '@kit.ArkUI';
 import { ManualDataManager } from "../../../../common/manual/ManualModel";
 import { HelpDetailSheet } from "../manual/HelpDetailSheet";
 import { ITheme } from "../../../../common/theme/ThemeModel";
+import { HdsNavDestination, HdsNavDestinationAttribute } from "@kit.UIDesignKit";
+import { getImmersiveTitleBarStyle } from "../../../../common/style/NavStyles";
 
 @Builder
 export function SettingsAIBuilder(name: string, param: Object) {
@@ -15,6 +17,8 @@ export function SettingsAIBuilder(name: string, param: Object) {
 @Component
 export struct DeadlinerAISettingsPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+
+  @StorageLink('isWideScreen') isWideScreen: boolean = false;
 
   pageStack: NavPathStack = new NavPathStack();
 
@@ -48,107 +52,118 @@ export struct DeadlinerAISettingsPage {
   }
 
   build() {
-    NavDestination() {
-      Column({ space: 16 }) {
+    HdsNavDestination() {
+      Column() {
+        Scroll() {
+          Column({ space: 16 }) {
+            Blank().height(34)
 
-        Column({ space: 8 }) {
-          Row() {
-            SymbolGlyph($r('sys.symbol.exclamationmark_circle'))
-              .fontSize(16)
-              .fontColor([$r('sys.color.warning')])
-              .margin({ right: 4 })
-            Text("合规使用说明")
-              .fontSize(14)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('sys.color.font_primary'))
+            Column({ space: 8 }) {
+              Row() {
+                SymbolGlyph($r('sys.symbol.exclamationmark_circle'))
+                  .fontSize(16)
+                  .fontColor([$r('sys.color.warning')])
+                  .margin({ right: 4 })
+                Text("合规使用说明")
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor($r('sys.color.font_primary'))
+              }
+              .width('100%')
+
+              Text("本应用为 AI 服务的客户端工具。根据监管要求，您填写的 API Key 必须是您本人在 AI 提供商开放平台经过实名认证后获取的有效凭证。\n本应用仅作技术透传，不存储您的身份信息。")
+                .fontSize(12)
+                .fontColor($r('sys.color.font_secondary'))
+                .lineHeight(18)
+                .width('100%')
+            }
+            .padding(12)
+            .backgroundColor($r('app.color.background_secondary'))
+            .borderRadius(24)
+
+
+            // 2. API Key 输入框
+            Column({ space: 8 }) {
+              Text("API Key")
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .width('100%')
+
+              TextInput({ text: this.apiKey, placeholder: 'sk-...' })
+                .type(InputType.Password)
+                .showPasswordIcon(true)
+                .onChange((value) => {
+                  this.apiKey = value;
+                  // 只要修改了，就重置验证状态，强制用户重新测试
+                  this.isVerified = false;
+                })
+
+              // [新增] 本地存储声明
+              Text("您的 Key 仅加密存储于当前设备本地，不会上传至本应用服务器。")
+                .fontSize(10)
+                .fontColor($r('sys.color.font_tertiary'))
+                .width('100%')
+            }
+
+            // [新增] 3. 校验状态展示 (审核员通过的视觉依据)
+            if (this.isVerified) {
+              Row() {
+                SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+                  .fontSize(18)
+                  .fontColor([$r('app.color.confirm')])
+                  .margin({ right: 8 })
+                Text("API Key 有效性校验通过 (已实名)")
+                  .fontSize(14)
+                  .fontColor('#4CAF50')
+                  .fontWeight(FontWeight.Medium)
+              }
+              .width('100%')
+              .padding({ top: 4, bottom: 4 })
+              .transition(TransitionEffect.OPACITY.animation({ duration: 300 }))
+            }
+
+            Divider().color(Color.Transparent).height(4)
+
+            // 4. 高级设置 (保持只读，减少审核员困惑，体现“专为DeepSeek打造”)
+            Column({ space: 12 }) {
+              Text("高级设置")
+                .fontSize(14)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('sys.color.font_secondary'))
+                .width('100%')
+
+              // 模型名称
+              Row() {
+                Text("模型名称").width(80).fontSize(16)
+                TextInput({ text: this.model, placeholder: 'deepseek-chat' })
+                  .layoutWeight(1)
+                  // .enabled(false) // 锁死，不让乱改
+                  .fontColor($r('sys.color.font_secondary'))
+              }
+
+              // API 地址
+              Row() {
+                Text("API 地址").width(80).fontSize(16)
+                TextInput({ text: this.baseUrl, placeholder: 'https://api.deepseek.com' })
+                  .type(InputType.URL)
+                  .layoutWeight(1)
+                  // .enabled(false) // 锁死
+                  .fontColor($r('sys.color.font_secondary'))
+              }
+            }
+            .padding(12)
+            .backgroundColor($r('app.color.background_secondary'))
+            .borderRadius(24)
+
+            Blank()
           }
+          .height('100%')
           .width('100%')
-
-          Text("本应用为 DeepSeek 服务的客户端工具。根据监管要求，您填写的 API Key 必须是您本人在 DeepSeek 开放平台经过实名认证后获取的有效凭证。\n本应用仅作技术透传，不存储您的身份信息。")
-            .fontSize(12)
-            .fontColor($r('sys.color.font_secondary'))
-            .lineHeight(18)
-            .width('100%')
+          .justifyContent(FlexAlign.Start)
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
         }
-        .padding(12)
-        .backgroundColor($r('app.color.background_secondary'))
-        .borderRadius(24)
-
-
-        // 2. API Key 输入框
-        Column({ space: 8 }) {
-          Text("DeepSeek API Key")
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .width('100%')
-
-          TextInput({ text: this.apiKey, placeholder: 'sk-...' })
-            .type(InputType.Password)
-            .showPasswordIcon(true)
-            .onChange((value) => {
-              this.apiKey = value;
-              // 只要修改了，就重置验证状态，强制用户重新测试
-              this.isVerified = false;
-            })
-
-          // [新增] 本地存储声明
-          Text("您的 Key 仅加密存储于当前设备本地，不会上传至本应用服务器。")
-            .fontSize(10)
-            .fontColor($r('sys.color.font_tertiary'))
-            .width('100%')
-        }
-
-        // [新增] 3. 校验状态展示 (审核员通过的视觉依据)
-        if (this.isVerified) {
-          Row() {
-            SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
-              .fontSize(18)
-              .fontColor([$r('app.color.confirm')])
-              .margin({ right: 8 })
-            Text("API Key 有效性校验通过 (已实名)")
-              .fontSize(14)
-              .fontColor('#4CAF50')
-              .fontWeight(FontWeight.Medium)
-          }
-          .width('100%')
-          .padding({ top: 4, bottom: 4 })
-          .transition(TransitionEffect.OPACITY.animation({ duration: 300 }))
-        }
-
-        Divider().color(Color.Transparent).height(4)
-
-        // 4. 高级设置 (保持只读，减少审核员困惑，体现“专为DeepSeek打造”)
-        Column({ space: 12 }) {
-          Text("高级设置")
-            .fontSize(14)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('sys.color.font_secondary'))
-            .width('100%')
-
-          // 模型名称
-          Row() {
-            Text("模型名称").width(80).fontSize(16)
-            TextInput({ text: this.model, placeholder: 'deepseek-chat' })
-              .layoutWeight(1)
-              // .enabled(false) // 锁死，不让乱改
-              .fontColor($r('sys.color.font_secondary'))
-          }
-
-          // API 地址
-          Row() {
-            Text("API 地址").width(80).fontSize(16)
-            TextInput({ text: this.baseUrl, placeholder: 'https://api.deepseek.com' })
-              .type(InputType.URL)
-              .layoutWeight(1)
-              // .enabled(false) // 锁死
-              .fontColor($r('sys.color.font_secondary'))
-          }
-        }
-        .padding(12)
-        .backgroundColor($r('app.color.background_secondary'))
-        .borderRadius(24)
-
-        Blank()
+        .layoutWeight(1)
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
 
         // 5. 保存并验证按钮
         // 按钮文案改成“校验并保存”，强调“校验”动作
@@ -201,7 +216,7 @@ export struct DeadlinerAISettingsPage {
               // 4. 失败提示，引导用户检查 Key
               AlertDialog.show({
                 title: '验证失败',
-                message: `无法连接 DeepSeek 服务。\n错误信息：${msg}\n\n请确保您的 API Key 正确且已在 DeepSeek 平台完成实名认证。`,
+                message: `无法连接至 AI 服务。\n错误信息：${msg}\n\n请确保您的 API Key 正确且已在相关平台完成实名认证。`,
                 confirm: {
                   value: '知道了',
                   action: () => {}
@@ -214,21 +229,33 @@ export struct DeadlinerAISettingsPage {
       }
       .padding(16)
       .height('100%')
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
     }
-    .title("AI 服务配置")
+    .titleBar({
+      style: getImmersiveTitleBarStyle(this.isWideScreen, false),
+      content: {
+        title: {
+          mainTitle: "Lifi AI 设置"
+        },
+        menu: {
+          value: [
+            {
+              content: {
+                icon: $r('sys.symbol.questionmark_circle'),
+                action: () => { this.isHelpSheetShow = true },
+                label: '帮助'
+              },
+            }
+          ]
+        }
+      }
+    })
     .onReady((context: NavDestinationContext) => {
       this.pageStack = context.pathStack;
     })
-    .menus([
-      {
-        value: '帮助',
-        symbolIcon: new SymbolGlyphModifier($r('sys.symbol.questionmark_circle')),
-        action: () => { this.isHelpSheetShow = true }
-      }
-    ])
     .backgroundColor(this.theme.bgPrimary)
     .bindSheet($$this.isHelpSheetShow, this.helpSheet(), {
-      title: { title: '如何配置 DeepSeek API？' },
+      title: { title: '如何配置大模型 API？' },
       detents: [
         SheetSize.FIT_CONTENT,
         SheetSize.MEDIUM,
@@ -241,5 +268,6 @@ export struct DeadlinerAISettingsPage {
       blurStyle: BlurStyle.Regular,
       onDisappear: () => { this.isHelpSheetShow = false },
     })
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
   }
 }

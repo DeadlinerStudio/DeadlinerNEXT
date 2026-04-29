@@ -23,23 +23,29 @@ import { GuideContainer } from './OnboardingCorePages';
 
 @Builder
 function SetupPageHeader(icon: Resource, title: string, subtitle: string, color: ResourceColor) {
-  Column({ space: 12 }) {
+  Column({ space: 16 }) {
     SymbolGlyph(icon)
       .fontSize(56)
       .fontColor([color])
+      .margin({ top: 36 })
 
-    Text(title)
-      .fontSize(24)
-      .fontWeight(FontWeight.Bold)
-      .textAlign(TextAlign.Center)
+    Column({ space: 12 }) {
+      Text(title)
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .textAlign(TextAlign.Center)
 
-    Text(subtitle)
-      .fontSize(15)
-      .lineHeight(24)
-      .fontColor($r('app.color.font_secondary'))
-      .textAlign(TextAlign.Center)
+      Text(subtitle)
+        .fontSize(15)
+        .lineHeight(24)
+        .fontColor($r('app.color.font_secondary'))
+        .textAlign(TextAlign.Center)
+    }
+    .padding({ left: 8, right: 8 })
   }
   .width('100%')
+  .height('42%')
+  .justifyContent(FlexAlign.Center)
   .alignItems(HorizontalAlign.Center)
 }
 
@@ -70,8 +76,6 @@ export struct NotificationPage {
           '先授予系统通知权限，再决定是否开启 DDL 临近提醒。其他通知项后续也能随时调整。',
           this.theme.tabIcon
         )
-
-        Blank()
 
         SettingsSection({
           bgColor: $r('sys.color.search_container_focus_color'),
@@ -114,7 +118,7 @@ export struct NotificationPage {
       }
       .width('100%')
       .height('100%')
-      .justifyContent(FlexAlign.Center)
+      .justifyContent(FlexAlign.SpaceBetween)
     }
   }
 }
@@ -148,8 +152,6 @@ export struct ImmersiveEffectPage {
           this.theme.tabIcon
         )
 
-        Blank()
-
         SettingsSection({
           bgColor: $r('sys.color.search_container_focus_color'),
           marginHorizontal: 0
@@ -182,7 +184,7 @@ export struct ImmersiveEffectPage {
       }
       .width('100%')
       .height('100%')
-      .justifyContent(FlexAlign.Center)
+      .justifyContent(FlexAlign.SpaceBetween)
     }
   }
 
@@ -210,8 +212,6 @@ export struct SyncPage {
           '这里先决定你是否启用云同步，以及更偏向使用华为端云协同还是 WebDAV。',
           this.theme.tabIcon
         )
-
-        Blank()
 
         SettingsSection({
           bgColor: $r('sys.color.search_container_focus_color'),
@@ -246,7 +246,7 @@ export struct SyncPage {
       }
       .width('100%')
       .height('100%')
-      .justifyContent(FlexAlign.Center)
+      .justifyContent(FlexAlign.SpaceBetween)
     }
   }
 }
@@ -269,8 +269,6 @@ export struct AiPage {
           '演示阶段我们只保留最关键的一步：填写 API Key，并在需要时快速校验一下。',
           this.theme.tabIcon
         )
-
-        Blank()
 
         SettingsSection({
           title: 'DeepSeek API Key',
@@ -317,7 +315,7 @@ export struct AiPage {
       }
       .width('100%')
       .height('100%')
-      .justifyContent(FlexAlign.Center)
+      .justifyContent(FlexAlign.SpaceBetween)
     }
   }
 }
@@ -376,8 +374,6 @@ export struct PersonalizationPage {
               this.theme.tabIcon
             )
 
-            Blank()
-
             SettingsSection({
               bgColor: $r('sys.color.search_container_focus_color'),
               marginHorizontal: 0
@@ -405,6 +401,7 @@ export struct PersonalizationPage {
           }
           .width('100%')
           .height('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
         }
       }
       .bindSheet($$this.isThemeSelectSheetShow, this.themeSheet(), {

@@ -35,6 +35,7 @@ export struct HelpDetailSheet {
           title: this.item.title,
           subtitle: this.item.subtitle,
           icon: this.item.icon ?? $r('sys.symbol.doc_text'),
+          isImage: this.item.isImage,
           baseColor: this.item.themeColor,
         })
       }

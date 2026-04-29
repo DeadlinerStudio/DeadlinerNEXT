@@ -22,6 +22,7 @@ import { MemoryBank } from '../../ai/model/MemoryModels';
 import { AIService } from '../../ai/AIServcice';
 import { MemoryManageSheet } from './MemoryManageSheet';
 import { HabitFormHelper } from '../routes/main/modify/habit/HabitFormHelper';
+import { Symbol } from '../components/infra/Symbol';
 
 // ==========================================
 // MARK: - 对话流模型定义
@@ -487,9 +488,12 @@ export struct AIPanelView {
       // Avatar
       Stack() {
         Circle().width(78).height(78).fillOpacity(0.1).fill(this.theme.brand)
-        SymbolGlyph($r('sys.symbol.wand_and_stars'))
-          .fontSize(30)
-          .fontColor([this.theme.brand])
+        Symbol({
+          icon: $r('app.media.lifi'),
+          isImage: true,
+          fontSize: 30,
+          fontColor: this.theme.brand
+        })
       }
       .margin({ top: 40 })
 

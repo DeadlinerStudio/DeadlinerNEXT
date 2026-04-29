@@ -14,6 +14,7 @@ import { notificationManager } from '@kit.NotificationKit';
 import { ManualDataManager } from '../common/manual/ManualModel';
 import { SettingsConstants as C } from '../common/local/SettingsConstants';
 import { ThemeManager } from '../common/theme/ThemeManager';
+import { DynamicIconUtils } from '../utils/DynamicIconUtils';
 
 const DOMAIN = 0x0000;
 
@@ -51,6 +52,8 @@ export default class EntryAbility extends UIAbility {
 
     await TaskRepository.getInstance().initialReminderCheck();
     await HabitRepository.getInstance().initialReminderCheck();
+
+    DynamicIconUtils.refreshSeasonIconIfNeeded(this.context);
 
     this.checkLoginStatus();
 

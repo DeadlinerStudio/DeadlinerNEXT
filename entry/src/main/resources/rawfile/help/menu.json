@@ -62,11 +62,12 @@
       },
       {
         "id": "ai_feature",
-        "title": "AI 任务助手",
-        "subtitle": "接入 AI 能力一键提取 Deadline",
-        "iconName": "wand_and_stars",
+        "title": "Lifi AI",
+        "subtitle": "智能待办管家，和你聊天规划日程",
+        "iconName": "lifi",
         "fileName": "ai_feature.md",
-        "themeColor": "#9D7AD2"
+        "themeColor": "#9D7AD2",
+        "isImage": true
       },
       {
         "id": "crossplatform",

@@ -1,4 +1,5 @@
 import { ITheme } from "../../common/theme/ThemeModel";
+import { Symbol } from "./infra/Symbol";
 
 @Component
 export struct BrandPageHeader {
@@ -10,6 +11,8 @@ export struct BrandPageHeader {
   @Prop baseColor: string | ResourceColor = '';
   subtitle?: string = '使用手册详情';
   decorIcon?: Resource = $r('sys.symbol.book');
+
+  isImage?: boolean;
 
   @Builder
   BackgroundLayer() {
@@ -68,10 +71,13 @@ export struct BrandPageHeader {
       Row({ space: 16 }) {
         // 主图标 (使用 Symbol)
         if (this.icon) {
-          SymbolGlyph(this.icon)
-            .fontSize(56)
-            .fontColor([Color.White])
-            .fontWeight(600)
+          Symbol({
+            icon: this.icon,
+            isImage: this.isImage === true,
+            fontSize: 56,
+            fontColor: Color.White,
+            fontWeight: 600
+          })
         }
 
         Column({ space: 4 }) {

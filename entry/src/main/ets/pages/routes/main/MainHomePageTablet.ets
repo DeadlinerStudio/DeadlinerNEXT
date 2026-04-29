@@ -111,7 +111,7 @@ export struct MainHomePageTablet {
       onClick: () => { this.isSearchShow = true }
     },
     {
-      icon: $r('sys.symbol.wand_and_stars'),
+      icon: $r('app.media.lifi'),
       onClick: () => { this.openAiPanel() }
     },
     {

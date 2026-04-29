@@ -30,7 +30,7 @@ const THEME_OPTIONS: ThemeOption[] = [
 
 @Component
 export struct ThemeSelectSheet {
-  @Provide('navPathStack') navStack: NavPathStack = new NavPathStack();
+  @Provide('themeSelectPathStack') themeSelectPathStack: NavPathStack = new NavPathStack();
   @StorageProp('currentThemeKey') currentKey: string = 'vibrant';
   @StorageProp('currentTheme') @Watch('syncThemeWhiteGlow') theme: ITheme = {} as ITheme;
   @State themeWhiteGlow: boolean = false;
@@ -75,7 +75,7 @@ export struct ThemeSelectSheet {
       .titleMode(HdsNavDestinationTitleMode.MODAL)
       .backgroundColor(Color.Transparent)
       .onBackPressed(() => {
-        this.navStack.pop();
+        this.themeSelectPathStack.pop();
         return true;
       })
       .mode(NavDestinationMode.DIALOG)
@@ -107,7 +107,7 @@ export struct ThemeSelectSheet {
       .titleMode(HdsNavDestinationTitleMode.MODAL)
       .backgroundColor(Color.Transparent)
       .onBackPressed(() => {
-        this.navStack.pop();
+        this.themeSelectPathStack.pop();
         return true;
       })
       .mode(NavDestinationMode.DIALOG)
@@ -116,7 +116,7 @@ export struct ThemeSelectSheet {
   }
 
   build() {
-    HdsNavigation(this.navStack) {
+    HdsNavigation(this.themeSelectPathStack) {
       Column() {
         TopSafeContainer({ topAvoidHeight: 72, bgColor: Color.Transparent }) {
           SettingsSection({ bgColor: $r('sys.color.search_container_focus_color') }) {
@@ -125,7 +125,7 @@ export struct ThemeSelectSheet {
               subtitle: '自定义概览统计图表颜色',
               icon: $r('sys.symbol.data_proportion'),
               onItemClick: () => {
-                this.navStack.pushPath({ name: 'ChartCustomizer' })
+                this.themeSelectPathStack.pushPath({ name: 'ChartCustomizer' })
               }
             })
           }
@@ -233,7 +233,7 @@ export struct ThemeSelectSheet {
       .borderRadius(24)
       .backgroundColor($r('sys.color.search_container_focus_color'))
       .onClick(() => {
-        this.navStack.pushPath({ name: 'ColorCustomizer' });
+        this.themeSelectPathStack.pushPath({ name: 'ColorCustomizer' });
       })
     }
   }

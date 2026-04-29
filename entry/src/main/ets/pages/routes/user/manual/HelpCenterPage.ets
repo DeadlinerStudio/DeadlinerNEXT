@@ -103,6 +103,7 @@ export struct HelpCenterPage {
                     SettingsItem({
                       title: item.title,
                       icon: item.icon,
+                      isImage: item.isImage,
                       onItemClick: () => {
                         this.appPathStack.pushPath({
                           name: 'helpDetail',

@@ -2,6 +2,7 @@ import { SettingsConstants as C } from '../../common/local/SettingsConstants';
 import { getHdsMaterialLevelRaw } from '../../common/style/MaterialLevel';
 import { BlurBackgroundModifier } from '../../utils/animation/BlurBackgroundModifier';
 import { HdsMiniBarButton } from './infra/HdsMiniBarButton';
+import { Symbol } from './infra/Symbol';
 
 @Component
 export struct HdsTitleBarMenuButton {
@@ -9,6 +10,8 @@ export struct HdsTitleBarMenuButton {
   @Prop iconSize: number = 24;
   @Prop buttonSize: number = 40;
   @Prop barHeight: number = 52;
+
+  isImage?: boolean
 
   @Prop isEnabled: boolean = true;
   @Require onButtonClick: () => void;
@@ -28,9 +31,12 @@ export struct HdsTitleBarMenuButton {
 
   @Builder
   private buttonIcon() {
-    SymbolGlyph(this.icon)
-      .fontSize(this.iconSize)
-      .fontColor([$r('sys.color.ohos_id_color_text_primary')])
+    Symbol({
+      icon: this.icon,
+      isImage: this.isImage === true,
+      fontSize: this.iconSize,
+      fontColor: $r('sys.color.ohos_id_color_text_primary')
+    })
   }
 
   build() {
