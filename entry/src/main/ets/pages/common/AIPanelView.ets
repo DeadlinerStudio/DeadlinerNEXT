@@ -20,6 +20,13 @@ import { DateTimeUtils } from '../../utils/DateTimeUtils';
 import { DeadlineType, DDLItem } from '../../model/DDLModels';
 import { MemoryBank } from '../../ai/model/MemoryModels';
 import { AIService } from '../../ai/AIServcice';
+import { DeadlinerCoreService } from '../../ai/core/DeadlinerCoreService';
+import {
+  AdapterCreateHabitPayload,
+  AdapterCreateTaskPayload,
+  AdapterReadHabitsPayload,
+  AdapterReadTasksPayload
+} from '../../ai/core/DeadlinerToolAdapter';
 import { MemoryManageSheet } from './MemoryManageSheet';
 import { HabitFormHelper } from '../routes/main/modify/habit/HabitFormHelper';
 import { Symbol } from '../components/infra/Symbol';
@@ -30,6 +37,7 @@ import { Symbol } from '../components/infra/Symbol';
 export enum DisplayItemType {
   UserQuery,
   AIChat,
+  AIThinking,
   AITask,
   AIHabit,
   AIMemory,
@@ -58,6 +66,34 @@ interface TaskAIDTO {
   due: Date;
 }
 
+interface CreateTaskToolArgs {
+  name?: string;
+  dueTime?: string;
+  due_time?: string;
+  note?: string;
+}
+
+interface CreateHabitToolArgs {
+  name?: string;
+  period?: string;
+  timesPerPeriod?: number;
+  times_per_period?: number;
+  goalType?: string;
+  goal_type?: string;
+  totalTarget?: number;
+  total_target?: number;
+}
+
+class ProposalToolRequestLink {
+  key: string;
+  request: AIToolRequest;
+
+  constructor(key: string, request: AIToolRequest) {
+    this.key = key;
+    this.request = request;
+  }
+}
+
 // ==========================================
 // MARK: - 核心 UI 组件
 // ==========================================
@@ -82,9 +118,14 @@ export struct AIPanelView {
 
   // UI 刷新辅助状态
   @State memoryProfileCount: number = 0;
+  @State currentProgressHint: string = '';
+  @State lastSubmittedToolName: string = '';
+  @State taskProposalToolRequests: ProposalToolRequestLink[] = [];
+  @State habitProposalToolRequests: ProposalToolRequestLink[] = [];
 
   private scroller: Scroller = new Scroller();
   private toolOriginalUserText: string = "";
+  private coreService: DeadlinerCoreService = DeadlinerCoreService.getInstance();
 
   @State showMemorySheet: boolean = false;
 
@@ -96,6 +137,14 @@ export struct AIPanelView {
     MemoryBank.getInstance().init(getContext(this)).then(() => {
       this.refreshMemoryState();
     });
+    this.coreService.startUiSession();
+    this.coreService.setProgressHandler((update) => {
+      this.handleProgressUpdate(update.kind, update.message);
+    });
+  }
+
+  aboutToDisappear() {
+    this.coreService.setProgressHandler(undefined);
   }
 
   private refreshMemoryState() {
@@ -133,25 +182,34 @@ export struct AIPanelView {
         this.sessionSummary = result.sessionSummary.substring(0, 600);
       }
 
-      // 2. 拦截 Tool Call (目前只处理 readTasks)
+      // 2. 拦截 Tool Call
       if (result.toolCalls && result.toolCalls.length > 0) {
         this.isParsing = false;
-        const firstCall = result.toolCalls.find(c => c.tool === "readTasks");
+        const firstCall = result.toolCalls[0];
 
         if (firstCall) {
           this.toolOriginalUserText = query;
-          const reqItem = new DisplayItem(DisplayItemType.AIToolRequest);
-          reqItem.toolReq = {
-            id: util.generateRandomUUID(true),
-            tool: "readTasks",
-            args: this.sanitizeReadTasksArgs(firstCall.args, query),
-            reason: firstCall.reason
+          const toolReq: AIToolRequest = {
+            id: firstCall.id || util.generateRandomUUID(true),
+            tool: firstCall.tool,
+            args: this.normalizeToolArgs(firstCall.tool, firstCall.args, query),
+            reason: this.defaultToolReason(firstCall.tool),
+            executionMode: firstCall.executionMode
           };
-          this.displayItems.push(reqItem);
-        } else {
-          const chatItem = new DisplayItem(DisplayItemType.AIChat);
-          chatItem.text = "我需要调用一个暂不支持的本地工具。请更新版本或换个问法。";
-          this.displayItems.push(chatItem);
+
+          const proposalHandled = this.presentToolRequestAsProposal(toolReq);
+          if (proposalHandled) {
+            this.scrollToBottom();
+            return;
+          }
+
+          if (toolReq && toolReq.executionMode === 'AUTO') {
+            await this.approveAndRunTool(toolReq);
+          } else {
+            const reqItem = new DisplayItem(DisplayItemType.AIToolRequest);
+            reqItem.toolReq = toolReq;
+            this.displayItems.push(reqItem);
+          }
         }
         this.scrollToBottom();
         return;
@@ -182,37 +240,28 @@ export struct AIPanelView {
     this.isParsing = true;
 
     try {
-      if (req.tool !== "readTasks") {
-        const errItem = new DisplayItem(DisplayItemType.AIChat);
-        errItem.text = `暂不支持的工具：${req.tool}`;
-        this.displayItems.push(errItem);
-        return;
-      }
-
-      // 1. 执行本地查询
-      const ddlTasks = await TaskRepository.getInstance().getDDLsByType(DeadlineType.TASK);
-      const payload = this.makeReadTasksPayload(ddlTasks, req.args);
-
-      const toolResult: AIToolResult = {
-        id: util.generateRandomUUID(true),
-        tool: "readTasks",
-        appliedArgs: req.args,
-        payload: payload,
-        generatedAt: new Date()
-      };
+      this.lastSubmittedToolName = req.tool;
+      const toolResult = await this.coreService.runToolCall({
+        id: req.id,
+        tool: req.tool,
+        args: req.args,
+        reason: req.reason,
+        executionMode: req.executionMode
+      });
 
       const resItem = new DisplayItem(DisplayItemType.AIToolResult, toolResult.id);
       resItem.toolRes = toolResult;
       this.displayItems.push(resItem);
+      this.markProposalApplied(req, toolResult);
       this.scrollToBottom();
 
       // 2. 二段回灌给 AI
-      const sysLang = i18n.System.getSystemLanguage();
-      const sessionCtx = this.buildSessionContextString();
-      const originalText = this.toolOriginalUserText || "（用户未提供原始问题）";
-
       const result2 = await AIService.getInstance().continueAfterTool(
-        originalText, toolResult, sysLang, sessionCtx, this.sessionSummary
+        this.toolOriginalUserText || '',
+        toolResult,
+        i18n.System.getSystemLanguage(),
+        this.buildSessionContextString(),
+        this.sessionSummary
       );
 
       if (result2.sessionSummary) {
@@ -220,6 +269,7 @@ export struct AIPanelView {
       }
 
       this.appendResultToUI(result2);
+      this.clearProposalToolRequest(req.tool, req.id);
 
     } catch (err) {
       console.error("[AIPanelView] Tool Error:", JSON.stringify(err));
@@ -229,6 +279,7 @@ export struct AIPanelView {
     } finally {
       this.repoBusy = false;
       this.isParsing = false;
+      this.currentProgressHint = '';
       this.refreshMemoryState();
       this.scrollToBottom();
     }
@@ -246,14 +297,15 @@ export struct AIPanelView {
         this.displayItems.push(item);
       }
     }
-    if (result.tasks) {
+    const suppressProposalCards = this.shouldSuppressProposalCards();
+    if (result.tasks && !suppressProposalCards) {
       for (const task of result.tasks) {
         const item = new DisplayItem(DisplayItemType.AITask);
         item.task = task;
         this.displayItems.push(item);
       }
     }
-    if (result.habits) {
+    if (result.habits && !suppressProposalCards) {
       for (const habit of result.habits) {
         const item = new DisplayItem(DisplayItemType.AIHabit);
         item.habit = habit;
@@ -265,6 +317,38 @@ export struct AIPanelView {
       item.text = result.chatResponse;
       this.displayItems.push(item);
     }
+    this.lastSubmittedToolName = '';
+  }
+
+  private shouldSuppressProposalCards(): boolean {
+    return this.lastSubmittedToolName === 'read_tasks' ||
+      this.lastSubmittedToolName === 'read_habits' ||
+      this.lastSubmittedToolName === 'create_task' ||
+      this.lastSubmittedToolName === 'create_habit';
+  }
+
+  private defaultToolReason(toolName: string): string {
+    switch (toolName) {
+      case 'read_tasks':
+        return '为了回答你的问题，我需要查看你近期的任务。';
+      case 'create_task':
+        return '我准备帮你创建这个任务，请确认本地写入。';
+      case 'update_deadline':
+        return '我准备修改现有任务的截止时间，请确认本地写入。';
+      case 'read_habits':
+        return '为了避免重复创建，我需要先查看你现有的习惯。';
+      case 'create_habit':
+        return '我准备帮你创建这个习惯，请确认本地写入。';
+      default:
+        return '需要调用本地工具继续处理。';
+    }
+  }
+
+  private normalizeToolArgs(toolName: string, args: Object, query: string): Object {
+    if (toolName !== 'read_tasks') {
+      return args;
+    }
+    return this.sanitizeReadTasksArgs(args as ReadTasksArgs, query) as Object;
   }
 
   private buildSessionContextString(maxChars: number = 1200): string {
@@ -275,11 +359,12 @@ export struct AIPanelView {
       switch (item.type) {
         case DisplayItemType.UserQuery: lines.push(`User: ${item.text}`); break;
         case DisplayItemType.AIChat: lines.push(`AI: ${item.text}`); break;
+        case DisplayItemType.AIThinking: lines.push(`Thinking: ${item.text}`); break;
         case DisplayItemType.AITask: lines.push(`PendingTask: ${item.task?.name} | due=${item.task?.dueTime || "无"}`); break;
         case DisplayItemType.AIHabit: lines.push(`PendingHabit: ${item.habit?.name} | ${item.habit?.period} x${item.habit?.timesPerPeriod}`); break;
         case DisplayItemType.AIMemory: lines.push(`MemoryCaptured: ${item.text}`); break;
         case DisplayItemType.AIToolRequest: lines.push(`ToolRequest: ${item.toolReq?.tool}`); break;
-        case DisplayItemType.AIToolResult: lines.push(`ToolResult: ${item.toolRes?.tool} count=${item.toolRes?.payload.summary.count}`); break;
+        case DisplayItemType.AIToolResult: lines.push(`ToolResult: ${this.toolResultSummary(item.toolRes as AIToolResult)}`); break;
       }
       if (lines.join("\n").length > maxChars) break;
     }
@@ -402,8 +487,13 @@ export struct AIPanelView {
 
   async createTaskFromProposal(task: AITask) {
     if (this.repoBusy) return;
-    this.repoBusy = true;
     try {
+      const linkedReq = this.findTaskProposalToolRequest(task);
+      if (linkedReq) {
+        await this.approveAndRunTool(linkedReq);
+        return;
+      }
+      this.repoBusy = true;
       // 显示二次确认 Dialog
       AlertDialog.show({
         title: '确认创建任务？',
@@ -553,7 +643,7 @@ export struct AIPanelView {
               if (this.isParsing) {
                 Row({ space: 8 }) {
                   LoadingProgress().width(16).height(16).color(this.theme.brand)
-                  Text("Deadliner 正在思考...").fontSize(12).fontColor($r('sys.color.font_secondary'))
+                  Text(this.currentProgressHint || "Deadliner 正在思考...").fontSize(12).fontColor($r('sys.color.font_secondary'))
                 }
                 .width('100%')
                 .padding({ left: 16, top: 8, bottom: 8 })
@@ -611,6 +701,18 @@ export struct AIPanelView {
         Blank()
       }.width('100%').padding({ top: 8, bottom: 8 })
     }
+    else if (item.type === DisplayItemType.AIThinking) {
+      Row({ space: 8 }) {
+        SymbolGlyph($r('sys.symbol.data')).fontSize(14).fontColor([this.theme.brand])
+        Text(item.text).fontSize(12).fontColor($r('sys.color.font_secondary'))
+        Blank()
+      }
+      .width('100%')
+      .padding(12)
+      .backgroundColor('#100A59F7')
+      .borderRadius(16)
+      .margin({ top: 4, bottom: 4 })
+    }
     else if (item.type === DisplayItemType.AIMemory) {
       Row({ space: 8 }) {
         SymbolGlyph($r('sys.symbol.small_head')).fontSize(14).fontColor([Color.Pink])
@@ -631,7 +733,7 @@ export struct AIPanelView {
     else if (item.type === DisplayItemType.AIToolResult && item.toolRes) {
       Row({ space: 8 }) {
         SymbolGlyph($r('sys.symbol.data')).fontSize(14).fontColor([Color.Orange])
-        Text(`已读取任务：${item.toolRes.payload.summary.count} 条（逾期 ${item.toolRes.payload.summary.overdue}）`)
+        Text(this.toolResultSummary(item.toolRes))
           .fontSize(12).fontColor($r('sys.color.font_secondary'))
         Blank()
       }.width('100%').padding(12).backgroundColor('#10FFA500').borderRadius(10).margin({ top: 4, bottom: 4 })
@@ -670,13 +772,13 @@ export struct AIPanelView {
     Column({ space: 12 }) {
       Row({ space: 6 }) {
         SymbolGlyph($r('sys.symbol.archivebox')).fontSize(14).fontColor([Color.Orange])
-        Text("需要读取任务列表").fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('sys.color.font_secondary'))
+        Text(this.toolDisplayTitle(req.tool)).fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('sys.color.font_secondary'))
         Blank()
       }.width('100%')
 
-      Text(req.reason || "为了回答你的问题，我需要查看你近期的任务。").fontSize(14).fontColor($r('sys.color.font_primary')).width('100%')
+      Text(req.reason || this.defaultToolReason(req.tool)).fontSize(14).fontColor($r('sys.color.font_primary')).width('100%')
 
-      Text(`范围：未来 ${req.args.timeRangeDays || 7} 天 · 状态：${req.args.status || "OPEN"}`)
+      Text(this.toolArgsSummary(req))
         .fontSize(12).fontColor($r('sys.color.font_secondary')).width('100%')
 
       Row({ space: 12 }) {
@@ -685,7 +787,7 @@ export struct AIPanelView {
           .backgroundColor($r('sys.color.comp_background_tertiary')).fontColor($r('sys.color.font_primary'))
           .onClick(() => {
             const item = new DisplayItem(DisplayItemType.AIChat);
-            item.text = "好的，我不读取任务列表。你可以告诉我更具体的任务信息。";
+            item.text = "好的，这次我不执行这个本地操作。你也可以提供更明确的信息让我继续。";
             this.displayItems.push(item);
             this.scrollToBottom();
           })
@@ -698,6 +800,58 @@ export struct AIPanelView {
       }.width('100%')
     }
     .width('100%').padding(16).backgroundColor($r('sys.color.comp_background_secondary')).borderRadius(16).margin({ top: 8, bottom: 8 })
+  }
+
+  private toolDisplayTitle(toolName: string): string {
+    switch (toolName) {
+      case 'read_tasks':
+        return '需要读取任务列表';
+      case 'create_task':
+        return '需要创建任务';
+      case 'update_deadline':
+        return '需要修改截止时间';
+      case 'read_habits':
+        return '需要读取习惯列表';
+      case 'create_habit':
+        return '需要创建习惯';
+      default:
+        return `需要执行工具 ${toolName}`;
+    }
+  }
+
+  private toolArgsSummary(req: AIToolRequest): string {
+    if (req.tool === 'read_tasks') {
+      const args = req.args as ReadTasksArgs;
+      return `范围：未来 ${args.timeRangeDays || 7} 天 · 状态：${args.status || 'OPEN'}`;
+    }
+    return `工具：${req.tool} · 模式：${req.executionMode || 'ASK_USER'}`;
+  }
+
+  private toolResultSummary(result: AIToolResult): string {
+    if (result.tool === 'read_tasks') {
+      const payload = result.payload as AdapterReadTasksPayload;
+      return `已读取任务：${payload.summary.count} 条（逾期 ${payload.summary.overdue}）`;
+    }
+    if (result.tool === 'read_habits') {
+      const payload = result.payload as AdapterReadHabitsPayload;
+      return `已读取习惯：${payload.summary.count} 条`;
+    }
+    if (result.tool === 'create_task' || result.tool === 'update_deadline') {
+      const payload = result.payload as AdapterCreateTaskPayload;
+      if (result.tool === 'create_task' && payload.task.name) {
+        return `已创建任务：${payload.task.name}`;
+      }
+      if (result.tool === 'update_deadline' && payload.task.name) {
+        return `已更新截止时间：${payload.task.name}`;
+      }
+    }
+    if (result.tool === 'create_habit') {
+      const payload = result.payload as AdapterCreateHabitPayload;
+      if (payload.habit.name) {
+        return `已创建习惯：${payload.habit.name}`;
+      }
+    }
+    return `工具执行完成：${result.tool}`;
   }
 
   @Builder
@@ -718,9 +872,14 @@ export struct AIPanelView {
 
   async createHabitFromProposal(habit: AIHabit) {
     if (this.repoBusy) return;
-    this.repoBusy = true;
 
     try {
+      const linkedReq = this.findHabitProposalToolRequest(habit);
+      if (linkedReq) {
+        await this.approveAndRunTool(linkedReq);
+        return;
+      }
+      this.repoBusy = true;
       // 1. 映射 Period (周期) 到 pIndex
       let pIndex = 0; // 默认 DAILY
       if (habit.period === 'WEEKLY') pIndex = 1;
@@ -790,6 +949,130 @@ export struct AIPanelView {
         .margin({ top: 8 })
     }
     .width('100%').padding(16).backgroundColor($r('sys.color.comp_background_secondary')).borderRadius(16).margin({ top: 8, bottom: 8 })
+  }
+
+  private handleProgressUpdate(kind: string, message: string) {
+    if (!message || message.length === 0) {
+      return;
+    }
+    this.currentProgressHint = message;
+    if (!this.shouldAppendThinkingMessage(message)) {
+      return;
+    }
+    const item = new DisplayItem(DisplayItemType.AIThinking);
+    item.text = message;
+    this.displayItems.push(item);
+    this.scrollToBottom();
+  }
+
+  private shouldAppendThinkingMessage(message: string): boolean {
+    const lastItem = this.displayItems.length > 0 ? this.displayItems[this.displayItems.length - 1] : undefined;
+    if (!lastItem || lastItem.type !== DisplayItemType.AIThinking) {
+      return true;
+    }
+    return lastItem.text !== message;
+  }
+
+  private presentToolRequestAsProposal(req: AIToolRequest): boolean {
+    if (req.tool === 'create_task') {
+      const proposal = this.taskProposalFromToolRequest(req);
+      if (!proposal) {
+        return false;
+      }
+      this.taskProposalToolRequests.push(new ProposalToolRequestLink(this.makeTaskKey(proposal), req));
+      this.handleProgressUpdate('thinking', 'Deadliner 已经整理好一个待创建任务。');
+      const item = new DisplayItem(DisplayItemType.AITask);
+      item.task = proposal;
+      this.displayItems.push(item);
+      return true;
+    }
+    if (req.tool === 'create_habit') {
+      const proposal = this.habitProposalFromToolRequest(req);
+      if (!proposal) {
+        return false;
+      }
+      this.habitProposalToolRequests.push(new ProposalToolRequestLink(this.makeHabitKey(proposal), req));
+      this.handleProgressUpdate('thinking', 'Deadliner 已经整理好一个待创建习惯。');
+      const item = new DisplayItem(DisplayItemType.AIHabit);
+      item.habit = proposal;
+      this.displayItems.push(item);
+      return true;
+    }
+    return false;
+  }
+
+  private taskProposalFromToolRequest(req: AIToolRequest): AITask | null {
+    const args = req.args as CreateTaskToolArgs;
+    const name = (args.name ?? '').trim();
+    if (!name) {
+      return null;
+    }
+    return {
+      name: name,
+      dueTime: args.dueTime ?? args.due_time,
+      note: args.note
+    };
+  }
+
+  private habitProposalFromToolRequest(req: AIToolRequest): AIHabit | null {
+    const args = req.args as CreateHabitToolArgs;
+    const name = (args.name ?? '').trim();
+    if (!name) {
+      return null;
+    }
+    return {
+      name: name,
+      period: (args.period ?? 'DAILY').toUpperCase(),
+      timesPerPeriod: Math.max(1, args.timesPerPeriod ?? args.times_per_period ?? 1),
+      goalType: (args.goalType ?? args.goal_type ?? 'PER_PERIOD').toUpperCase(),
+      totalTarget: args.totalTarget ?? args.total_target
+    };
+  }
+
+  private findTaskProposalToolRequest(task: AITask): AIToolRequest | null {
+    const key = this.makeTaskKey(task);
+    const found = this.taskProposalToolRequests.find((item) => item.key === key);
+    return found ? found.request : null;
+  }
+
+  private findHabitProposalToolRequest(habit: AIHabit): AIToolRequest | null {
+    const key = this.makeHabitKey(habit);
+    const found = this.habitProposalToolRequests.find((item) => item.key === key);
+    return found ? found.request : null;
+  }
+
+  private clearProposalToolRequest(toolName: string, requestId: string) {
+    if (toolName === 'create_task') {
+      this.taskProposalToolRequests = this.taskProposalToolRequests.filter((item) => item.request.id !== requestId);
+    }
+    if (toolName === 'create_habit') {
+      this.habitProposalToolRequests = this.habitProposalToolRequests.filter((item) => item.request.id !== requestId);
+    }
+  }
+
+  private markProposalApplied(req: AIToolRequest, result: AIToolResult) {
+    if (req.tool === 'create_task') {
+      const proposal = this.taskProposalFromToolRequest(req);
+      const payload = result.payload as AdapterCreateTaskPayload;
+      if (proposal && payload.ok) {
+        const key = this.makeTaskKey(proposal);
+        if (!this.addedTaskKeys.includes(key)) {
+          this.addedTaskKeys.push(key);
+        }
+      }
+      return;
+    }
+
+    if (req.tool === 'create_habit') {
+      const proposal = this.habitProposalFromToolRequest(req);
+      const payload = result.payload as AdapterCreateHabitPayload;
+      if (proposal && payload.ok) {
+        const key = this.makeHabitKey(proposal);
+        if (!this.addedHabitKeys.includes(key)) {
+          this.addedHabitKeys.push(key);
+        }
+      }
+    }
   }
 
   build() {

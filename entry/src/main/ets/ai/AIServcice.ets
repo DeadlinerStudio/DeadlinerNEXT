@@ -1,11 +1,14 @@
+import { common } from '@kit.AbilityKit';
 import { LocalValues } from '../common/local/LocalValues';
 import { DirectProvider } from './core/DirectProvider';
+import { DeadlinerCoreService } from './core/DeadlinerCoreService';
 import { LLMProvider } from './core/LLMProvider';
 import { ChatRequest, Message, MixedResult, AITask, AIHabit, AIToolResult, MonthlyAnalysisResult } from './model/AIModels';
 import { MemoryBank } from './model/MemoryModels';
 
 export class AIService {
   private static instance: AIService;
+  private coreService: DeadlinerCoreService = DeadlinerCoreService.getInstance();
 
   private constructor() {}
 
@@ -14,6 +17,10 @@ export class AIService {
       AIService.instance = new AIService();
     }
     return AIService.instance;
+  }
+
+  public async init(context: common.Context): Promise<void> {
+    await this.coreService.init(context);
   }
 
   private getProvider(): LLMProvider {
@@ -37,41 +44,7 @@ export class AIService {
     sessionContext: string = "",
     sessionSummary: string = ""
   ): Promise<MixedResult> {
-    const memoryBank = MemoryBank.getInstance();
-    const longTerm = memoryBank.getLongTermContext();
-
-    const systemPrompt = this.buildAgentSystemPrompt(
-      preferredLang,
-      longTerm,
-      sessionSummary,
-      sessionContext
-    );
-
-    const messages: Message[] = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: text }
-    ];
-
-    const content = await this.fetchFromProvider(messages);
-    console.info("[AIService] Raw Response:", content);
-
-    const jsonString = this.extractJsonData(content);
-    const result = JSON.parse(jsonString) as MixedResult;
-
-    // 1. 处理新提取的记忆
-    if (result.newMemories && result.newMemories.length > 0) {
-      const filtered = this.filterMemories(result.newMemories, result, text);
-      for (const mem of filtered) {
-        await memoryBank.saveMemory(mem, "Auto-Extracted");
-      }
-    }
-
-    // 2. 更新用户画像
-    if (result.userProfile && result.userProfile.trim().length > 0) {
-      await memoryBank.saveUserProfile(result.userProfile);
-    }
-
-    return result;
+    return this.coreService.processInput(text);
   }
 
   // ==========================================
@@ -85,51 +58,7 @@ export class AIService {
     sessionContext: string = "",
     sessionSummary: string = ""
   ): Promise<MixedResult> {
-    const memoryBank = MemoryBank.getInstance();
-    const longTerm = memoryBank.getLongTermContext();
-
-    const toolHint = `
-    你正在进行二段对话（工具结果已提供）。
-    - 不要再次请求 readTasks（除非用户明确要求刷新/再查）。
-    - 你可以基于工具结果输出新的 tasks/habits proposal（用于新增/补全/纠错），但必须避免重复已存在任务。
-    `;
-
-    const systemPrompt = this.buildAgentSystemPrompt(
-      preferredLang,
-      longTerm,
-      sessionSummary,
-      sessionContext,
-      toolHint
-    );
-
-    // 把 toolResult 编码成 JSON 字符串
-    const toolJson = JSON.stringify(toolResult);
-
-    const messages: Message[] = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: originalUserText },
-      { role: "user", content: `TOOL_RESULT_JSON:\n${toolJson}` }
-    ];
-
-    const content = await this.fetchFromProvider(messages);
-    console.info("[AIService] Raw Response (after tool):", content);
-
-    const jsonString = this.extractJsonData(content);
-    const result = JSON.parse(jsonString) as MixedResult;
-
-    // 二段也允许更新记忆
-    if (result.newMemories && result.newMemories.length > 0) {
-      const filtered = this.filterMemories(result.newMemories, result, content);
-      for (const mem of filtered) {
-        await memoryBank.saveMemory(mem, "Auto-Extracted");
-      }
-    }
-
-    if (result.userProfile && result.userProfile.trim().length > 0) {
-      await memoryBank.saveUserProfile(result.userProfile);
-    }
-
-    return result;
+    return this.coreService.submitToolResult(toolResult);
   }
 
   // ==========================================
@@ -137,18 +66,7 @@ export class AIService {
   // ==========================================
 
   public async extractTasks(text: string, preferredLang: string = 'zh-CN'): Promise<AITask[]> {
-    const systemPrompt = this.buildTaskSystemPrompt(preferredLang);
-    const messages: Message[] = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: text }
-    ];
-
-    const content = await this.fetchFromProvider(messages);
-    console.info('[AIService] Legacy Extract Tasks Raw Response:', content);
-
-    const jsonString = this.extractJsonData(content);
-    const resultObj = JSON.parse(jsonString) as MixedResult;
-    return resultObj.tasks ?? [];
+    return this.coreService.extractTasks(text, preferredLang);
   }
 
   public async extractHabits(text: string, preferredLang: string = 'zh-CN'): Promise<AIHabit[]> {

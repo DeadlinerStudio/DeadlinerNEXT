@@ -7,6 +7,6 @@
   "license": "",
   "dependencies": {
     "@hw-agconnect/auth": "^1.0.5",
+    "libffi_ohos.so": "file:./src/main/cpp/types/libffi_ohos"
   }
 }
-

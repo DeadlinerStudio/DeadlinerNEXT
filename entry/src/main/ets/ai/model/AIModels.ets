@@ -95,9 +95,11 @@ export interface MixedResult {
 // ==========================================
 
 export interface AIToolCall {
+  id?: string;
   tool: string;
-  args: ReadTasksArgs;
+  args: Object;
   reason?: string;
+  executionMode?: string;
 }
 
 export interface ReadTasksArgs {
@@ -112,16 +114,18 @@ export interface ReadTasksArgs {
 // 注意：ArkTS 中用 string 替代 Swift 的 UUID
 export interface AIToolRequest {
   id: string; // uuid
-  tool: string; // "readTasks"
-  args: ReadTasksArgs;
+  tool: string;
+  args: Object;
   reason?: string;
+  executionMode?: string;
 }
 
 export interface AIToolResult {
-  id: string; // uuid
-  tool: string; // "readTasks"
-  appliedArgs: ReadTasksArgs;
-  payload: ReadTasksResultPayload;
+  id: string; // core tool request id
+  tool: string;
+  appliedArgs: Object;
+  payload: Object;
+  resultJson: string;
   generatedAt: Date;
 }
 

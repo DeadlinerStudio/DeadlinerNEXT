@@ -15,6 +15,7 @@ import { ManualDataManager } from '../common/manual/ManualModel';
 import { SettingsConstants as C } from '../common/local/SettingsConstants';
 import { ThemeManager } from '../common/theme/ThemeManager';
 import { DynamicIconUtils } from '../utils/DynamicIconUtils';
+import { AIService } from '../ai/AIServcice';
 
 const DOMAIN = 0x0000;
 
@@ -29,6 +30,7 @@ export default class EntryAbility extends UIAbility {
       await ThemeManager.init(this.context);
 
       await LocalValues.getInstance().init(this.context);
+      await AIService.getInstance().init(this.context);
 
       if (this.mainWindowClass) {
         hilog.info(DOMAIN, 'testTag', 'LocalValues loaded after window created, refreshing window mode...');
