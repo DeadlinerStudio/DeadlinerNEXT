@@ -449,6 +449,8 @@ struct Index {
           return;
         }
         this.isGuideSheetShow = false;
+      },
+      onWillDismiss: () => {
       }
     })
   }

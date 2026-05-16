@@ -144,6 +144,9 @@ export class LocalValues {
       const directAddOnAi = await this.pref.get(C.KEY_DIRECT_ADD_ON_AI, true);
       AppStorage.setOrCreate(C.KEY_DIRECT_ADD_ON_AI, directAddOnAi);
 
+      const silentTaskAdd = await this.pref.get(C.KEY_AI_SILENT_TASK_ADD, true);
+      AppStorage.setOrCreate(C.KEY_AI_SILENT_TASK_ADD, silentTaskAdd);
+
       const showPaperTalkShare = await this.pref.get(C.KEY_SHOW_PAPERTALK_SHARE, true);
       AppStorage.setOrCreate(C.KEY_SHOW_PAPERTALK_SHARE, showPaperTalkShare);
 

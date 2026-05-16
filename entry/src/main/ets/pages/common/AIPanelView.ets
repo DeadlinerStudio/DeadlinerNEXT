@@ -71,9 +71,33 @@ interface CreateTaskToolArgs {
   dueTime?: string;
   due_time?: string;
   note?: string;
+  task?: CreateTaskBatchItemArgs;
+  tasks?: CreateTaskBatchItemArgs[];
+  items?: CreateTaskBatchItemArgs[];
+}
+
+interface CreateTaskBatchItemArgs {
+  name?: string;
+  dueTime?: string;
+  due_time?: string;
+  note?: string;
 }
 
 interface CreateHabitToolArgs {
+  name?: string;
+  period?: string;
+  timesPerPeriod?: number;
+  times_per_period?: number;
+  goalType?: string;
+  goal_type?: string;
+  totalTarget?: number;
+  total_target?: number;
+  habit?: CreateHabitBatchItemArgs;
+  habits?: CreateHabitBatchItemArgs[];
+  items?: CreateHabitBatchItemArgs[];
+}
+
+interface CreateHabitBatchItemArgs {
   name?: string;
   period?: string;
   timesPerPeriod?: number;
@@ -103,6 +127,7 @@ export struct AIPanelView {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
   @Consume('appPathStack') appPathStack: NavPathStack;
   @StorageProp(C.KEY_DIRECT_ADD_ON_AI) directAdd: boolean = true;
+  @StorageProp(C.KEY_AI_SILENT_TASK_ADD) silentTaskAdd: boolean = true;
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
   @Require onDismissPanel: () => void;
 
@@ -183,34 +208,8 @@ export struct AIPanelView {
       }
 
       // 2. 拦截 Tool Call
-      if (result.toolCalls && result.toolCalls.length > 0) {
+      if (await this.handleToolCalls(result, query)) {
         this.isParsing = false;
-        const firstCall = result.toolCalls[0];
-
-        if (firstCall) {
-          this.toolOriginalUserText = query;
-          const toolReq: AIToolRequest = {
-            id: firstCall.id || util.generateRandomUUID(true),
-            tool: firstCall.tool,
-            args: this.normalizeToolArgs(firstCall.tool, firstCall.args, query),
-            reason: this.defaultToolReason(firstCall.tool),
-            executionMode: firstCall.executionMode
-          };
-
-          const proposalHandled = this.presentToolRequestAsProposal(toolReq);
-          if (proposalHandled) {
-            this.scrollToBottom();
-            return;
-          }
-
-          if (toolReq && toolReq.executionMode === 'AUTO') {
-            await this.approveAndRunTool(toolReq);
-          } else {
-            const reqItem = new DisplayItem(DisplayItemType.AIToolRequest);
-            reqItem.toolReq = toolReq;
-            this.displayItems.push(reqItem);
-          }
-        }
         this.scrollToBottom();
         return;
       }
@@ -268,6 +267,9 @@ export struct AIPanelView {
         this.sessionSummary = result2.sessionSummary.substring(0, 600);
       }
 
+      if (await this.handleToolCalls(result2, this.toolOriginalUserText || '')) {
+        return;
+      }
       this.appendResultToUI(result2);
       this.clearProposalToolRequest(req.tool, req.id);
 
@@ -318,6 +320,44 @@ export struct AIPanelView {
       this.displayItems.push(item);
     }
     this.lastSubmittedToolName = '';
+  }
+
+  private async handleToolCalls(result: MixedResult, query: string): Promise<boolean> {
+    if (!result.toolCalls || result.toolCalls.length === 0) {
+      return false;
+    }
+    this.toolOriginalUserText = query;
+    for (const call of result.toolCalls) {
+      if (!call) {
+        continue;
+      }
+      const toolReq: AIToolRequest = {
+        id: call.id || util.generateRandomUUID(true),
+        tool: call.tool,
+        args: this.normalizeToolArgs(call.tool, call.args, query),
+        reason: this.defaultToolReason(call.tool),
+        executionMode: call.executionMode
+      };
+
+      const proposalHandled = this.presentToolRequestAsProposal(toolReq);
+      if (proposalHandled) {
+        const normalizedTool = toolReq.tool.toLowerCase();
+        if (this.silentTaskAdd && (normalizedTool === 'create_task' || normalizedTool === 'create_habit')) {
+          this.handleProgressUpdate('thinking', '已开启静默添加，正在自动提交本批创建。');
+          await this.approveAndRunTool(toolReq);
+        }
+        continue;
+      }
+
+      if (toolReq.executionMode === 'AUTO') {
+        await this.approveAndRunTool(toolReq);
+      } else {
+        const reqItem = new DisplayItem(DisplayItemType.AIToolRequest);
+        reqItem.toolReq = toolReq;
+        this.displayItems.push(reqItem);
+      }
+    }
+    return true;
   }
 
   private shouldSuppressProposalCards(): boolean {
@@ -781,6 +821,22 @@ export struct AIPanelView {
       Text(this.toolArgsSummary(req))
         .fontSize(12).fontColor($r('sys.color.font_secondary')).width('100%')
 
+      if (req.tool === 'create_task' || req.tool === 'create_habit') {
+        Scroll(this.scroller) {
+          Text(this.toolArgsDetail(req))
+            .fontSize(12)
+            .fontColor($r('sys.color.font_secondary'))
+            .width('100%')
+        }
+        .scrollable(ScrollDirection.Vertical)
+        .scrollBar(BarState.Auto)
+        .height(140)
+        .width('100%')
+        .padding(10)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(12)
+      }
+
       Row({ space: 12 }) {
         Button("拒绝")
           .type(ButtonType.Normal).borderRadius(24).layoutWeight(1)
@@ -824,7 +880,34 @@ export struct AIPanelView {
       const args = req.args as ReadTasksArgs;
       return `范围：未来 ${args.timeRangeDays || 7} 天 · 状态：${args.status || 'OPEN'}`;
     }
+    if (req.tool === 'create_task') {
+      const tasks = this.taskProposalsFromToolRequest(req);
+      return `任务创建：${tasks.length} 条 · 模式：${req.executionMode || 'ASK_USER'}`;
+    }
+    if (req.tool === 'create_habit') {
+      const habits = this.habitProposalsFromToolRequest(req);
+      return `习惯创建：${habits.length} 条 · 模式：${req.executionMode || 'ASK_USER'}`;
+    }
     return `工具：${req.tool} · 模式：${req.executionMode || 'ASK_USER'}`;
+  }
+
+  private toolArgsDetail(req: AIToolRequest): string {
+    if (req.tool === 'create_task') {
+      const tasks = this.taskProposalsFromToolRequest(req);
+      return tasks.map((task, index) => {
+        const note = task.note && task.note.trim().length > 0 ? task.note : '无';
+        const due = task.dueTime && task.dueTime.trim().length > 0 ? task.dueTime : '无';
+        return `${index + 1}. 名称：${task.name}\n截止：${due}\n备注：${note}`;
+      }).join('\n\n');
+    }
+    if (req.tool === 'create_habit') {
+      const habits = this.habitProposalsFromToolRequest(req);
+      return habits.map((habit, index) => {
+        const total = habit.goalType === 'TOTAL' ? `，总目标：${habit.totalTarget ?? '缺失'}` : '';
+        return `${index + 1}. 名称：${habit.name}\n周期：${habit.period}\n频次：${habit.timesPerPeriod}\n目标：${habit.goalType}${total}`;
+      }).join('\n\n');
+    }
+    return '';
   }
 
   private toolResultSummary(result: AIToolResult): string {
@@ -838,16 +921,28 @@ export struct AIPanelView {
     }
     if (result.tool === 'create_task' || result.tool === 'update_deadline') {
       const payload = result.payload as AdapterCreateTaskPayload;
-      if (result.tool === 'create_task' && payload.task.name) {
-        return `已创建任务：${payload.task.name}`;
+      if (result.tool === 'create_task') {
+        const createdCount = payload.summary?.successCount ?? payload.createdTasks?.length ?? (payload.task ? 1 : 0);
+        const failCount = payload.summary?.failCount ?? 0;
+        if (createdCount > 1 || failCount > 0) {
+          return `任务创建完成：成功 ${createdCount}，失败 ${failCount}`;
+        }
+        if (payload.task && payload.task.name) {
+          return `已创建任务：${payload.task.name}`;
+        }
       }
-      if (result.tool === 'update_deadline' && payload.task.name) {
+      if (result.tool === 'update_deadline' && payload.task && payload.task.name) {
         return `已更新截止时间：${payload.task.name}`;
       }
     }
     if (result.tool === 'create_habit') {
       const payload = result.payload as AdapterCreateHabitPayload;
-      if (payload.habit.name) {
+      const createdCount = payload.summary?.successCount ?? payload.createdHabits?.length ?? (payload.habit ? 1 : 0);
+      const failCount = payload.summary?.failCount ?? 0;
+      if (createdCount > 1 || failCount > 0) {
+        return `习惯创建完成：成功 ${createdCount}，失败 ${failCount}`;
+      }
+      if (payload.habit && payload.habit.name) {
         return `已创建习惯：${payload.habit.name}`;
       }
     }
@@ -975,58 +1070,100 @@ export struct AIPanelView {
 
   private presentToolRequestAsProposal(req: AIToolRequest): boolean {
     if (req.tool === 'create_task') {
-      const proposal = this.taskProposalFromToolRequest(req);
-      if (!proposal) {
+      const proposals = this.taskProposalsFromToolRequest(req);
+      if (proposals.length === 0) {
         return false;
       }
-      this.taskProposalToolRequests.push(new ProposalToolRequestLink(this.makeTaskKey(proposal), req));
-      this.handleProgressUpdate('thinking', 'Deadliner 已经整理好一个待创建任务。');
-      const item = new DisplayItem(DisplayItemType.AITask);
-      item.task = proposal;
-      this.displayItems.push(item);
+      for (const proposal of proposals) {
+        this.taskProposalToolRequests.push(new ProposalToolRequestLink(this.makeTaskKey(proposal), req));
+        const item = new DisplayItem(DisplayItemType.AITask);
+        item.task = proposal;
+        this.displayItems.push(item);
+      }
+      this.handleProgressUpdate('thinking', `Deadliner 已经整理好 ${proposals.length} 个待创建任务。`);
       return true;
     }
     if (req.tool === 'create_habit') {
-      const proposal = this.habitProposalFromToolRequest(req);
-      if (!proposal) {
+      const proposals = this.habitProposalsFromToolRequest(req);
+      if (proposals.length === 0) {
         return false;
       }
-      this.habitProposalToolRequests.push(new ProposalToolRequestLink(this.makeHabitKey(proposal), req));
-      this.handleProgressUpdate('thinking', 'Deadliner 已经整理好一个待创建习惯。');
-      const item = new DisplayItem(DisplayItemType.AIHabit);
-      item.habit = proposal;
-      this.displayItems.push(item);
+      for (const proposal of proposals) {
+        this.habitProposalToolRequests.push(new ProposalToolRequestLink(this.makeHabitKey(proposal), req));
+        const item = new DisplayItem(DisplayItemType.AIHabit);
+        item.habit = proposal;
+        this.displayItems.push(item);
+      }
+      this.handleProgressUpdate('thinking', `Deadliner 已经整理好 ${proposals.length} 个待创建习惯。`);
       return true;
     }
     return false;
   }
 
   private taskProposalFromToolRequest(req: AIToolRequest): AITask | null {
+    const tasks = this.taskProposalsFromToolRequest(req);
+    return tasks.length > 0 ? tasks[0] : null;
+  }
+
+  private taskProposalsFromToolRequest(req: AIToolRequest): AITask[] {
     const args = req.args as CreateTaskToolArgs;
+    const fromBatch = this.normalizeTaskToolArgs(args);
+    if (fromBatch && fromBatch.length > 0) {
+      return fromBatch
+        .map((item) => {
+          const normalized: AITask = {
+            name: (item.name ?? '').trim(),
+            dueTime: item.dueTime ?? item.due_time,
+            note: item.note
+          };
+          return normalized;
+        })
+        .filter((item) => item.name.length > 0);
+    }
     const name = (args.name ?? '').trim();
     if (!name) {
-      return null;
+      return [];
     }
-    return {
+    return [{
       name: name,
       dueTime: args.dueTime ?? args.due_time,
       note: args.note
-    };
+    }];
   }
 
   private habitProposalFromToolRequest(req: AIToolRequest): AIHabit | null {
+    const habits = this.habitProposalsFromToolRequest(req);
+    return habits.length > 0 ? habits[0] : null;
+  }
+
+  private habitProposalsFromToolRequest(req: AIToolRequest): AIHabit[] {
     const args = req.args as CreateHabitToolArgs;
+    const fromBatch = this.normalizeHabitToolArgs(args);
+    if (fromBatch && fromBatch.length > 0) {
+      return fromBatch
+        .map((item) => {
+          const normalized: AIHabit = {
+            name: (item.name ?? '').trim(),
+            period: (item.period ?? 'DAILY').toUpperCase(),
+            timesPerPeriod: Math.max(1, item.timesPerPeriod ?? item.times_per_period ?? 1),
+            goalType: (item.goalType ?? item.goal_type ?? 'PER_PERIOD').toUpperCase(),
+            totalTarget: item.totalTarget ?? item.total_target
+          };
+          return normalized;
+        })
+        .filter((item) => item.name.length > 0);
+    }
     const name = (args.name ?? '').trim();
     if (!name) {
-      return null;
+      return [];
     }
-    return {
+    return [{
       name: name,
       period: (args.period ?? 'DAILY').toUpperCase(),
       timesPerPeriod: Math.max(1, args.timesPerPeriod ?? args.times_per_period ?? 1),
       goalType: (args.goalType ?? args.goal_type ?? 'PER_PERIOD').toUpperCase(),
       totalTarget: args.totalTarget ?? args.total_target
-    };
+    }];
   }
 
   private findTaskProposalToolRequest(task: AITask): AIToolRequest | null {
@@ -1052,10 +1189,11 @@ export struct AIPanelView {
 
   private markProposalApplied(req: AIToolRequest, result: AIToolResult) {
     if (req.tool === 'create_task') {
-      const proposal = this.taskProposalFromToolRequest(req);
+      const proposals = this.taskProposalsFromToolRequest(req);
       const payload = result.payload as AdapterCreateTaskPayload;
-      if (proposal && payload.ok) {
-        const key = this.makeTaskKey(proposal);
+      const successCount = payload.summary?.successCount ?? (payload.ok ? proposals.length : 0);
+      for (let index = 0; index < Math.min(successCount, proposals.length); index++) {
+        const key = this.makeTaskKey(proposals[index]);
         if (!this.addedTaskKeys.includes(key)) {
           this.addedTaskKeys.push(key);
         }
@@ -1064,15 +1202,73 @@ export struct AIPanelView {
     }
 
     if (req.tool === 'create_habit') {
-      const proposal = this.habitProposalFromToolRequest(req);
+      const proposals = this.habitProposalsFromToolRequest(req);
       const payload = result.payload as AdapterCreateHabitPayload;
-      if (proposal && payload.ok) {
-        const key = this.makeHabitKey(proposal);
+      const successCount = payload.summary?.successCount ?? (payload.ok ? proposals.length : 0);
+      for (let index = 0; index < Math.min(successCount, proposals.length); index++) {
+        const key = this.makeHabitKey(proposals[index]);
         if (!this.addedHabitKeys.includes(key)) {
           this.addedHabitKeys.push(key);
         }
       }
     }
+  }
+
+  private normalizeTaskToolArgs(args: CreateTaskToolArgs): CreateTaskBatchItemArgs[] {
+    const candidates: CreateTaskBatchItemArgs[] = [];
+    if (args.tasks) {
+      candidates.push(...args.tasks);
+    }
+    if (args.items) {
+      candidates.push(...args.items);
+    }
+    if (args.task) {
+      candidates.push(args.task);
+    }
+    if (candidates.length > 0) {
+      return candidates;
+    }
+    const name = (args.name ?? '').trim();
+    if (name.length === 0) {
+      return [];
+    }
+    const fallback: CreateTaskBatchItemArgs = {
+      name: name,
+      dueTime: args.dueTime ?? args.due_time,
+      note: args.note
+    };
+    return [fallback];
+  }
+
+  private normalizeHabitToolArgs(args: CreateHabitToolArgs): CreateHabitBatchItemArgs[] {
+    const candidates: CreateHabitBatchItemArgs[] = [];
+    if (args.habits) {
+      candidates.push(...args.habits);
+    }
+    if (args.items) {
+      candidates.push(...args.items);
+    }
+    if (args.habit) {
+      candidates.push(args.habit);
+    }
+    if (candidates.length > 0) {
+      return candidates;
+    }
+    const name = (args.name ?? '').trim();
+    if (name.length === 0) {
+      return [];
+    }
+    const fallback: CreateHabitBatchItemArgs = {
+      name: name,
+      period: args.period,
+      timesPerPeriod: args.timesPerPeriod,
+      times_per_period: args.times_per_period,
+      goalType: args.goalType,
+      goal_type: args.goal_type,
+      totalTarget: args.totalTarget,
+      total_target: args.total_target
+    };
+    return [fallback];
   }
 
   build() {

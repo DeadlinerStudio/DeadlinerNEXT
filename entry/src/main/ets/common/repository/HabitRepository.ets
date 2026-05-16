@@ -246,12 +246,26 @@ export class HabitRepository {
       .filter(r => r.status === HabitRecordStatus.COMPLETED);
     const todayCount = recordsToday.reduce((sum, r) => sum + r.count, 0);
 
-    if (habit.period === HabitPeriod.DAILY ||
-      habit.period === HabitPeriod.ONCE ||
+    if (habit.period === HabitPeriod.DAILY) {
+      // === DAILY: 每日累积模式 ===
+      // 支持每日多次打卡（例如 timesPerPeriod=3），点击一次累加一次。
+      const target = Math.max(1, habit.timesPerPeriod);
+      if (todayCount >= target && habit.goalType === HabitGoalType.PER_PERIOD) {
+        // 每日目标已达标：保持现有策略，不再继续累加
+      } else {
+        await this.db.insertHabitRecord({
+          id: 0,
+          habitId: habitId,
+          date: this.formatDate(date),
+          count: 1,
+          status: HabitRecordStatus.COMPLETED,
+          createdAt: new Date().toISOString()
+        });
+      }
+    } else if (habit.period === HabitPeriod.ONCE ||
       habit.period === HabitPeriod.EBBINGHAUS) {
 
       // === 简单模式 (0/1) ===
-      // DAILY: 每天打一次
       // ONCE: 一次性任务，打完即止（但在 Repo 层我们只管记录状态，UI 层负责隐藏）
       // EBBINGHAUS: 到了节点打一次
 

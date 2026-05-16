@@ -46,6 +46,7 @@ export class SettingsConstants {
 
   static readonly KEY_SHOW_AI_INPUT = 'show_ai_input';
   static readonly KEY_DIRECT_ADD_ON_AI = 'direct_add_on_ai';
+  static readonly KEY_AI_SILENT_TASK_ADD = 'ai_silent_task_add';
   static readonly KEY_SHOW_PAPERTALK_SHARE = 'show_papertalk_share';
 
   static readonly KEY_AUTO_ARCHIVE_DAYS = 'auto_archive_days';

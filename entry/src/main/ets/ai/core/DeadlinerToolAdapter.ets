@@ -51,7 +51,10 @@ export interface AdapterTaskPayload {
 
 export interface AdapterCreateTaskPayload {
   ok: boolean;
-  task: AdapterTaskPayload;
+  task: AdapterTaskPayload | null;
+  createdTasks: AdapterTaskPayload[];
+  summary: AdapterBatchSummary;
+  items: AdapterBatchItemResult<AdapterTaskPayload>[];
 }
 
 export interface AdapterReadHabitItem {
@@ -83,7 +86,24 @@ export interface AdapterHabitPayload {
 
 export interface AdapterCreateHabitPayload {
   ok: boolean;
-  habit: AdapterHabitPayload;
+  habit: AdapterHabitPayload | null;
+  createdHabits: AdapterHabitPayload[];
+  summary: AdapterBatchSummary;
+  items: AdapterBatchItemResult<AdapterHabitPayload>[];
+}
+
+export interface AdapterBatchSummary {
+  total: number;
+  successCount: number;
+  failCount: number;
+}
+
+export interface AdapterBatchItemResult<TPayload> {
+  ok: boolean;
+  itemIndex: number;
+  errorCode?: string;
+  message?: string;
+  data?: TPayload;
 }
 
 export interface AdapterToolExecution {
@@ -113,6 +133,40 @@ interface CreateTaskArgs {
   dueTime?: string;
   due_time?: string;
   note?: string;
+  tasks?: CreateTaskItemArgs[];
+}
+
+interface CreateTaskItemArgs {
+  name?: string;
+  dueTime?: string;
+  due_time?: string;
+  note?: string;
+}
+
+interface ResolveCreateTaskItemsResult {
+  ok: boolean;
+  isBatch: boolean;
+  items: CreateTaskItemArgs[];
+  message?: string;
+}
+
+interface ResolveCreateHabitItemsResult {
+  ok: boolean;
+  isBatch: boolean;
+  items: CreateHabitItemArgs[];
+  message?: string;
+}
+
+interface ValidatedCreateTaskItem {
+  name: string;
+  dueDate: Date;
+  note: string;
+}
+
+interface ValidateCreateTaskItemResult {
+  ok: boolean;
+  message?: string;
+  normalized?: ValidatedCreateTaskItem;
 }
 
 interface UpdateDeadlineArgs {
@@ -131,6 +185,32 @@ interface CreateHabitArgs {
   goal_type?: string;
   totalTarget?: number;
   total_target?: number;
+  habits?: CreateHabitItemArgs[];
+}
+
+interface CreateHabitItemArgs {
+  name?: string;
+  period?: string;
+  timesPerPeriod?: number;
+  times_per_period?: number;
+  goalType?: string;
+  goal_type?: string;
+  totalTarget?: number;
+  total_target?: number;
+}
+
+interface ValidatedCreateHabitItem {
+  name: string;
+  period: HabitPeriod;
+  timesPerPeriod: number;
+  goalType: HabitGoalType;
+  totalTarget: number | null;
+}
+
+interface ValidateCreateHabitItemResult {
+  ok: boolean;
+  message?: string;
+  normalized?: ValidatedCreateHabitItem;
 }
 
 class EmptyArgs {
@@ -261,44 +341,78 @@ export class DeadlinerToolAdapter {
   }
 
   private async executeCreateTask(rawArgs: CreateTaskArgs): Promise<AdapterToolExecution> {
-    const name = (rawArgs.name ?? '').trim();
-    const dueTime = (rawArgs.dueTime ?? rawArgs.due_time ?? '').trim();
-    if (!name) {
-      return this.fail('INVALID_ARGS', 'create_task 缺少 name');
-    }
-    if (!dueTime) {
-      return this.fail('INVALID_ARGS', 'create_task 缺少 dueTime');
+    const resolveResult = this.resolveCreateTaskItems(rawArgs);
+    if (!resolveResult.ok) {
+      return this.fail('INVALID_ARGS', resolveResult.message ?? 'create_task 参数错误');
     }
 
-    const dueDate = DateTimeUtils.parseDateString(dueTime);
-    if (!dueDate) {
-      return this.fail('INVALID_ARGS', 'dueTime 格式必须为 YYYY-MM-DD HH:mm');
+    const items = resolveResult.items;
+    const createdTasks: AdapterTaskPayload[] = [];
+    const batchItems: AdapterBatchItemResult<AdapterTaskPayload>[] = [];
+
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+      const validation = this.validateCreateTaskItem(item);
+      if (!validation.ok || !validation.normalized) {
+        if (!resolveResult.isBatch) {
+          return this.fail('INVALID_ARGS', validation.message ?? 'create_task 参数错误');
+        }
+        batchItems.push({
+          ok: false,
+          itemIndex: index,
+          errorCode: 'INVALID_ARGS',
+          message: validation.message ?? '任务参数错误'
+        });
+        continue;
+      }
+
+      const normalized = validation.normalized;
+      const params: DDLInsertParams = {
+        name: normalized.name,
+        startTime: DateTimeUtils.toLocalISOString(new Date()),
+        endTime: DateTimeUtils.toLocalISOString(normalized.dueDate),
+        state: TaskState.ACTIVE,
+        isCompleted: false,
+        completeTime: '',
+        note: normalized.note,
+        isArchived: false,
+        isStared: false,
+        type: DeadlineType.TASK,
+        calendarEventId: null
+      };
+
+      try {
+        const taskId = await TaskRepository.getInstance().insertDDL(params);
+        console.info(`[DeadlinerToolAdapter] create_task inserted id=${taskId} name=${normalized.name}`);
+        const task: AdapterTaskPayload = {
+          id: taskId,
+          name: normalized.name,
+          due: this.toToolDue(params.endTime)
+        };
+        createdTasks.push(task);
+        batchItems.push({
+          ok: true,
+          itemIndex: index,
+          data: task
+        });
+      } catch (err) {
+        console.error(`[DeadlinerToolAdapter] create_task failed index=${index} err=${JSON.stringify(err)}`);
+        batchItems.push({
+          ok: false,
+          itemIndex: index,
+          errorCode: 'CREATE_FAILED',
+          message: '任务创建失败'
+        });
+      }
     }
 
-    const params: DDLInsertParams = {
-      name: name,
-      startTime: DateTimeUtils.toLocalISOString(new Date()),
-      endTime: DateTimeUtils.toLocalISOString(dueDate),
-      state: TaskState.ACTIVE,
-      isCompleted: false,
-      completeTime: '',
-      note: rawArgs.note ?? '',
-      isArchived: false,
-      isStared: false,
-      type: DeadlineType.TASK,
-      calendarEventId: null
-    };
-
-    const taskId = await TaskRepository.getInstance().insertDDL(params);
-    console.info(`[DeadlinerToolAdapter] create_task inserted id=${taskId} name=${name}`);
-    const task: AdapterTaskPayload = {
-      id: taskId,
-      name: name,
-      due: this.toToolDue(params.endTime)
-    };
+    const summary = this.buildBatchSummary(items.length, createdTasks.length);
     const payload: AdapterCreateTaskPayload = {
-      ok: true,
-      task: task
+      ok: summary.failCount === 0,
+      task: createdTasks.length > 0 ? createdTasks[0] : null,
+      createdTasks: createdTasks,
+      summary: summary,
+      items: batchItems
     };
     return this.success(payload);
   }
@@ -340,7 +454,14 @@ export class DeadlinerToolAdapter {
     };
     const payload: AdapterCreateTaskPayload = {
       ok: true,
-      task: taskPayload
+      task: taskPayload,
+      createdTasks: [taskPayload],
+      summary: this.buildBatchSummary(1, 1),
+      items: [{
+        ok: true,
+        itemIndex: 0,
+        data: taskPayload
+      }]
     };
     return this.success(payload);
   }
@@ -381,9 +502,148 @@ export class DeadlinerToolAdapter {
   }
 
   private async executeCreateHabit(rawArgs: CreateHabitArgs): Promise<AdapterToolExecution> {
+    const resolveResult = this.resolveCreateHabitItems(rawArgs);
+    if (!resolveResult.ok) {
+      return this.fail('INVALID_ARGS', resolveResult.message ?? 'create_habit 参数错误');
+    }
+
+    const items = resolveResult.items;
+    const createdHabits: AdapterHabitPayload[] = [];
+    const batchItems: AdapterBatchItemResult<AdapterHabitPayload>[] = [];
+
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+      const validation = this.validateCreateHabitItem(item);
+      if (!validation.ok || !validation.normalized) {
+        if (!resolveResult.isBatch) {
+          return this.fail('INVALID_ARGS', validation.message ?? 'create_habit 参数错误');
+        }
+        batchItems.push({
+          ok: false,
+          itemIndex: index,
+          errorCode: 'INVALID_ARGS',
+          message: validation.message ?? '习惯参数错误'
+        });
+        continue;
+      }
+
+      const normalized = validation.normalized;
+      try {
+        const ddlParams: DDLInsertParams = {
+          name: normalized.name,
+          startTime: DateTimeUtils.toLocalISOString(new Date()),
+          endTime: DateTimeUtils.toLocalISOString(new Date()),
+          state: TaskState.ACTIVE,
+          isCompleted: false,
+          completeTime: '',
+          note: '',
+          isArchived: false,
+          isStared: false,
+          type: DeadlineType.HABIT,
+          calendarEventId: null
+        };
+        const ddlId = await TaskRepository.getInstance().insertDDL(ddlParams);
+
+        const habitId = await HabitRepository.getInstance().createHabitForDdl(
+          ddlId,
+          normalized.name,
+          normalized.period,
+          normalized.timesPerPeriod,
+          normalized.goalType,
+          normalized.totalTarget,
+          '',
+          null,
+          null,
+          0,
+          null
+        );
+        console.info(`[DeadlinerToolAdapter] create_habit inserted id=${habitId} name=${normalized.name} ddlId=${ddlId}`);
+
+        const habit: AdapterHabitPayload = {
+          id: habitId,
+          name: normalized.name,
+          period: normalized.period,
+          timesPerPeriod: normalized.timesPerPeriod,
+          goalType: normalized.goalType,
+          totalTarget: normalized.totalTarget
+        };
+        createdHabits.push(habit);
+        batchItems.push({
+          ok: true,
+          itemIndex: index,
+          data: habit
+        });
+      } catch (err) {
+        console.error(`[DeadlinerToolAdapter] create_habit failed index=${index} err=${JSON.stringify(err)}`);
+        batchItems.push({
+          ok: false,
+          itemIndex: index,
+          errorCode: 'CREATE_FAILED',
+          message: '习惯创建失败'
+        });
+      }
+    }
+
+    const summary = this.buildBatchSummary(items.length, createdHabits.length);
+    const payload: AdapterCreateHabitPayload = {
+      ok: summary.failCount === 0,
+      habit: createdHabits.length > 0 ? createdHabits[0] : null,
+      createdHabits: createdHabits,
+      summary: summary,
+      items: batchItems
+    };
+    return this.success(payload);
+  }
+
+  private resolveCreateTaskItems(rawArgs: CreateTaskArgs): ResolveCreateTaskItemsResult {
+    const items = rawArgs.tasks;
+    if (items !== undefined) {
+      if (!Array.isArray(items) || items.length === 0) {
+        return { ok: false, isBatch: true, items: [], message: 'create_task 的 tasks 不能为空数组' };
+      }
+      return { ok: true, isBatch: true, items: items };
+    }
+    return { ok: true, isBatch: false, items: [rawArgs] };
+  }
+
+  private resolveCreateHabitItems(rawArgs: CreateHabitArgs): ResolveCreateHabitItemsResult {
+    const items = rawArgs.habits;
+    if (items !== undefined) {
+      if (!Array.isArray(items) || items.length === 0) {
+        return { ok: false, isBatch: true, items: [], message: 'create_habit 的 habits 不能为空数组' };
+      }
+      return { ok: true, isBatch: true, items: items };
+    }
+    return { ok: true, isBatch: false, items: [rawArgs] };
+  }
+
+  private validateCreateTaskItem(rawArgs: CreateTaskItemArgs): ValidateCreateTaskItemResult {
+    const name = (rawArgs.name ?? '').trim();
+    const dueTime = (rawArgs.dueTime ?? rawArgs.due_time ?? '').trim();
+    if (!name) {
+      return { ok: false, message: 'create_task 缺少 name' };
+    }
+    if (!dueTime) {
+      return { ok: false, message: 'create_task 缺少 dueTime' };
+    }
+    const dueDate = DateTimeUtils.parseDateString(dueTime);
+    if (!dueDate) {
+      return { ok: false, message: 'dueTime 格式必须为 YYYY-MM-DD HH:mm' };
+    }
+    return {
+      ok: true,
+      normalized: {
+        name: name,
+        dueDate: dueDate,
+        note: rawArgs.note ?? ''
+      }
+    };
+  }
+
+  private validateCreateHabitItem(rawArgs: CreateHabitItemArgs): ValidateCreateHabitItemResult {
     const name = (rawArgs.name ?? '').trim();
     if (!name) {
-      return this.fail('INVALID_ARGS', 'create_habit 缺少 name');
+      return { ok: false, message: 'create_habit 缺少 name' };
     }
 
     const periodRaw = (rawArgs.period ?? 'DAILY').toUpperCase();
@@ -393,61 +653,34 @@ export class DeadlinerToolAdapter {
 
     const period = this.toHabitPeriod(periodRaw);
     if (!period) {
-      return this.fail('INVALID_ARGS', `不支持的 habit period: ${periodRaw}`);
+      return { ok: false, message: `不支持的 habit period: ${periodRaw}` };
     }
-
     const goalType = this.toHabitGoalType(goalTypeRaw);
     if (!goalType) {
-      return this.fail('INVALID_ARGS', `不支持的 habit goalType: ${goalTypeRaw}`);
+      return { ok: false, message: `不支持的 habit goalType: ${goalTypeRaw}` };
     }
-
     if (goalType === HabitGoalType.TOTAL && (totalTarget === null || totalTarget === undefined || totalTarget < 1)) {
-      return this.fail('INVALID_ARGS', 'TOTAL 习惯必须提供 totalTarget');
+      return { ok: false, message: 'TOTAL 习惯必须提供 totalTarget' };
     }
 
-    const ddlParams: DDLInsertParams = {
-      name: name,
-      startTime: DateTimeUtils.toLocalISOString(new Date()),
-      endTime: DateTimeUtils.toLocalISOString(new Date()),
-      state: TaskState.ACTIVE,
-      isCompleted: false,
-      completeTime: '',
-      note: '',
-      isArchived: false,
-      isStared: false,
-      type: DeadlineType.HABIT,
-      calendarEventId: null
-    };
-    const ddlId = await TaskRepository.getInstance().insertDDL(ddlParams);
-
-    const habitId = await HabitRepository.getInstance().createHabitForDdl(
-      ddlId,
-      name,
-      period,
-      timesPerPeriod,
-      goalType,
-      totalTarget,
-      '',
-      null,
-      null,
-      0,
-      null
-    );
-    console.info(`[DeadlinerToolAdapter] create_habit inserted id=${habitId} name=${name} ddlId=${ddlId}`);
-
-    const habit: AdapterHabitPayload = {
-      id: habitId,
-      name: name,
-      period: period,
-      timesPerPeriod: timesPerPeriod,
-      goalType: goalType,
-      totalTarget: totalTarget
-    };
-    const payload: AdapterCreateHabitPayload = {
+    return {
       ok: true,
-      habit: habit
+      normalized: {
+        name: name,
+        period: period,
+        timesPerPeriod: timesPerPeriod,
+        goalType: goalType,
+        totalTarget: totalTarget
+      }
     };
-    return this.success(payload);
+  }
+
+  private buildBatchSummary(total: number, successCount: number): AdapterBatchSummary {
+    return {
+      total: total,
+      successCount: successCount,
+      failCount: Math.max(0, total - successCount)
+    };
   }
 
   private copyTaskWithNewEndTime(task: DDLItem, endTime: string): DDLItem {
