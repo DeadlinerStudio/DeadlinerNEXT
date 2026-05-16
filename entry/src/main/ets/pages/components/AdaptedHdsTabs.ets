@@ -1,9 +1,13 @@
-import { DividerMode, hdsMaterial, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
+import { DividerMode, HdsBarStyle, hdsMaterial, HdsTabs,
+  HdsTabsBarChangeMode,
+  HdsTabsController } from '@kit.UIDesignKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { ITheme } from '../../common/theme/ThemeModel';
 import { LocalValues } from '../../common/local/LocalValues';
 import { getHdsMaterialLevel } from '../../common/style/MaterialLevel';
 import { ThemeManager } from '../../common/theme/ThemeManager';
+import { Symbol } from './infra/Symbol';
+import { SettingsConstants as C } from '../../common/local/SettingsConstants'
 
 @Component
 export struct AdaptedHdsTabs {
@@ -23,6 +27,23 @@ export struct AdaptedHdsTabs {
 
   // 点击事件回调（把业务逻辑抛给父组件）
   onTabClick?: (index: number) => void;
+
+  @Builder
+  miniBarBuilder() {
+    Row() {
+      Column() {
+        Symbol({
+          isImage: true,
+          icon: $r('app.media.lifi'),
+          fontSize: 28
+        })
+      }.width(48).height(48).justifyContent(FlexAlign.Center).margin({left: 4, right: 4})
+    }
+  }
+
+  onMiniBarClick?: () => void;
+
+  @StorageProp(C.KEY_SHOW_MINIBAR) showMiniBar: boolean = (deviceInfo.distributionOSApiVersion >= 60100);;
 
   build() {
     if (deviceInfo.distributionOSApiVersion >= 60100 && LocalValues.getInstance().getApi23Enable()) {
@@ -62,7 +83,21 @@ export struct AdaptedHdsTabs {
             maskHeight: 42
           },
           lightColor: this.theme.useWhiteGlow ? Color.White : this.theme.brand50,
-          adaptToHandedness: this.isWideScreen
+          adaptToHandedness: this.isWideScreen,
+          miniBar: this.showMiniBar ? {
+            miniBarBuilder: () => this.miniBarBuilder(),
+            miniBarWidth: {
+              smallWidth: 56,
+              mediumWidth: 56,
+              largeWidth: 56
+            },
+            onBarStyleChange: (miniBarStyle: HdsBarStyle, tabBarStyle: HdsBarStyle, _1: number, _2: number, mode: HdsTabsBarChangeMode) => {
+              if (mode === HdsTabsBarChangeMode.USER_CLICK) {
+                if (this.onMiniBarClick) this.onMiniBarClick();
+              }
+              this.controller.applyMiniBarStyle(HdsBarStyle.COLLAPSE);
+            }
+          } : undefined
         })
     } else {
       if (this.isWideScreen && this.tabletUi) {

@@ -36,6 +36,7 @@ export class SettingsConstants {
 
   static readonly KEY_STARTUP_PAGE = 'startup_page';
   static readonly KEY_SHOW_GUIDE_NEXT_LAUNCH = 'show_guide_next_launch';
+  static readonly KEY_APP_FIRST_LAUNCH = 'app_first_launch';
 
   static readonly KEY_ENGLISH_SOMEWHERE = 'english_somewhere';
   static readonly KEY_HABIT_PROGRESS_STYLE = 'habit_progress_style';
@@ -60,4 +61,6 @@ export class SettingsConstants {
   static readonly KEY_TREND_CARD_ORDER = 'trend_card_order';
   static readonly KEY_MONTHLY_ANALYSIS = 'monthly_analysis';
   static readonly KEY_LAST_ANALYZED_MONTH = 'last_analyzed_month';
+
+  static readonly KEY_SHOW_MINIBAR = 'show_minibar';
 }

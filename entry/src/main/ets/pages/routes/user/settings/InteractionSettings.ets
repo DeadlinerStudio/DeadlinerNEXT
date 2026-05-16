@@ -134,7 +134,7 @@ struct InteractionSettings {
           SettingsSection({ title: "AI 交互" }) {
             SubSettingsSwitch({
               title: "添加页面 AI 识别框",
-              subtitle: "在添加页面显示 Deadliner AI 任务提取识别框",
+              subtitle: "在添加页面显示 Lifi AI 任务提取识别框",
               isOn: this.directAdd,
               onChange: (isOn): Promise<void> => LocalValues.getInstance().setDirectAddOnAi(isOn)
             })
@@ -144,7 +144,7 @@ struct InteractionSettings {
 
             SubSettingsSwitch({
               title: "无感任务添加",
-              subtitle: "Deadliner AI 对话中点击“去添加”不跳转添加任务页",
+              subtitle: "Lifi AI 对话中点击“去添加”不跳转添加任务页",
               isOn: this.showAiInput,
               onChange: (isOn): Promise<void> => LocalValues.getInstance().setShowAiInput(isOn)
             })

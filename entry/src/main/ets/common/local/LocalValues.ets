@@ -123,6 +123,9 @@ export class LocalValues {
       const showGuideNextLaunch = await this.pref.get(C.KEY_SHOW_GUIDE_NEXT_LAUNCH, false);
       AppStorage.setOrCreate(C.KEY_SHOW_GUIDE_NEXT_LAUNCH, showGuideNextLaunch);
 
+      const isFirstLaunch = await this.pref.get(C.KEY_APP_FIRST_LAUNCH, true);
+      AppStorage.setOrCreate(C.KEY_APP_FIRST_LAUNCH, isFirstLaunch);
+
       const english = await this.pref.get(C.KEY_ENGLISH_SOMEWHERE, true);
       AppStorage.setOrCreate(C.KEY_ENGLISH_SOMEWHERE, english);
 
@@ -155,6 +158,9 @@ export class LocalValues {
 
       const materialLevel = await this.pref.get(C.KEY_API23_MATERIAL_LEVEL, 'EXQUISITE');
       AppStorage.setOrCreate(C.KEY_API23_MATERIAL_LEVEL, materialLevel)
+
+      const minibar = await this.pref.get(C.KEY_SHOW_MINIBAR, (deviceInfo.distributionOSApiVersion >= 60100));
+      AppStorage.setOrCreate(C.KEY_SHOW_MINIBAR, minibar);
 
       const experimentalComponents = await this.pref.get(C.KEY_EXPERIMENTAL_COMPONENTS, true);
       AppStorage.setOrCreate(C.KEY_EXPERIMENTAL_COMPONENTS, experimentalComponents);
@@ -521,6 +527,28 @@ export class LocalValues {
     await this.setValue(C.KEY_SHOW_GUIDE_NEXT_LAUNCH, enable);
   }
 
+  async getIsAppFirstLaunch(): Promise<boolean> {
+    const cached = AppStorage.get<boolean>(C.KEY_APP_FIRST_LAUNCH);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    if (!this.pref) return true;
+
+    try {
+      const value = await this.pref.get(C.KEY_APP_FIRST_LAUNCH, true) as boolean;
+      AppStorage.setOrCreate(C.KEY_APP_FIRST_LAUNCH, value);
+      return value;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  async setAppFirstLaunch(isFirst: boolean) {
+    AppStorage.setOrCreate(C.KEY_APP_FIRST_LAUNCH, isFirst);
+    await this.setValue(C.KEY_APP_FIRST_LAUNCH, isFirst);
+  }
+
   /**
    * 获取概览页卡片顺序
    */
@@ -683,5 +711,17 @@ export class LocalValues {
     const levels = ['ADAPTIVE', 'SMOOTH', 'GENTLE', 'EXQUISITE'];
     const actual = (levels.includes(level)) ? level : 'ADAPTIVE';
     await this.setValue(C.KEY_API23_MATERIAL_LEVEL, actual);
+  }
+
+  getMiniBar(): boolean {
+    return AppStorage.get(C.KEY_SHOW_MINIBAR) ?? (deviceInfo.distributionOSApiVersion >= 60100);
+  }
+
+  async setMiniBar(enable: boolean) {
+    if (deviceInfo.distributionOSApiVersion >= 60100) {
+      await this.setValue(C.KEY_SHOW_MINIBAR, enable);
+      return;
+    }
+    await this.setValue(C.KEY_SHOW_MINIBAR, false);
   }
 }

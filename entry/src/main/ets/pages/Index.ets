@@ -17,6 +17,7 @@ import { AdaptedHdsTabs } from './components/AdaptedHdsTabs';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { CapturePage } from './routes/capture/CapturePage';
 import { LottieOnboardingSheet } from './common/LottieOnboardingSheet';
+import { AISheetController } from './components/AISheetController';
 
 interface TabData {
   title: string,
@@ -72,8 +73,6 @@ struct Index {
 
   @State isBlocking: boolean = false;
   @State isGuideSheetShow: boolean = false;
-  private isDialogOpened: boolean = false;
-  private isCheckingPrivacyDialog: boolean = false;
   private hasPresentedGuideSheet: boolean = false;
 
   onDataReady() {
@@ -82,7 +81,6 @@ struct Index {
         this.isShowUI = true;
       });
 
-      this.checkAndShowDialog();
       void this.maybeShowGuideSheet();
     }
   }
@@ -104,7 +102,6 @@ struct Index {
     });
 
     if (this.isAppDataReady) {
-      this.checkAndShowDialog();
       void this.maybeShowGuideSheet();
     }
   }
@@ -152,57 +149,28 @@ struct Index {
     }
   }
 
-  async checkAndShowDialog() {
-    if (!this.isAppDataReady) {
-      console.info('App data is not ready, skip privacy check.');
-      return;
-    }
-
-    if (this.isCheckingPrivacyDialog) {
-      return;
-    }
-
-    if (this.appPathStack.size() > 0) {
-      console.info('Current stack has pages, skip privacy check.');
-      return;
-    }
-
-    if (this.privacyAgreed) {
-      this.isBlocking = false;
-      return;
-    }
-
-    this.isCheckingPrivacyDialog = true;
-
-    try {
-      const isAgreed = await LocalValues.getInstance().getIsPrivacyAgreed();
-      if (!isAgreed) {
-        this.isBlocking = true;
-        this.isDialogOpened = false;
-        void this.maybeShowGuideSheet();
-      } else if (isAgreed) {
-        this.isBlocking = false;
-        this.privacyAgreed = true;
-        void this.maybeShowGuideSheet();
-      }
-    } finally {
-      this.isCheckingPrivacyDialog = false;
-    }
-  }
-
   private async maybeShowGuideSheet(): Promise<void> {
     if (!this.isAppDataReady || this.hasPresentedGuideSheet || this.isGuideSheetShow) {
       return;
     }
 
+    const localValues = LocalValues.getInstance();
+    
+    // 强制同步本地状态，避免异步导致组件先渲染
+    const isAgreed = await localValues.getIsPrivacyAgreed();
+    this.privacyAgreed = isAgreed;
+    
+    const isFirstLaunch = await localValues.getIsAppFirstLaunch();
+    const shouldShowForGuide = this.showGuideNextLaunch || isFirstLaunch;
+
     const shouldShowForPrivacy = !this.privacyAgreed;
-    const shouldShowForGuide = this.showGuideNextLaunch;
 
     if (!shouldShowForPrivacy && !shouldShowForGuide) {
+      this.isBlocking = false;
       return;
     }
 
-    if (!this.privacyAgreed || this.isBlocking || this.isDialogOpened || this.appPathStack.size() > 0) {
+    if (!this.privacyAgreed || this.appPathStack.size() > 0) {
       if (!shouldShowForPrivacy) {
         return;
       }
@@ -211,14 +179,24 @@ struct Index {
     }
 
     this.hasPresentedGuideSheet = true;
-    if (shouldShowForGuide) {
-      await LocalValues.getInstance().setShowGuideNextLaunch(false);
+    
+    if (this.showGuideNextLaunch) {
+      await localValues.setShowGuideNextLaunch(false);
     }
+    
+    if (isFirstLaunch) {
+      await localValues.setAppFirstLaunch(false);
+    }
+    
+    if (shouldShowForPrivacy) {
+        this.isBlocking = true;
+    }
+
     setTimeout(() => {
-      if ((shouldShowForPrivacy || (!this.isBlocking && this.privacyAgreed)) && this.appPathStack.size() === 0) {
+      if ((shouldShowForPrivacy || shouldShowForGuide) && this.appPathStack.size() === 0) {
         this.isGuideSheetShow = true;
       }
-    }, 300);
+    }, 100); // 缩短延迟，尽快弹出
   }
 
   @Builder
@@ -295,6 +273,8 @@ struct Index {
     };
   }
 
+  @State aiSheetController: AISheetController = new AISheetController();
+
   build() {
     Stack() {
       if (this.customBg) {
@@ -331,12 +311,18 @@ struct Index {
                 console.debug(`[MainPage] 重复点击了第 ${index} 页，触发回到顶部`);
                 AppStorage.setOrCreate(`Event_ScrollToTop_${index}`, Date.now());
               }
+            },
+            onMiniBarClick: () => {
+              this.aiSheetController.showAI();
             }
           }) {
             // --- Tab 1: 主页 ---
             TabContent() {
               if (!(this.isWideScreen && this.tabletUi)) {
-                MainHomePage({ currentTabIndex: this.currentIndex })
+                MainHomePage({
+                  currentTabIndex: this.currentIndex,
+                  aiSheetController: this.aiSheetController
+                })
                   .width("100%")
                   .height("100%")
                   .attributeModifier(new TabAnimModifier(0, this.currentIndex))
@@ -345,7 +331,9 @@ struct Index {
                     curve: Curve.EaseInOut
                   })
               } else {
-                MainHomePageTablet()
+                MainHomePageTablet({
+                  aiSheetController: this.aiSheetController
+                })
                   .width("100%")
                   .height("100%")
                   .attributeModifier(new TabAnimModifier(0, this.currentIndex))

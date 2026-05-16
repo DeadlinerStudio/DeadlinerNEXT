@@ -1,9 +1,11 @@
 import { promptAction } from '@kit.ArkUI';
 import { i18n } from '@kit.LocalizationKit';
 import { HabitRepository } from '../../../../../common/repository/HabitRepository';
+import { TaskRepository } from '../../../../../common/repository/TaskRepository';
 import { DatabaseHelper } from '../../../../../common/data/DatabaseHelper';
 import { DeadlineType, HabitGoalType, HabitPeriod } from '../../../../../model/DDLModels';
 import { AIService } from '../../../../../ai/AIServcice';
+import { DateTimeUtils } from '../../../../../utils/DateTimeUtils';
 
 export interface AIParseResult {
   name: string;
@@ -67,17 +69,10 @@ export class HabitFormHelper {
 
     try {
       const now = new Date();
-      const toLocalISO = (d: Date) => {
-        const offset = d.getTimezoneOffset() * 60000;
-        const local = new Date(d.getTime() - offset);
-        return local.toISOString().slice(0, 19);
-      };
-
-      const dbHelper = DatabaseHelper.getInstance();
-      const ddlId = await dbHelper.insertDDL({
+      const ddlId = await TaskRepository.getInstance().insertDDL({
         name: name,
-        startTime: toLocalISO(now),
-        endTime: toLocalISO(new Date(now.getFullYear() + 100, 0, 1)),
+        startTime: DateTimeUtils.toLocalISOString(now),
+        endTime: DateTimeUtils.toLocalISOString(new Date(now.getFullYear() + 100, 0, 1)),
         isCompleted: false,
         completeTime: "",
         note: "",
@@ -137,6 +132,8 @@ export class HabitFormHelper {
           times: habit.timesPerPeriod.toString(),
           total: total
         };
+      } else {
+        promptAction.showToast({ message: '未能识别出习惯，请尝试换种说法' });
       }
     } catch (err) {
       promptAction.showToast({ message: `抱歉，遇到了一些问题：${err.message || '网络连接失败'}` });

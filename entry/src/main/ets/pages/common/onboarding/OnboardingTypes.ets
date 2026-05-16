@@ -3,6 +3,7 @@ export const PANEL_BG: ResourceColor = $r('sys.color.search_container_focus_colo
 export type GuidePageId =
   | 'intro_welcome'
   | 'privacy'
+  | 'huawei_login'
   | 'intro_setup'
   | 'notifications'
   | 'immersive'

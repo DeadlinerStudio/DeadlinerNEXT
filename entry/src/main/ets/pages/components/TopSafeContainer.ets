@@ -50,6 +50,10 @@ export struct TopSafeContainer {
       .backgroundColor((this.needBgTransparent && this.customBg) ? Color.Transparent : this.bgColor)
       .scrollBar(BarState.Off) // 隐藏外层滚动条，视觉更纯净
       .edgeEffect(EdgeEffect.Spring)
+      .nestedScroll({
+        scrollForward: NestedScrollMode.PARENT_FIRST,
+        scrollBackward: NestedScrollMode.SELF_FIRST
+      })
       // 关键：允许外层 Scroll 延伸到屏幕边缘（包括状态栏区域）
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
     } else {

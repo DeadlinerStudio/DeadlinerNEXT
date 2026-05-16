@@ -339,7 +339,14 @@ export struct HabitListSection {
     VibrationUtils.vibrateShort();
 
     const beforeRate = item.doneCount / item.targetCount;
-    await this.repo.toggleRecord(item.habit.id, this.selectedDate);
+    
+    // 如果已经打满了，循环回到 0 (删除选中日期的记录)
+    if (item.doneCount >= item.targetCount) {
+      await this.repo.deleteRecordsForHabitOnDate(item.habit.id, this.selectedDate);
+    } else {
+      await this.repo.toggleRecord(item.habit.id, this.selectedDate);
+    }
+
     await this.refreshAll(this.selectedDate);
 
     const afterItem = this.allHabitsCache.find(it => it.habit.id === item.habit.id);
@@ -551,7 +558,9 @@ export struct HabitListSection {
 
   build() {
     Column() {
-      TopSafeContainer({ topAvoidHeight: this.topAvoidHeight, scrollable: false, needBgTransparent: true }) {
+      Column() {
+        Blank().height(this.topAvoidHeight).width('100%')
+
         Column() {
           HabitProgress({ progress: this.getTodayCompletionRatio() })
             .margin({ top: 12, bottom: 12 })
@@ -651,6 +660,6 @@ export struct HabitListSection {
         subtitle: '修改待办信息。'
       }
     })
-    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
   }
 }

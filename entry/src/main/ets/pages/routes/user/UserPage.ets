@@ -471,7 +471,7 @@ export struct UserPage {
       blurStyle: BlurStyle.Regular,
       backgroundColor: Color.Transparent,
       title: {
-        title: 'Deadliner AI',
+        title: 'Lifi AI',
       }
     })
     .padding({ top: (this.isWideScreen && this.tabletUi) ? this.statusBarHeight : 0 })

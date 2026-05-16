@@ -24,6 +24,7 @@ import { getImmersiveTitleBarStyle } from '../../../common/style/NavStyles'
 import { SideDashboard } from '../../components/SideDashboard'
 import { SearchPage } from './search/SearchPage'
 import { AddDialogTablet } from '../../components/AddDialogTablet'
+import { AISheetController } from '../../components/AISheetController'
 
 interface MainHomePageButton {
   icon: Resource,
@@ -44,6 +45,14 @@ export struct MainHomePageTablet {
 
   @State @Watch('onHabitSelectionChange') isHabitSelectionMode: boolean = false
   private habitController: HabitListController = new HabitListController();
+
+  @ObjectLink aiSheetController: AISheetController;
+
+  bindController() {
+    this.aiSheetController._triggerAction = () => {
+      this.openAiPanel();
+    }
+  }
 
   // 当任务进入多选，强制关闭习惯多选
   onTaskSelectionChange() {
@@ -86,6 +95,8 @@ export struct MainHomePageTablet {
 
   aboutToAppear(): void {
     this.updateButtons();
+
+    this.bindController();
   }
 
   private scrollerTask: Scroller = new Scroller();
@@ -419,7 +430,7 @@ export struct MainHomePageTablet {
       onDisappear: () => { this.closeAiPanel(); },
       blurStyle: BlurStyle.Regular,
       backgroundColor: Color.Transparent,
-      title: { title: 'Deadliner AI' }
+      title: { title: 'Lifi AI' }
     })
     .hideBackButton(true)
     .padding({ top: this.statusBarHeight })

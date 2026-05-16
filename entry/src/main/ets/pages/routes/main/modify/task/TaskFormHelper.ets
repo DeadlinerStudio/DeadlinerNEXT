@@ -67,6 +67,8 @@ export class TaskFormHelper {
           note: task.note ?? "",
           endTime: endDate || undefined
         };
+      } else {
+        promptAction.showToast({ message: '未能识别出任务，请尝试换种说法' });
       }
     } catch (err) {
       promptAction.showToast({

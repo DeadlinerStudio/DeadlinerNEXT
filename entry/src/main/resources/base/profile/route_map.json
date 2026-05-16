@@ -21,7 +21,7 @@
       "pageSourceFile": "src/main/ets/pages/routes/user/settings/DeadlinerAISettingsPage.ets",
       "buildFunction": "SettingsAIBuilder",
       "data": {
-        "description": "Deadliner AI 设置页"
+        "description": "Lifi AI 设置页"
       }
     },
     {
@@ -69,6 +69,7 @@
       "pageSourceFile": "src/main/ets/pages/routes/user/settings/AppearanceSettings.ets",
       "buildFunction": "AppearanceSettingsBuilder",
       "data": {
+
         "description": "显示与个性化"
       }
     },

@@ -555,7 +555,7 @@ export struct AIPanelView {
               name: task.name,
               note: task.note || "",
               startTime: DateTimeUtils.toLocalISOString(now),
-              endTime: task.dueTime ? DateTimeUtils.toLocalISOString(end) : "",
+              endTime: DateTimeUtils.toLocalISOString(end),
               isCompleted: false,
               completeTime: "",
               isArchived: false,
@@ -627,7 +627,7 @@ export struct AIPanelView {
       }
       .margin({ top: 40 })
 
-      Text('Deadliner Agent')
+      Text('Lifi AI')
         .fontSize(20)
         .fontWeight(FontWeight.Medium)
       Text('一句话生成任务 / 习惯 / 记忆')

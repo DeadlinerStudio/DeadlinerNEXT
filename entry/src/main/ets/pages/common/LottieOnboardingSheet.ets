@@ -5,9 +5,9 @@ import { ITheme } from '../../common/theme/ThemeModel';
 import { getImmersiveTitleBarStyle } from '../../common/style/NavStyles';
 import { ManualDataManager } from '../../common/manual/ManualModel';
 import { WebBrowserPageBuilder, WebParams } from './WebBrowserPage';
-import { DEFAULT_LOTTIE_SCENES, buildGuidePageIds, loadGuideSceneConfigs } from './onboarding/OnboardingConfig';
+import { buildGuidePageIds, loadGuideSceneConfigs } from './onboarding/OnboardingConfig';
 import { IntroHeroPage, LottieScenePage, PrivacyAgreementPage } from './onboarding/OnboardingCorePages';
-import { AiPage, ImmersiveEffectPage, NotificationPage, PersonalizationPage, SyncPage } from './onboarding/OnboardingSetupPages';
+import { AiPage, HuaweiLoginPage, ImmersiveEffectPage, NotificationPage, PersonalizationPage, SyncPage } from './onboarding/OnboardingSetupPages';
 import { GuidePageId, LottieSceneMeta, PANEL_BG, RawFileResourceManager } from './onboarding/OnboardingTypes';
 import { HelpDetailSheet } from '../routes/user/manual/HelpDetailSheet';
 
@@ -23,7 +23,7 @@ export struct LottieOnboardingSheet {
   @Provide('onboardingLocalPathStack') onboardingNavStack: NavPathStack = new NavPathStack();
   @State private currentIndex: number = 0;
   @State private privacyAccepted: boolean = false;
-  @State private lottieScenes: LottieSceneMeta[] = DEFAULT_LOTTIE_SCENES;
+  @State private lottieScenes: LottieSceneMeta[] = [];
   @State private isHelpSheetShow: boolean = false;
 
   aboutToAppear(): void {
@@ -37,7 +37,7 @@ export struct LottieOnboardingSheet {
   }
 
   private pageIds(): GuidePageId[] {
-    return buildGuidePageIds(deviceInfo.distributionOSApiVersion >= 60100);
+    return buildGuidePageIds(deviceInfo.distributionOSApiVersion >= 60100, this.lottieScenes);
   }
 
   private currentPageId(): GuidePageId {
@@ -46,7 +46,7 @@ export struct LottieOnboardingSheet {
 
   private lottieSceneById(id: GuidePageId): LottieSceneMeta {
     const scene: LottieSceneMeta | undefined = this.lottieScenes.find((item: LottieSceneMeta) => item.id === id);
-    return scene ? scene : this.lottieScenes[0];
+    return scene ? scene : {} as LottieSceneMeta;
   }
 
   private canGoNext(): boolean {
@@ -144,36 +144,43 @@ export struct LottieOnboardingSheet {
   private pageBuilder(pageId: GuidePageId) {
     if (pageId === 'intro_welcome') {
       IntroHeroPage({
-        icon: $r('sys.symbol.hand_tap_wave_2'),
+        icon: $r('app.media.icon'),
+        isImage: true,
         title: '欢迎使用 Deadliner',
-        subtitle: '这是一段完整的新用户引导演示。我们会先完成基础确认，再做几项必要设置，最后介绍核心交互。'
+        subtitle: '在开始您的旅途前，我们会先完成基础确认，再做几项必要设置，最后介绍核心交互。',
+        isActive: this.currentPageId() === pageId
       })
     } else if (pageId === 'privacy') {
       PrivacyAgreementPage({
         accepted: $privacyAccepted,
-        onJumpToWeb: () => this.openPrivacyWeb()
+        onJumpToWeb: () => this.openPrivacyWeb(),
+        isActive: this.currentPageId() === pageId
       })
+    } else if (pageId === 'huawei_login') {
+      HuaweiLoginPage({ isActive: this.currentPageId() === pageId })
     } else if (pageId === 'intro_setup') {
       IntroHeroPage({
         icon: $r('sys.symbol.slider_horizontal_2'),
         title: '下面，我们来做一些必要的设置',
-        subtitle: '这几步都尽量保持轻量，你可以先完成最关键的部分，后面也能随时在设置里继续调整。'
+        subtitle: '这几步都尽量保持轻量，你可以先完成最关键的部分，后面也能随时在设置里继续调整。',
+        isActive: this.currentPageId() === pageId
       })
     } else if (pageId === 'notifications') {
-      NotificationPage()
+      NotificationPage({ isActive: this.currentPageId() === pageId })
     } else if (pageId === 'immersive') {
-      ImmersiveEffectPage()
+      ImmersiveEffectPage({ isActive: this.currentPageId() === pageId })
     } else if (pageId === 'sync') {
-      SyncPage()
+      SyncPage({ isActive: this.currentPageId() === pageId })
     } else if (pageId === 'ai') {
-      AiPage()
+      AiPage({ isActive: this.currentPageId() === pageId })
     } else if (pageId === 'personalization') {
-      PersonalizationPage()
+      PersonalizationPage({ isActive: this.currentPageId() === pageId })
     } else if (pageId === 'intro_interaction') {
       IntroHeroPage({
         icon: $r('sys.symbol.rectangle_on_rectangle'),
-        title: '在开始您的任务管理体验之前，容许我为您介绍我们的交互',
-        subtitle: '接下来这 5 个场景，覆盖了你最常用的进入方式和几个最高频的快捷操作。'
+        title: '最后，容许我为您介绍我们的核心交互',
+        subtitle: '接下来这 5 个场景，覆盖了你最常用的进入方式和几个最高频的快捷操作。',
+        isActive: this.currentPageId() === pageId
       })
     } else {
       LottieScenePage({
@@ -201,7 +208,7 @@ export struct LottieOnboardingSheet {
           this.currentIndex = index;
         })
         .width('100%')
-        .height(640)
+        .layoutWeight(1)
 
         Row({ space: 10 }) {
           ForEach(this.pageIds(), (_pageId: GuidePageId, index: number) => {
@@ -218,7 +225,7 @@ export struct LottieOnboardingSheet {
           Button(this.currentPageId() === 'privacy' ? '不同意并退出' : '上一步')
             .type(ButtonType.Normal)
             .layoutWeight(1)
-            .height(48)
+            .height(40)
             .enabled(this.currentPageId() === 'privacy' || this.canGoPrev())
             .fontSize(16)
             .backgroundColor(PANEL_BG)
@@ -234,7 +241,7 @@ export struct LottieOnboardingSheet {
 
           Button(this.canGoNext() ? '下一步' : '开始体验')
             .layoutWeight(1)
-            .height(48)
+            .height(40)
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .backgroundColor(this.theme.tabIcon)
@@ -243,6 +250,7 @@ export struct LottieOnboardingSheet {
             .onClick(() => this.handleNext())
         }
         .width('100%')
+        .margin({ bottom: 8 })
 
         Blank()
           .width(0)
@@ -263,14 +271,14 @@ export struct LottieOnboardingSheet {
           })
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 18, bottom: 26 })
+      .height('100%')
+      .padding({ left: 20, right: 20, top: 12, bottom: 12 })
       .backgroundColor(Color.Transparent)
     }
     .titleBar({
-      style: getImmersiveTitleBarStyle(false, false),
       content: {
         title: {
-          mainTitle: '功能引导'
+          mainTitle: ''
         },
         menu: {
           value: this.buildTitleMenus()
@@ -283,5 +291,6 @@ export struct LottieOnboardingSheet {
     .hideBackButton(true)
     .backgroundColor(Color.Transparent)
     .mode(NavigationMode.Stack)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 }

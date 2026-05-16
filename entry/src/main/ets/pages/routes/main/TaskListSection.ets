@@ -116,6 +116,12 @@ export struct TaskListSection {
   }
 
   private compareTaskOrder(lhs: DDLItem, rhs: DDLItem): number {
+    const isLAbandoned = lhs.state === TaskState.ABANDONED;
+    const isRAbandoned = rhs.state === TaskState.ABANDONED;
+    if (isLAbandoned !== isRAbandoned) {
+      return isLAbandoned ? 1 : -1;
+    }
+
     if (lhs.isCompleted !== rhs.isCompleted) {
       return lhs.isCompleted ? 1 : -1;
     }
@@ -513,14 +519,16 @@ export struct TaskListSection {
           .height(50)
           .margin({ top: 100 })
       } else {
-        TopSafeContainer({ topAvoidHeight: this.topAvoidHeight, needBgTransparent: true }) {
-          Column() {
-            Refresh({ refreshing: $$this.isRefreshing }) {
-              List({
-                space: 8,
-                scroller: this.scroller,
-              }) {
-                if (this.taskList.length > 0) {
+        Column() {
+          Refresh({ refreshing: $$this.isRefreshing }) {
+            List({
+              space: 8,
+              scroller: this.scroller,
+            }) {
+              ListItem() {
+                Column().height(this.topAvoidHeight).width('100%')
+              }
+              if (this.taskList.length > 0) {
                   ForEach(this.taskList, (item: TaskUIModel, index: number) => {
                     ListItem() {
                       DDLItemCardSwipeable({
@@ -581,6 +589,9 @@ export struct TaskListSection {
                   .attributeModifier(new FloatUpModifier(2, 15))
                 }
               }
+              .onScroll((scrollOffset: number, scrollState: ScrollState) => {
+                this.controller.onScroll(this.scroller.currentOffset().yOffset);
+              })
               .width("100%")
               .height("100%") // 撑满 TopSafeContainer 的剩余空间
               .scrollBar(BarState.Off)
@@ -606,7 +617,6 @@ export struct TaskListSection {
             })
             .clip(false)
           }
-        }
       }
     }
     .width("100%")

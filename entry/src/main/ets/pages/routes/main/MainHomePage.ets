@@ -20,6 +20,7 @@ import { MainButtonType } from '../../../common/local/LocalModels'
 import { getImmersiveTitleBarStyle } from '../../../common/style/NavStyles'
 import { HdsTitleBarMenuButton } from '../../components/HdsTitleBarMenuButton'
 import { HdsTitleBarSegment } from '../../components/HdsTitleBarSegment'
+import { AISheetController } from '../../components/AISheetController'
 
 enum MainTabIndex {
   TASKS = 0,
@@ -52,6 +53,19 @@ export struct MainHomePage {
   @State confettiController: ConfettiController = new ConfettiController();
 
   @StorageLink('QuickAddTaskTrigger') @Watch('onQuickAddTaskChange') quickAddTrigger: boolean = false;
+
+  @ObjectLink aiSheetController: AISheetController;
+
+  @State scrollY: number = 0;
+
+  bindController() {
+    this.aiSheetController._triggerAction = () => {
+      this.openAiPanel();
+    }
+    this.taskController.onScroll = (offset: number) => {
+      this.scrollY = offset;
+    }
+  }
 
   /**
    * 监听回调函数
@@ -127,9 +141,12 @@ export struct MainHomePage {
     this.updateButtons();
 
     this.onStartupSettingLoaded();
+
+    this.bindController();
   }
 
   private scroller: Scroller = new Scroller();
+  private dummyScroller: Scroller = new Scroller();
 
   @StorageProp('Event_ScrollToTop_0')
   @Watch('onScrollToTopEvent')
@@ -145,7 +162,15 @@ export struct MainHomePage {
 
   onSegmentChange() {
     if (this.selectedIndexes.length > 0) {
-      this.currentIndex = this.selectedIndexes[0]
+      const nextIndex = this.selectedIndexes[0];
+
+      // 如果要切到习惯页，先把任务页的 Scroller 重置回 0
+      // 这样 HdsNavigation 才会因为绑定的还是同一个 scroller 且 offset 为 0 而丝滑地展开，且不触发重绘
+      if (nextIndex === MainTabIndex.HABITS) {
+        this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
+      }
+
+      this.currentIndex = nextIndex;
       this.taskController.requestExitSelection();
       this.habitController.requestExitSelection();
     }
@@ -199,35 +224,48 @@ export struct MainHomePage {
 
   @Builder topSegment() {
     Stack({ alignContent: Alignment.Center }) {
-      Row() {
-        HdsTitleBarMenuButton({
-          icon: this.leftBtn.icon,
-          onButtonClick: this.leftBtn.onClick,
-          isImage: this.leftBtn.isImage,
-          isEnabled: ((this.leftBtnType === MainButtonType.AI) && !this.isBasicMode) || (this.leftBtnType !== MainButtonType.AI)
-        })
-      }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.Start)
-      .padding({ left: 16 })
-      .hitTestBehavior(HitTestMode.Transparent)
+      if (this.titleMode === HdsNavigationTitleMode.FULL) {
+        Row() {
+          HdsTitleBarMenuButton({
+            icon: this.leftBtn.icon,
+            onButtonClick: this.leftBtn.onClick,
+            isImage: this.leftBtn.isImage,
+            isEnabled: ((this.leftBtnType === MainButtonType.AI) && !this.isBasicMode) ||
+              (this.leftBtnType !== MainButtonType.AI)
+          })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Start)
+        .padding({ left: 16 })
+        .hitTestBehavior(HitTestMode.Transparent)
+        .opacity(Math.max(0, 1 - this.scrollY / 40))
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.OPACITY.combine(TransitionEffect.translate({ x: -20 })),
+          TransitionEffect.OPACITY.combine(TransitionEffect.translate({ x: -20 }))
+        ))
 
-      Column() {
-        HdsTitleBarSegment({
-          buttons: this.tabButtons,
-          selectedIndexes: $selectedIndexes,
-          maxFontScale: 2,
-          segmentHeight: this.SEGMENT_HEIGHT,
-          normalWidth: '50%',
-          experimentalWidth: 196,
-          experimentalHeight: 52
-        })
-          .align(Alignment.Center)
-          .margin({ top: 8 })
+        Column() {
+          HdsTitleBarSegment({
+            buttons: this.tabButtons,
+            selectedIndexes: $selectedIndexes,
+            maxFontScale: 2,
+            segmentHeight: this.SEGMENT_HEIGHT,
+            normalWidth: '50%',
+            experimentalWidth: 196,
+            experimentalHeight: 52
+          })
+            .align(Alignment.Center)
+            .margin({ top: 8 })
+        }
+        .justifyContent(FlexAlign.Center)
+        .hitTestBehavior(HitTestMode.None)
+        .opacity(Math.max(0, 1 - this.scrollY / 40))
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.OPACITY.combine(TransitionEffect.scale({ x: 0.9, y: 0.9 })),
+          TransitionEffect.OPACITY.combine(TransitionEffect.scale({ x: 0.9, y: 0.9 }))
+        ))
       }
-      .justifyContent(FlexAlign.Center)
-      .hitTestBehavior(HitTestMode.None)
 
       Row() {
         HdsTitleBarMenuButton({
@@ -311,6 +349,8 @@ export struct MainHomePage {
     }
   }
 
+  @State titleMode: HdsNavigationTitleMode = HdsNavigationTitleMode.FULL;
+
   build() {
     HdsNavigation() {
         RelativeContainer() {
@@ -332,7 +372,7 @@ export struct MainHomePage {
               })
           } else {
             HabitListSection({
-              scroller: this.scroller,
+              scroller: this.dummyScroller,
               topAvoidHeight: this.statusBarHeight + this.topContentHeight,
               isSelectionMode: $isHabitSelectionMode,
               controller: this.habitController,
@@ -444,10 +484,10 @@ export struct MainHomePage {
     }
     .id(`main_navigation_${this.currentThemeKey}`)
     .titleBar({
-      style: getImmersiveTitleBarStyle(false, false),  // 暂时屏蔽新材质
+      style: getImmersiveTitleBarStyle(false),
       content: {
         title: {
-          mainTitle: '清单'
+          mainTitle: 'Deadliner'
         },
         stackBuilder: () => {
           this.topSegment();
@@ -464,10 +504,16 @@ export struct MainHomePage {
       blurStyle: BlurStyle.Regular,
       backgroundColor: Color.Transparent,
       title: {
-        title: 'Deadliner AI',
+        title: 'Lifi AI',
       }
     })
-    .titleMode(HdsNavigationTitleMode.FULL)
+    .titleMode(HdsNavigationTitleMode.FREE)
+    .bindToScrollable([this.scroller])
+    .onTitleModeChange((titleMode) => {
+      animateTo({ duration: 400, curve: Curve.Friction }, () => {
+        this.titleMode = titleMode;
+      })
+    })
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .mode(NavigationMode.Stack)
     .navBarWidth('100%')

@@ -2,8 +2,8 @@ import lottie, { AnimationItem } from '@ohos/lottie';
 import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { ITheme } from '../../../common/theme/ThemeModel';
-import { DEFAULT_LOTTIE_SCENES } from './OnboardingConfig';
 import { LottieSceneMeta, PANEL_BG } from './OnboardingTypes';
+import { deviceInfo } from '@kit.BasicServicesKit';
 
 @Component
 export struct GuideContainer {
@@ -23,34 +23,60 @@ export struct GuideContainer {
 @Component
 export struct IntroHeroPage {
   icon: Resource = $r('sys.symbol.star_slash');
+  isImage: boolean = false;
   title: string = '';
   subtitle: string = '';
+  @Prop @Watch('onActiveChanged') isActive: boolean = false;
 
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
   @State private visible: boolean = false;
 
   aboutToAppear(): void {
+    if (this.isActive) {
+      this.triggerAnimation();
+    }
+  }
+
+  onActiveChanged(): void {
+    if (this.isActive) {
+      this.triggerAnimation();
+    } else {
+      this.visible = false;
+    }
+  }
+
+  private triggerAnimation(): void {
     this.visible = false;
     setTimeout(() => {
-      animateTo({ duration: 350, curve: Curve.EaseOut }, () => {
+      animateTo({ duration: 400, curve: Curve.EaseOut }, () => {
         this.visible = true;
       });
-    }, 60);
+    }, 50);
   }
 
   build() {
     GuideContainer() {
       Column() {
         Column() {
-          SymbolGlyph(this.icon)
-            .fontSize(68)
-            .fontColor([this.theme.tabIcon])
-            .opacity(this.visible ? 1 : 0.3)
-            .translate({ y: this.visible ? 0 : 16 })
-            .animation({ duration: 350, curve: Curve.EaseOut })
+          if (this.isImage) {
+            Image(this.icon)
+              .width(86)
+              .height(86)
+              .opacity(this.visible ? 1 : 0)
+              .scale({ x: this.visible ? 1 : 0.8, y: this.visible ? 1 : 0.8 })
+              .animation({ duration: 400, curve: Curve.EaseOut })
+          } else {
+            SymbolGlyph(this.icon)
+              .fontSize(72)
+              .fontColor([this.theme.tabIcon])
+              .renderingStrategy(SymbolRenderingStrategy.MULTIPLE_OPACITY)
+              .opacity(this.visible ? 1 : 0)
+              .scale({ x: this.visible ? 1 : 0.8, y: this.visible ? 1 : 0.8 })
+              .animation({ duration: 400, curve: Curve.EaseOut })
+          }
         }
         .width('100%')
-        .height('46%')
+        .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
 
         Column({ space: 18 }) {
@@ -59,25 +85,24 @@ export struct IntroHeroPage {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('sys.color.ohos_id_color_text_primary'))
             .textAlign(TextAlign.Center)
-            .opacity(this.visible ? 1 : 0.2)
-            .translate({ y: this.visible ? 0 : 24 })
-            .animation({ duration: 400, curve: Curve.EaseOut })
+            .opacity(this.visible ? 1 : 0)
+            .translate({ y: this.visible ? 0 : 20 })
+            .animation({ duration: 450, curve: Curve.EaseOut, delay: 100 })
 
           Text(this.subtitle)
             .fontSize(15)
             .lineHeight(24)
             .fontColor($r('app.color.font_secondary'))
             .textAlign(TextAlign.Center)
-            .opacity(this.visible ? 1 : 0.2)
-            .translate({ y: this.visible ? 0 : 24 })
-            .animation({ duration: 450, curve: Curve.EaseOut })
+            .opacity(this.visible ? 1 : 0)
+            .translate({ y: this.visible ? 0 : 20 })
+            .animation({ duration: 500, curve: Curve.EaseOut, delay: 150 })
         }
         .width('100%')
-        .padding({ left: 10, right: 10, bottom: 18 })
+        .padding({ left: 10, right: 10, bottom: 32 })
       }
       .width('100%')
       .height('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
     }
   }
 }
@@ -86,8 +111,33 @@ export struct IntroHeroPage {
 export struct PrivacyAgreementPage {
   onJumpToWeb: () => void = () => {};
   @Link accepted: boolean;
+  @Prop @Watch('onActiveChanged') isActive: boolean = false;
 
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @State private visible: boolean = false;
+
+  aboutToAppear(): void {
+    if (this.isActive) {
+      this.triggerAnimation();
+    }
+  }
+
+  onActiveChanged(): void {
+    if (this.isActive) {
+      this.triggerAnimation();
+    } else {
+      this.visible = false;
+    }
+  }
+
+  private triggerAnimation(): void {
+    this.visible = false;
+    setTimeout(() => {
+      animateTo({ duration: 400, curve: Curve.EaseOut }, () => {
+        this.visible = true;
+      });
+    }, 50);
+  }
 
   build() {
     GuideContainer() {
@@ -96,10 +146,13 @@ export struct PrivacyAgreementPage {
           SymbolGlyph($r('sys.symbol.security_shield'))
             .fontSize(64)
             .fontColor([this.theme.tabIcon])
-            .margin({ top: 20 })
+            .renderingStrategy(SymbolRenderingStrategy.MULTIPLE_OPACITY)
+            .opacity(this.visible ? 1 : 0)
+            .scale({ x: this.visible ? 1 : 0.8, y: this.visible ? 1 : 0.8 })
+            .animation({ duration: 400, curve: Curve.EaseOut })
         }
         .width('100%')
-        .height('40%')
+        .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
 
         Column({ space: 16 }) {
@@ -108,15 +161,12 @@ export struct PrivacyAgreementPage {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('sys.color.ohos_id_color_text_primary'))
             .textAlign(TextAlign.Center)
-
-          Text('在继续使用 Deadliner 之前，请先阅读并确认隐私协议。')
-            .fontSize(15)
-            .lineHeight(24)
-            .fontColor($r('app.color.font_secondary'))
-            .textAlign(TextAlign.Center)
+            .opacity(this.visible ? 1 : 0)
+            .translate({ y: this.visible ? 0 : 20 })
+            .animation({ duration: 450, curve: Curve.EaseOut, delay: 50 })
 
           Text() {
-            Span('欢迎使用 Deadliner 待办日历。在使用本应用前，请您务必认真阅读并充分理解 ')
+            Span('在使用本应用前，请您务必认真阅读并充分理解 ')
               .fontColor($r('app.color.font_primary'))
             Span('《隐私协议》')
               .fontColor(this.theme.tabIcon)
@@ -128,6 +178,9 @@ export struct PrivacyAgreementPage {
           .fontSize(15)
           .lineHeight(24)
           .textAlign(TextAlign.Center)
+          .opacity(this.visible ? 1 : 0)
+          .translate({ y: this.visible ? 0 : 20 })
+          .animation({ duration: 550, curve: Curve.EaseOut, delay: 150 })
 
           Row() {
             Checkbox({ name: 'privacy_checkbox' })
@@ -150,24 +203,27 @@ export struct PrivacyAgreementPage {
           .justifyContent(FlexAlign.Center)
           .width('100%')
           .margin({ top: 8 })
+          .opacity(this.visible ? 1 : 0)
+          .animation({ duration: 600, curve: Curve.EaseOut, delay: 200 })
 
           Text('点击底部“下一步”继续。')
             .fontSize(12)
             .fontColor($r('app.color.font_secondary'))
+            .opacity(this.visible ? 1 : 0)
+            .animation({ duration: 650, curve: Curve.EaseOut, delay: 250 })
         }
         .width('100%')
-        .padding({ left: 8, right: 8, bottom: 18 })
+        .padding({ left: 8, right: 8, bottom: 32 })
       }
       .width('100%')
       .height('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
     }
   }
 }
 
 @Component
 export struct LottieScenePage {
-  scene: LottieSceneMeta = DEFAULT_LOTTIE_SCENES[0];
+  @Prop scene: LottieSceneMeta;
   @Prop @Watch('onActiveChanged') isActive: boolean = false;
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
@@ -262,7 +318,7 @@ export struct LottieScenePage {
       Stack({ alignContent: Alignment.Center }) {
         Canvas(this.canvasRenderingContext)
           .width('100%')
-          .height('100%')
+          .height('75%')
           .onReady(() => {
             this.handleCanvasReady();
           })
@@ -278,7 +334,7 @@ export struct LottieScenePage {
         }
       }
       .width('100%')
-      .height('56%')
+      .layoutWeight(1)
       .borderRadius(28)
       .clip(true)
 
@@ -288,25 +344,45 @@ export struct LottieScenePage {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('sys.color.ohos_id_color_text_primary'))
           .textAlign(TextAlign.Center)
+          .opacity(this.isActive ? 1 : 0)
+          .translate({ y: this.isActive ? 0 : 20 })
+          .animation({ duration: 450, curve: Curve.EaseOut, delay: 100 })
 
-        Text(this.scene.subtitle)
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(this.theme.tabIcon)
-          .textAlign(TextAlign.Center)
+        if (deviceInfo.sdkApiVersion >= 22) {
+          Text(this.scene.subtitle)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.theme.tabIcon)
+            .textAlign(TextAlign.Center)
+            .minLines(2)
+            .opacity(this.isActive ? 1 : 0)
+            .translate({ y: this.isActive ? 0 : 20 })
+            .animation({ duration: 500, curve: Curve.EaseOut, delay: 150 })
+        } else {
+          Text(this.scene.subtitle)
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.theme.tabIcon)
+            .textAlign(TextAlign.Center)
+            .opacity(this.isActive ? 1 : 0)
+            .translate({ y: this.isActive ? 0 : 20 })
+            .animation({ duration: 500, curve: Curve.EaseOut, delay: 150 })
+        }
 
         Text(this.scene.detail)
           .fontSize(14)
           .lineHeight(22)
           .fontColor($r('app.color.font_secondary'))
           .textAlign(TextAlign.Center)
+          .opacity(this.isActive ? 1 : 0)
+          .translate({ y: this.isActive ? 0 : 20 })
+          .animation({ duration: 550, curve: Curve.EaseOut, delay: 200 })
       }
       .width('100%')
-      .padding({ left: 8, right: 8, bottom: 8 })
+      .padding({ left: 8, right: 8, bottom: 32 })
     }
     .width('100%')
     .height('100%')
-    .justifyContent(FlexAlign.SpaceBetween)
     .padding({ left: 20, right: 20, top: 8, bottom: 8 })
   }
 }

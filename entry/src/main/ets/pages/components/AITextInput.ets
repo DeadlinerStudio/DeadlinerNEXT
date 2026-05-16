@@ -8,7 +8,7 @@ export struct AITextInput {
   @State placeholder: string = '问 AI...';
 
   // 这里的 Consume 是为了配合你之前的上下文，如果没有可以删掉
-  @Consume('isAiFlowShown') isAiFlowShown: boolean;
+  @Consume('isAiFlowShown') isAiFlowShown: boolean = false;
 
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
@@ -52,7 +52,10 @@ export struct AITextInput {
   }
 
   private async triggerAI() {
-    if (!this.text.trim()) return;
+    if (!this.text.trim()) {
+      promptAction.showToast({ message: '请先输入内容再让 AI 识别' });
+      return;
+    }
     this.isAiFlowShown = true;
     this.isAiLoading = true;
 
@@ -62,7 +65,8 @@ export struct AITextInput {
     try {
       await this.onAITriggered();
     } catch (e) {
-      // ignore
+      console.error(`[AITextInput] AI trigger failed: ${e}`);
+      promptAction.showToast({ message: 'AI 识别失败，请稍后重试' });
     }
 
     this.isAiLoading = false;

@@ -53,6 +53,8 @@ struct AppearanceSettings {
   @StorageLink(C.KEY_ENABLE_API23) api23: boolean = true;
   @StorageLink(C.KEY_EXPERIMENTAL_COMPONENTS) experimentalComponents: boolean = true;
 
+  @StorageLink(C.KEY_SHOW_MINIBAR) showMiniBar: boolean = (deviceInfo.distributionOSApiVersion >= 60100);
+
   @StorageLink(C.KEY_ENABLE_TABLET_UI) tabletUi: boolean = true;
   @StorageLink(C.KEY_TABLET_SIDE_DASHBOARD) tabletSd: boolean = true;
 
@@ -251,6 +253,17 @@ struct AppearanceSettings {
                 subtitle: '开启后，主页顶部按钮将优先使用实验性的沉浸光感组件。',
                 isOn: this.experimentalComponents,
                 onChange: (isOn): Promise<void> => LocalValues.getInstance().setExperimentalComponents(isOn)
+              })
+            }
+          }
+
+          if (this.api23 && deviceInfo.distributionOSApiVersion >= 60100) {
+            SettingsSection() {
+              SubSettingsSwitch({
+                title: "底栏 Lifi AI 入口",
+                subtitle: "使用底栏的悬浮迷你栏快速进入 Lifi AI",
+                isOn: this.showMiniBar,
+                onChange: (isOn): Promise<void> => LocalValues.getInstance().setMiniBar(this.showMiniBar)
               })
             }
           }

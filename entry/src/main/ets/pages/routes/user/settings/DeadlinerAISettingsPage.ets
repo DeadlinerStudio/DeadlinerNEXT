@@ -11,11 +11,11 @@ import { getImmersiveTitleBarStyle } from "../../../../common/style/NavStyles";
 
 @Builder
 export function SettingsAIBuilder(name: string, param: Object) {
-  DeadlinerAISettingsPage()
+  LifiAISettingsPage()
 }
 
 @Component
-export struct DeadlinerAISettingsPage {
+export struct LifiAISettingsPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
