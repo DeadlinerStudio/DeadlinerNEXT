@@ -21,6 +21,12 @@ import { getImmersiveTitleBarStyle } from '../../../common/style/NavStyles'
 import { HdsTitleBarMenuButton } from '../../components/HdsTitleBarMenuButton'
 import { HdsTitleBarSegment } from '../../components/HdsTitleBarSegment'
 import { AISheetController } from '../../components/AISheetController'
+import { SideDashboard } from '../../components/SideDashboard'
+import {
+  AppBreakpoint,
+  APP_BREAKPOINT_DEFAULT,
+  APP_BREAKPOINT_STORAGE_KEY
+} from '../../../common/layout/AppBreakpoints'
 
 enum MainTabIndex {
   TASKS = 0,
@@ -40,6 +46,7 @@ export struct MainHomePage {
 
   @StorageLink(C.KEY_BASIC_MODE) isBasicMode: boolean = false;
   @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
+  @StorageLink(APP_BREAKPOINT_STORAGE_KEY) currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
 
   @State currentIndex: number = MainTabIndex.TASKS
   @State @Watch('onSegmentChange') selectedIndexes: number[] = [MainTabIndex.TASKS]
@@ -102,7 +109,7 @@ export struct MainHomePage {
   readonly SEGMENT_HEIGHT: number = 48;
 
   // 获取状态栏高度
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
 
   // readonly TITLE_BAR_CONTENT_HEIGHT: number = 74 + this.SEGMENT_HEIGHT;
   @State topContentHeight: number = 74;
@@ -174,6 +181,10 @@ export struct MainHomePage {
       this.taskController.requestExitSelection();
       this.habitController.requestExitSelection();
     }
+  }
+
+  private usesMediumLayout(): boolean {
+    return this.currentBreakpoint === AppBreakpoint.MD;
   }
 
   readonly tabButtons: ItemRestriction<SegmentButtonTextItem> = [
@@ -286,6 +297,56 @@ export struct MainHomePage {
     .width('100%')
   }
 
+  @Builder
+  private mediumContentBuilder() {
+    Row() {
+      if (this.currentIndex === MainTabIndex.TASKS) {
+        TaskListSection({
+          scroller: this.scroller,
+          topAvoidHeight: this.statusBarHeight + this.topContentHeight,
+          isSelectionMode: $isTaskSelectionMode,
+          controller: this.taskController,
+          confetti: this.confettiController
+        })
+          .id('main_task_content_md')
+          .layoutWeight(1)
+          .height('100%')
+      } else {
+        HabitListSection({
+          scroller: this.dummyScroller,
+          topAvoidHeight: this.statusBarHeight + this.topContentHeight,
+          isSelectionMode: $isHabitSelectionMode,
+          controller: this.habitController,
+          confetti: this.confettiController
+        })
+          .id('main_habit_content_md')
+          .layoutWeight(1)
+          .height('100%')
+      }
+
+      Divider()
+        .vertical(true)
+        .height('100%')
+        .strokeWidth(1)
+        .color($r('sys.color.ohos_id_color_list_separator'))
+        .opacity(0.5)
+
+      SideDashboard()
+        .width(132)
+        .height('100%')
+        .padding({ top: this.statusBarHeight + this.topContentHeight, left: 10, right: 10, bottom: 24 })
+    }
+    .id('content_md')
+    .width('100%')
+    .height('100%')
+    .alignRules({
+      top: { anchor: '__container__', align: VerticalAlign.Top },
+      bottom: { anchor: '__container__', align: VerticalAlign.Bottom },
+      left: { anchor: '__container__', align: HorizontalAlign.Start },
+      right: { anchor: '__container__', align: HorizontalAlign.End },
+    })
+  }
+
   @State isAISheetShow: boolean = false;
   @Consume('isAiFlowShown') isAiFlowShown: boolean;
 
@@ -354,37 +415,40 @@ export struct MainHomePage {
   build() {
     HdsNavigation() {
         RelativeContainer() {
-          // 列表内容：铺满整个容器
-          if (this.currentIndex === MainTabIndex.TASKS) {
-            TaskListSection({
-              scroller: this.scroller,
-              topAvoidHeight: this.statusBarHeight + this.topContentHeight,
-              isSelectionMode: $isTaskSelectionMode,
-              controller: this.taskController,
-              confetti: this.confettiController
-            })
-              .id('content')
-              .alignRules({
-                top: { anchor: '__container__', align: VerticalAlign.Top },
-                bottom: { anchor: '__container__', align: VerticalAlign.Bottom },
-                left: { anchor: '__container__', align: HorizontalAlign.Start },
-                right: { anchor: '__container__', align: HorizontalAlign.End },
-              })
+          if (this.usesMediumLayout()) {
+            this.mediumContentBuilder()
           } else {
-            HabitListSection({
-              scroller: this.dummyScroller,
-              topAvoidHeight: this.statusBarHeight + this.topContentHeight,
-              isSelectionMode: $isHabitSelectionMode,
-              controller: this.habitController,
-              confetti: this.confettiController
-            })
-              .id('content')
-              .alignRules({
-                top: { anchor: '__container__', align: VerticalAlign.Top },
-                bottom: { anchor: '__container__', align: VerticalAlign.Bottom },
-                left: { anchor: '__container__', align: HorizontalAlign.Start },
-                right: { anchor: '__container__', align: HorizontalAlign.End },
+            if (this.currentIndex === MainTabIndex.TASKS) {
+              TaskListSection({
+                scroller: this.scroller,
+                topAvoidHeight: this.statusBarHeight + this.topContentHeight,
+                isSelectionMode: $isTaskSelectionMode,
+                controller: this.taskController,
+                confetti: this.confettiController
               })
+                .id('main_task_content_phone')
+                .alignRules({
+                  top: { anchor: '__container__', align: VerticalAlign.Top },
+                  bottom: { anchor: '__container__', align: VerticalAlign.Bottom },
+                  left: { anchor: '__container__', align: HorizontalAlign.Start },
+                  right: { anchor: '__container__', align: HorizontalAlign.End },
+                })
+            } else {
+              HabitListSection({
+                scroller: this.dummyScroller,
+                topAvoidHeight: this.statusBarHeight + this.topContentHeight,
+                isSelectionMode: $isHabitSelectionMode,
+                controller: this.habitController,
+                confetti: this.confettiController
+              })
+                .id('main_habit_content_phone')
+                .alignRules({
+                  top: { anchor: '__container__', align: VerticalAlign.Top },
+                  bottom: { anchor: '__container__', align: VerticalAlign.Bottom },
+                  left: { anchor: '__container__', align: HorizontalAlign.Start },
+                  right: { anchor: '__container__', align: HorizontalAlign.End },
+                })
+            }
           }
 
           ConfettiView({

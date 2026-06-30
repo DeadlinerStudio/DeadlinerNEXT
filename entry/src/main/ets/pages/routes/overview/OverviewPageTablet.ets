@@ -16,7 +16,7 @@ import { PaperTalkUtils } from "../../../utils/PaperTalkUtils";
 export struct OverviewPageTablet {
   @Consume('appPathStack') appPathStack: NavPathStack;
   @StorageLink(C.KEY_SHOW_PAPERTALK_SHARE) showPaperTalkShare: boolean = true;
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
   private context = getContext(this) as common.UIAbilityContext;
 
   // --- 状态控制 ---

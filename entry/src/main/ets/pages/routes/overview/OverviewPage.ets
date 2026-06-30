@@ -12,6 +12,11 @@ import { HdsTitleBarSegment } from "../../components/HdsTitleBarSegment";
 import { SettingsConstants as C } from "../../../common/local/SettingsConstants";
 import { common } from "@kit.AbilityKit";
 import { PaperTalkUtils } from "../../../utils/PaperTalkUtils";
+import {
+  AppBreakpoint,
+  APP_BREAKPOINT_DEFAULT,
+  APP_BREAKPOINT_STORAGE_KEY
+} from "../../../common/layout/AppBreakpoints";
 
 @Component
 export struct OverviewPage {
@@ -20,7 +25,8 @@ export struct OverviewPage {
   @StorageLink(C.KEY_SHOW_PAPERTALK_SHARE) showPaperTalkShare: boolean = true;
 
   readonly SEGMENT_HEIGHT: number = 48;
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink(APP_BREAKPOINT_STORAGE_KEY) currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
   private context = getContext(this) as common.UIAbilityContext;
 
   @State viewModel: OverviewViewModel = new OverviewViewModel();
@@ -58,6 +64,10 @@ export struct OverviewPage {
     }
   }
 
+  private usesMediumLayout(): boolean {
+    return this.currentBreakpoint === AppBreakpoint.MD;
+  }
+
   @Builder tabSegment() {
     Column() {
       HdsTitleBarSegment({
@@ -76,6 +86,7 @@ export struct OverviewPage {
     .height('100%')
     .padding({ start: LengthMetrics.vp(16), end: LengthMetrics.vp(16) })
     .justifyContent(FlexAlign.Center)
+    .constraintSize({ maxWidth: 500 })
   }
 
   @State isHelpPopupShow: boolean = false
@@ -258,8 +269,8 @@ export struct OverviewPage {
                 historyStats: this.viewModel.historyStats,
                 completionTimeStats: this.viewModel.completionTimeStats,
                 overdueItems: this.viewModel.overdueItems,
-
                 cardOrder: this.viewModel.overviewCardOrder,
+                isMediumLayout: this.usesMediumLayout()
               })
             } else if (this.selectedIndexes[0] === 1) {
               TrendAnalysisSection({
@@ -267,7 +278,8 @@ export struct OverviewPage {
                 monthlyStats: this.viewModel.monthlyStats,
                 weeklyStats: this.viewModel.weeklyStats,
                 contributionStats: this.viewModel.contributionStats,
-                cardOrder: this.viewModel.trendCardOrder
+                cardOrder: this.viewModel.trendCardOrder,
+                isMediumLayout: this.usesMediumLayout()
               })
             } else if (this.selectedIndexes[0] === 2) {
               DashboardSection({
@@ -275,7 +287,8 @@ export struct OverviewPage {
                 dailyStats: this.viewModel.lastMonthDailyStats,
                 lastMonthName: this.viewModel.lastMonthName,
                 analysis: this.viewModel.monthlyAnalysis,
-                isAnalyzing: this.viewModel.isAnalyzing
+                isAnalyzing: this.viewModel.isAnalyzing,
+                isMediumLayout: this.usesMediumLayout()
               })
             }
           }

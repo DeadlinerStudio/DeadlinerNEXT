@@ -12,6 +12,84 @@ export struct DashboardSection {
   @Prop lastMonthName: string = '';
   @Prop analysis: MonthlyAnalysisResult | null = null;
   @Prop isAnalyzing: boolean = false;
+  @Prop isMediumLayout: boolean = false;
+
+  private metricsForColumn(columnIndex: number): Metric[] {
+    return this.metrics.filter((_: Metric, index: number) => index % 2 === columnIndex);
+  }
+
+  private hasAnalysisContent(): boolean {
+    return this.isAnalyzing || this.analysis !== null;
+  }
+
+  private mediumMetricRows(): Metric[][] {
+    const rows: Metric[][] = [];
+    let index = 0;
+    while (index < this.metrics.length) {
+      rows.push(this.metrics.slice(index, index + 3));
+      index += 3;
+    }
+    return rows;
+  }
+
+  private placeholderIndexes(count: number): number[] {
+    const indexes: number[] = [];
+    let index = 0;
+    while (index < count) {
+      indexes.push(index);
+      index += 1;
+    }
+    return indexes;
+  }
+
+  @Builder
+  private analysisBuilder() {
+    if (this.isAnalyzing) {
+      AnalyzingCard()
+        .width('100%')
+        .attributeModifier(new FloatUpModifier(1))
+    } else if (this.analysis !== null) {
+      AIAnalysisCard({ analysis: this.analysis })
+        .width('100%')
+        .attributeModifier(new FloatUpModifier(1))
+    }
+  }
+
+  @Builder
+  private metricColumnBuilder(columnIndex: number) {
+    Column({ space: 10 }) {
+      ForEach(this.metricsForColumn(columnIndex), (item: Metric) => {
+        MetricCard({ metric: item })
+          .width('100%')
+          .attributeModifier(new FloatUpModifier(this.metrics.indexOf(item) + (this.analysis !== null || this.isAnalyzing ? 2 : 1), 20))
+      }, (item: Metric) => item.label)
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private mediumMetricsGridBuilder() {
+    Column({ space: 12 }) {
+      ForEach(this.mediumMetricRows(), (row: Metric[], rowIndex: number) => {
+        Row({ space: 12 }) {
+          ForEach(row, (item: Metric) => {
+            MetricCard({ metric: item })
+              .layoutWeight(1)
+              .attributeModifier(new FloatUpModifier(this.metrics.indexOf(item) + (this.hasAnalysisContent() ? 2 : 1), 20))
+          }, (item: Metric) => item.label)
+
+          if (row.length < 3) {
+            ForEach(this.placeholderIndexes(3 - row.length), (_: number) => {
+              Blank().layoutWeight(1)
+            }, (item: number) => `${rowIndex}_${item}`)
+          }
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Top)
+      }, (_row: Metric[], index: number) => `metric_row_${index}`)
+    }
+    .width('100%')
+  }
 
   build() {
     Column({ space: 12 }) {
@@ -20,43 +98,64 @@ export struct DashboardSection {
         .padding({ left: 16, right: 16, top: 16 })
         .attributeModifier(new FloatUpModifier(0))
 
-      if (this.isAnalyzing) {
-        AnalyzingCard()
-          .padding({ left: 16, right: 16 })
-          .attributeModifier(new FloatUpModifier(1))
-      } else if (this.analysis !== null) {
-        AIAnalysisCard({ analysis: this.analysis })
-          .padding({ left: 16, right: 16 })
-          .attributeModifier(new FloatUpModifier(1))
-      }
-
-      WaterFlow() {
-        ForEach(this.metrics, (item: Metric, index: number) => {
-          FlowItem() {
-            MetricCard({ metric: item })
+      if (this.isMediumLayout) {
+        Column({ space: 12 }) {
+          if (this.hasAnalysisContent()) {
+            Column() {
+              this.analysisBuilder()
+            }
+            .padding({ left: 16, right: 16, top: 4 })
           }
-          .width('100%')
-          .attributeModifier(new FloatUpModifier(index + (this.analysis !== null || this.isAnalyzing ? 2 : 1), 20))
-        })
-      }
-      .columnsTemplate("1fr 1fr")
-      .columnsGap(10)
-      .rowsGap(10)
-      .width('100%')
-      .height(this.metrics.length > 0 ? 320 : 0)
-      .padding({ left: 16, right: 16, top: 4 })
-      .nestedScroll({
-        scrollForward: NestedScrollMode.PARENT_FIRST,
-        scrollBackward: NestedScrollMode.PARENT_FIRST
-      })
 
-      if (this.dailyStats.length > 0) {
-        LastMonthActivityMap({
-          monthName: this.lastMonthName,
-          dailyStats: this.dailyStats
+          Column() {
+            this.mediumMetricsGridBuilder()
+          }
+          .padding({ left: 16, right: 16, top: this.hasAnalysisContent() ? 0 : 4 })
+        }
+        .width('100%')
+
+        if (this.dailyStats.length > 0) {
+          LastMonthActivityMap({
+            monthName: this.lastMonthName,
+            dailyStats: this.dailyStats
+          })
+            .padding({ left: 16, right: 16, top: 4 })
+            .attributeModifier(new FloatUpModifier(this.metrics.length + (this.analysis !== null || this.isAnalyzing ? 2 : 1)))
+        }
+      } else {
+        Column() {
+          this.analysisBuilder()
+        }
+        .padding({ left: 16, right: 16 })
+
+        WaterFlow() {
+          ForEach(this.metrics, (item: Metric, index: number) => {
+            FlowItem() {
+              MetricCard({ metric: item })
+            }
+            .width('100%')
+            .attributeModifier(new FloatUpModifier(index + (this.analysis !== null || this.isAnalyzing ? 2 : 1), 20))
+          })
+        }
+        .columnsTemplate("1fr 1fr")
+        .columnsGap(10)
+        .rowsGap(10)
+        .width('100%')
+        .height(this.metrics.length > 0 ? 320 : 0)
+        .padding({ left: 16, right: 16, top: 4 })
+        .nestedScroll({
+          scrollForward: NestedScrollMode.PARENT_FIRST,
+          scrollBackward: NestedScrollMode.PARENT_FIRST
         })
-          .padding({ left: 16, right: 16, top: 4 })
-          .attributeModifier(new FloatUpModifier(this.metrics.length + (this.analysis !== null || this.isAnalyzing ? 2 : 1)))
+
+        if (this.dailyStats.length > 0) {
+          LastMonthActivityMap({
+            monthName: this.lastMonthName,
+            dailyStats: this.dailyStats
+          })
+            .padding({ left: 16, right: 16, top: 4 })
+            .attributeModifier(new FloatUpModifier(this.metrics.length + (this.analysis !== null || this.isAnalyzing ? 2 : 1)))
+        }
       }
 
       Blank().height(72)

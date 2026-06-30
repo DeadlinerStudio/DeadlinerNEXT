@@ -15,12 +15,21 @@ import { AddTaskSheet } from '../main/modify/task/AddTaskSheet';
 import { AddHabitSheet } from '../main/modify/habit/AddHabitSheet';
 import { ITheme } from '../../../common/theme/ThemeModel';
 import { BlurBackgroundModifier } from '../../../utils/animation/BlurBackgroundModifier';
+import {
+  AppBreakpoint,
+  APP_BREAKPOINT_DEFAULT,
+  APP_BREAKPOINT_STORAGE_KEY,
+  AppBreakpointUtils
+} from '../../../common/layout/AppBreakpoints';
 
 @Component
 export struct CapturePage {
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
 
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+
+  @StorageLink(APP_BREAKPOINT_STORAGE_KEY) currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
   
   @State inputText: string = '';
   @State items: InspirationItem[] = [];
@@ -274,6 +283,26 @@ export struct CapturePage {
 
   @StorageProp('customBackgroundImage') customBg: string = '';
 
+  private pageTopAvoidHeight(): number {
+    return this.statusBarHeight + 18 + this.topAvoidExtraHeight;
+  }
+
+  private usesWideLayout(): boolean {
+    return AppBreakpointUtils.isWide(this.currentBreakpoint);
+  }
+
+  private usesMediumLayout(): boolean {
+    return this.currentBreakpoint === AppBreakpoint.MD;
+  }
+
+  private wideGridColumnsTemplate(): string {
+    return this.currentBreakpoint === AppBreakpoint.XL ? '1fr 1fr 1fr' : '1fr 1fr';
+  }
+
+  private wideInputWidth(): string {
+    return this.currentBreakpoint === AppBreakpoint.XL ? '28%' : '34%';
+  }
+
   @Builder
   private inputCardBuilder() {
     Column({ space: 14 }) {
@@ -329,6 +358,63 @@ export struct CapturePage {
   }
 
   @Builder
+  private mediumInputCardBuilder() {
+    Column({ space: 12 }) {
+      Row({ space: 12 }) {
+        Column({ space: 6 }) {
+          Text('先记下一句想法')
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.font_primary'))
+            .width('100%')
+
+          Text('稍后再整理')
+            .fontSize(13)
+            .fontColor(this.selectionMode ? $r('app.color.font_secondary') : this.theme.brand)
+            .width('100%')
+
+          Text('这里适合放灵感、计划草稿、稍后可能要做的事。先别急着把它变得太正式，先让它被保留下来。')
+            .fontSize(13)
+            .lineHeight(20)
+            .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+
+        Button('保存灵感')
+          .type(ButtonType.Capsule)
+          .width(132)
+          .height(40)
+          .backgroundColor(this.theme.brand)
+          .fontColor(Color.White)
+          .fontSize(14)
+          .onClick(() => this.saveInputAsInspiration())
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
+
+      TextArea({ text: this.inputText, placeholder: '一句念头、一段草稿，或者一件还没想清楚的事。' })
+        .width('100%')
+        .height(108)
+        .fontSize(15)
+        .lineHeight(22)
+        .backgroundColor($r('sys.color.comp_background_secondary'))
+        .borderRadius(20)
+        .padding(14)
+        .onChange((value: string) => {
+          this.inputText = value;
+        })
+    }
+    .width('100%')
+    .padding(14)
+    .attributeModifier(new BlurBackgroundModifier(!!this.customBg, $r('app.color.background_secondary'), BlurStyle.Regular))
+    .borderRadius(22)
+  }
+
+  @Builder
   private emptyBuilder() {
     Column({ space: 12 }) {
       Text('这里会暂时停泊那些还没定型的内容')
@@ -344,6 +430,324 @@ export struct CapturePage {
     .width('100%')
     .padding({ top: 56, bottom: 56, left: 20, right: 20 })
     .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private portraitListBuilder() {
+    if (!this.isLoading && this.items.length === 0) {
+      this.emptyBuilder()
+    } else {
+      List({ space: 12 }) {
+        ForEach(this.items, (item: InspirationItem) => {
+          if (this.selectionMode) {
+            ListItem() {
+              this.inspirationRowBuilder(item)
+            }
+          } else {
+            HdsListItem({
+              customItemBuilder: this.inspirationRowBuilder.bind(this, item),
+              swipeActionOptions: {
+                icons: [
+                  {
+                    icon: new SymbolGlyphModifier($r('sys.symbol.list_checkmark'))
+                      .fontColor([Color.White]),
+                    backgroundColor: this.theme.chartInfo,
+                    onAction: (): void => {
+                      this.openAiTaskFromText(item.text);
+                    },
+                  },
+                  {
+                    icon: new SymbolGlyphModifier($r('sys.symbol.leaf'))
+                      .fontColor([Color.White]),
+                    backgroundColor: this.theme.chartCompleted,
+                    onAction: (): void => {
+                      this.openAiHabitFromText(item.text);
+                    },
+                  },
+                ],
+                deleteIconOptions: {
+                  backgroundColor: $r('app.color.chart_red'),
+                  iconColor: Color.White,
+                  onAction: (): void => {
+                    void this.deleteSingleItem(item);
+                  },
+                },
+                fullDeleteOptions: {
+                  isFullDelete: true,
+                  onFullDeleteAction: (): void => {
+                    void this.deleteSingleItem(item);
+                  },
+                },
+              }
+            })
+          }
+        }, (item: InspirationItem) => `${item.id}_${item.updatedAt}`)
+      }
+      .width('100%')
+      .height('100%')
+      .scrollBar(BarState.Off)
+    }
+  }
+
+  @Builder
+  private wideItemActionBuilder(item: InspirationItem) {
+    Row({ space: 8 }) {
+      Button('AI 任务')
+        .type(ButtonType.Capsule)
+        .layoutWeight(1)
+        .height(34)
+        .backgroundColor($r('sys.color.comp_background_secondary'))
+        .fontColor($r('sys.color.ohos_id_color_text_primary'))
+        .fontSize(13)
+        .onClick((): void => {
+          this.openAiTaskFromText(item.text);
+        })
+
+      Button('AI 习惯')
+        .type(ButtonType.Capsule)
+        .layoutWeight(1)
+        .height(34)
+        .backgroundColor($r('sys.color.comp_background_secondary'))
+        .fontColor($r('sys.color.ohos_id_color_text_primary'))
+        .fontSize(13)
+        .onClick((): void => {
+          this.openAiHabitFromText(item.text);
+        })
+
+      Button({ type: ButtonType.Circle }) {
+        SymbolGlyph($r('sys.symbol.trash'))
+          .fontSize(16)
+          .fontColor([Color.White])
+      }
+      .width(34)
+      .height(34)
+      .backgroundColor($r('app.color.chart_red'))
+      .onClick((): void => {
+        void this.deleteSingleItem(item);
+      })
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private wideInspirationCardBuilder(item: InspirationItem) {
+    Column({ space: 10 }) {
+      this.inspirationRowBuilder(item)
+
+      if (!this.selectionMode) {
+        this.wideItemActionBuilder(item)
+      }
+    }
+    .width('100%')
+  }
+
+  private mediumRows(): InspirationItem[][] {
+    const rows: InspirationItem[][] = [];
+    for (let i = 0; i < this.items.length; i += 2) {
+      rows.push(this.items.slice(i, i + 2));
+    }
+    return rows;
+  }
+
+  @Builder
+  private mediumRowBuilder(rowItems: InspirationItem[]) {
+    Row({ space: 12 }) {
+      ForEach(rowItems, (item: InspirationItem) => {
+        Column() {
+          this.wideInspirationCardBuilder(item)
+        }
+        .layoutWeight(1)
+      }, (item: InspirationItem) => `${item.id}_${item.updatedAt}`)
+
+      if (rowItems.length === 1) {
+        Blank().layoutWeight(1)
+      }
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+  }
+
+  @Builder
+  private wideGridBuilder() {
+    Grid() {
+      ForEach(this.items, (item: InspirationItem) => {
+        GridItem() {
+          this.wideInspirationCardBuilder(item)
+        }
+      }, (item: InspirationItem) => `${item.id}_${item.updatedAt}`)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .columnsTemplate(this.wideGridColumnsTemplate())
+    .columnsGap(12)
+    .rowsGap(12)
+    .scrollBar(BarState.Off)
+  }
+
+  @Builder
+  private mediumContentBuilder() {
+    Column({ space: 16 }) {
+      if (!this.selectionMode) {
+        Column() {
+          this.mediumInputCardBuilder()
+        }
+        .width('100%')
+        .constraintSize({ maxWidth: 720 })
+        .transition(
+          TransitionEffect.OPACITY
+            .combine(TransitionEffect.translate({ y: -24 }))
+            .animation({
+              duration: 280,
+              curve: Curve.FastOutSlowIn
+            })
+        )
+      }
+
+      if (!this.isLoading && this.items.length === 0) {
+        this.emptyBuilder()
+      } else {
+        List({ space: 12 }) {
+          ForEach(this.mediumRows(), (rowItems: InspirationItem[], index: number) => {
+            ListItem() {
+              this.mediumRowBuilder(rowItems)
+            }
+          }, (_rowItems: InspirationItem[], index: number) => `row_${index}`)
+        }
+        .width('100%')
+        .scrollBar(BarState.Off)
+      }
+
+      Blank().height(96)
+
+      this.sheetAnchorsBuilder()
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.Start)
+    .padding({ left: 16, right: 16 })
+    .constraintSize({ minHeight: '100%' })
+  }
+
+  @Builder
+  private sheetAnchorsBuilder() {
+    Blank()
+      .width(0)
+      .height(0)
+      .bindSheet($$this.isDetailSheetShow, this.detailSheetBuilder(), {
+        height: SheetSize.LARGE,
+        dragBar: true,
+        blurStyle: BlurStyle.Regular,
+        backgroundColor: Color.Transparent,
+        showClose: false,
+        onDisappear: () => {
+          this.isDetailSheetShow = false;
+          this.editingItem = null;
+        },
+      })
+
+    Blank()
+      .width(0)
+      .height(0)
+      .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), {
+        height: SheetSize.LARGE,
+        blurStyle: BlurStyle.Regular,
+        backgroundColor: Color.Transparent,
+        showClose: false,
+        onDisappear: () => {
+          this.isAddTaskSheetShow = false;
+        }
+      })
+
+    Blank()
+      .width(0)
+      .height(0)
+      .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), {
+        height: SheetSize.LARGE,
+        blurStyle: BlurStyle.Regular,
+        backgroundColor: Color.Transparent,
+        showClose: false,
+        onDisappear: () => {
+          this.isAddHabitSheetShow = false;
+        }
+      })
+  }
+
+  @Builder
+  private portraitContentBuilder() {
+    Column({ space: 16 }) {
+      if (!this.selectionMode) {
+        Column() {
+          this.inputCardBuilder()
+        }
+        .transition(
+          TransitionEffect.OPACITY
+            .combine(TransitionEffect.translate({ y: -24 }))
+            .animation({
+              duration: 280,
+              curve: Curve.FastOutSlowIn
+            })
+        )
+      }
+
+      this.portraitListBuilder()
+
+      Blank().height(96)
+
+      this.sheetAnchorsBuilder()
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.Start)
+    .padding({ left: 16, right: 16 })
+    .constraintSize({ minHeight: '100%' })
+  }
+
+  @Builder
+  private wideContentBuilder() {
+    if (this.selectionMode) {
+      Column({ space: 16 }) {
+        this.wideGridBuilder()
+
+        Blank().height(96)
+
+        this.sheetAnchorsBuilder()
+      }
+      .width('100%')
+      .height('100%')
+      .padding({ left: 16, right: 16, bottom: 16 })
+    } else {
+      Row({ space: 16 }) {
+        Column({ space: 16 }) {
+          this.inputCardBuilder()
+        }
+        .width(this.wideInputWidth())
+        .constraintSize({
+          minWidth: this.currentBreakpoint === AppBreakpoint.XL ? 340 : 320,
+          maxWidth: this.currentBreakpoint === AppBreakpoint.XL ? 460 : 420
+        })
+        .height('100%')
+
+        Column({ space: 16 }) {
+          if (!this.isLoading && this.items.length === 0) {
+            Column() {
+              this.emptyBuilder()
+            }
+            .width('100%')
+            .layoutWeight(1)
+            .justifyContent(FlexAlign.Center)
+          } else {
+            this.wideGridBuilder()
+          }
+
+          Blank().height(96)
+
+          this.sheetAnchorsBuilder()
+        }
+        .layoutWeight(1)
+        .height('100%')
+      }
+      .width('100%')
+      .height('100%')
+      .padding({ left: 16, right: 16, bottom: 16 })
+    }
   }
 
   @Builder
@@ -398,128 +802,22 @@ export struct CapturePage {
   build() {
     HdsNavigation() {
       TopSafeContainer({
-        topAvoidHeight: this.statusBarHeight + 18,
-        needBgTransparent: true
+        topAvoidHeight: this.pageTopAvoidHeight(),
+        needBgTransparent: true,
+        scrollable: !this.usesWideLayout()
       }) {
-        Column({ space: 16 }) {
-          if (!this.selectionMode) {
-            Column() {
-              this.inputCardBuilder()
-            }
-            .transition(
-              TransitionEffect.OPACITY
-                .combine(TransitionEffect.translate({ y: -24 }))
-                .animation({
-                  duration: 280,
-                  curve: Curve.FastOutSlowIn
-                })
-            )
-          }
-
-          if (!this.isLoading && this.items.length === 0) {
-            this.emptyBuilder()
-          } else {
-            List({ space: 12 }) {
-              ForEach(this.items, (item: InspirationItem) => {
-                if (this.selectionMode) {
-                  ListItem() {
-                    this.inspirationRowBuilder(item)
-                  }
-                } else {
-                  HdsListItem({
-                    customItemBuilder: this.inspirationRowBuilder.bind(this, item),
-                    swipeActionOptions: {
-                      icons: [
-                        {
-                          icon: new SymbolGlyphModifier($r('sys.symbol.list_checkmark'))
-                            .fontColor([Color.White]),
-                          backgroundColor: this.theme.chartInfo,
-                          onAction: (): void => {
-                            this.openAiTaskFromText(item.text);
-                          },
-                        },
-                        {
-                          icon: new SymbolGlyphModifier($r('sys.symbol.leaf'))
-                            .fontColor([Color.White]),
-                          backgroundColor: this.theme.chartCompleted,
-                          onAction: (): void => {
-                            this.openAiHabitFromText(item.text);
-                          },
-                        },
-                      ],
-                      deleteIconOptions: {
-                        backgroundColor: $r('app.color.chart_red'),
-                        iconColor: Color.White,
-                        onAction: (): void => {
-                          void this.deleteSingleItem(item);
-                        },
-                      },
-                      fullDeleteOptions: {
-                        isFullDelete: true,
-                        onFullDeleteAction: (): void => {
-                          void this.deleteSingleItem(item);
-                        },
-                      },
-                    }
-                  })
-                }
-              }, (item: InspirationItem) => `${item.id}_${item.updatedAt}`)
-            }
-            .width('100%')
-            .height('100%')
-            .scrollBar(BarState.Off)
-          }
-
-          Blank().height(96)
-
-          Blank()
-            .width(0)
-            .height(0)
-            .bindSheet($$this.isDetailSheetShow, this.detailSheetBuilder(), {
-              height: SheetSize.LARGE,
-              dragBar: true,
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
-              showClose: false,
-              onDisappear: () => {
-                this.isDetailSheetShow = false;
-                this.editingItem = null;
-              },
-            })
-
-          Blank()
-            .width(0)
-            .height(0)
-            .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), {
-              height: SheetSize.LARGE,
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
-              showClose: false,
-              onDisappear: () => {
-                this.isAddTaskSheetShow = false;
-              }
-            })
-
-          Blank()
-            .width(0)
-            .height(0)
-            .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), {
-              height: SheetSize.LARGE,
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
-              showClose: false,
-              onDisappear: () => {
-                this.isAddHabitSheetShow = false;
-              }
-            })
+        if (this.usesWideLayout()) {
+          this.wideContentBuilder()
+        } else if (this.usesMediumLayout()) {
+          this.mediumContentBuilder()
+        } else {
+          this.portraitContentBuilder()
         }
-        .width('100%')
-        .justifyContent(FlexAlign.Start)
-        .padding({ left: 16, right: 16 })
       }
     }
     .titleBar({
       style: getImmersiveTitleBarStyle(false, false),
+      avoidLayoutSafeArea: this.usesWideLayout(),
       content: {
         title: {
           mainTitle: this.selectionMode ? `已选 ${this.selectedIds.length} 项` : '灵感'
@@ -570,6 +868,7 @@ export struct CapturePage {
       }
     })
     .titleMode(HdsNavigationTitleMode.MINI)
+    .mode(NavigationMode.Stack)
     .hideBackButton(true)
   }
 }

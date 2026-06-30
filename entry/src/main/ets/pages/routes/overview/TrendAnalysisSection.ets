@@ -41,27 +41,67 @@ export struct TrendAnalysisSection {
   @Prop contributionStats: ContributionDay[];
 
   @Prop cardOrder: TrendCard[];
+  @Prop isMediumLayout: boolean = false;
+
+  private cardsForColumn(columnIndex: number): TrendCard[] {
+    return this.cardOrder.filter((_: TrendCard, index: number) => index % 2 === columnIndex);
+  }
+
+  private cardOrderIndex(cardId: TrendCard): number {
+    return this.cardOrder.indexOf(cardId);
+  }
+
+  @Builder
+  private cardBuilder(cardId: TrendCard) {
+    if (cardId === TrendCard.DAILY_TREND) {
+      DailyCompletedCard({ dailyStats: $dailyStats })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    } else if (cardId === TrendCard.MONTHLY_TREND) {
+      MonthlyTrendCard({ monthlyStats: $monthlyStats })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    } else if (cardId === TrendCard.WEEKLY_TREND) {
+      PrevWeeksCard({ weeklyStats: $weeklyStats })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    } else if (cardId === TrendCard.CONTRIBUTION_HEATMAP) {
+      ContributionHeatmapCard({ stats: this.contributionStats })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    }
+  }
 
   build() {
-    Column({ space: 8 }) {
-      ForEach(this.cardOrder, (cardId: TrendCard, idx) => {
-        if (cardId === TrendCard.DAILY_TREND) {
-          DailyCompletedCard({ dailyStats: $dailyStats })
-            .attributeModifier(new FloatUpModifier(idx))
-        } else if (cardId === TrendCard.MONTHLY_TREND) {
-          MonthlyTrendCard({ monthlyStats: $monthlyStats })
-            .attributeModifier(new FloatUpModifier(idx))
-        } else if (cardId === TrendCard.WEEKLY_TREND) {
-          PrevWeeksCard({ weeklyStats: $weeklyStats })
-            .attributeModifier(new FloatUpModifier(idx))
-        } else if (cardId === TrendCard.CONTRIBUTION_HEATMAP) {
-          ContributionHeatmapCard({ stats: this.contributionStats })
-            .attributeModifier(new FloatUpModifier(idx))
-        }
-      }, (item: string) => item)
+    Column() {
+      if (this.isMediumLayout) {
+        Row({ space: 12 }) {
+          Column({ space: 8 }) {
+            ForEach(this.cardsForColumn(0), (cardId: TrendCard) => {
+              this.cardBuilder(cardId)
+            }, (item: TrendCard) => item)
 
-      // 底部留白
-      Blank().height(72)
+            Blank().height(72)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+
+          Column({ space: 8 }) {
+            ForEach(this.cardsForColumn(1), (cardId: TrendCard) => {
+              this.cardBuilder(cardId)
+            }, (item: TrendCard) => item)
+
+            Blank().height(72)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .alignItems(VerticalAlign.Top)
+      } else {
+        Column({ space: 8 }) {
+          ForEach(this.cardOrder, (cardId: TrendCard) => {
+            this.cardBuilder(cardId)
+          }, (item: TrendCard) => item)
+
+          Blank().height(72)
+        }
+      }
     }
     .justifyContent(FlexAlign.Start)
     .constraintSize({ minHeight: '100%' })

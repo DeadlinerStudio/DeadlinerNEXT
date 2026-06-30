@@ -44,28 +44,69 @@ export struct OverviewStatsSection {
   @Prop overdueItems: DDLItem[];
 
   @Prop cardOrder: OverviewCard[];
+  @Prop isMediumLayout: boolean = false;
+
+  private cardsForColumn(columnIndex: number): OverviewCard[] {
+    return this.cardOrder.filter((_: OverviewCard, index: number) => index % 2 === columnIndex);
+  }
+
+  private cardOrderIndex(cardId: OverviewCard): number {
+    return this.cardOrder.indexOf(cardId);
+  }
+
+  @Builder
+  private cardBuilder(cardId: OverviewCard) {
+    if (cardId === OverviewCard.ACTIVE_STATS) {
+      ActiveStatsCard({
+        completed: this.todayCompleted,
+        todo: this.todayTodo,
+        overdue: this.todayOverdue,
+        abandoned: this.activeAbandoned
+      })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    } else if (cardId === OverviewCard.COMPLETION_TIME) {
+      CompletionTimeCard({ completionTimeStats: $completionTimeStats })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    } else if (cardId === OverviewCard.HISTORY_STATS) {
+      HistoryStatsCard({ historyStats: $historyStats })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    }
+  }
 
   build() {
-    Column({ space: 8 }) {
-      ForEach(this.cardOrder, (cardId: OverviewCard, idx) => {
-        if (cardId === OverviewCard.ACTIVE_STATS) {
-          ActiveStatsCard({
-            completed: this.todayCompleted,
-            todo: this.todayTodo,
-            overdue: this.todayOverdue,
-            abandoned: this.activeAbandoned
-          })
-            .attributeModifier(new FloatUpModifier(idx))
-        } else if (cardId === OverviewCard.COMPLETION_TIME) {
-          CompletionTimeCard({ completionTimeStats: $completionTimeStats })
-            .attributeModifier(new FloatUpModifier(idx))
-        } else if (cardId === OverviewCard.HISTORY_STATS) {
-          HistoryStatsCard({ historyStats: $historyStats })
-            .attributeModifier(new FloatUpModifier(idx))
-        }
-      }, (item: string) => item)
+    Column() {
+      if (this.isMediumLayout) {
+        Row({ space: 12 }) {
+          Column({ space: 8 }) {
+            ForEach(this.cardsForColumn(0), (cardId: OverviewCard) => {
+              this.cardBuilder(cardId)
+            }, (item: OverviewCard) => item)
 
-      Blank().height(72)
+            Blank().height(72)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+
+          Column({ space: 8 }) {
+            ForEach(this.cardsForColumn(1), (cardId: OverviewCard) => {
+              this.cardBuilder(cardId)
+            }, (item: OverviewCard) => item)
+
+            Blank().height(72)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .alignItems(VerticalAlign.Top)
+      } else {
+        Column({ space: 8 }) {
+          ForEach(this.cardOrder, (cardId: OverviewCard) => {
+            this.cardBuilder(cardId)
+          }, (item: OverviewCard) => item)
+
+          Blank().height(72)
+        }
+      }
     }
     .justifyContent(FlexAlign.Start)
     .constraintSize({ minHeight: '100%' })

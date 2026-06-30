@@ -82,7 +82,8 @@ export struct MainHomePageTablet {
   }
 
   // --- Layout Constants ---
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
 
   @State topContentHeight: number = 18;
 
@@ -255,7 +256,7 @@ export struct MainHomePageTablet {
           RelativeContainer() {
             TaskListSection({
               scroller: this.scrollerTask,
-              topAvoidHeight: 0,
+              topAvoidHeight: this.topAvoidExtraHeight,
               isSelectionMode: $isTaskSelectionMode,
               controller: this.taskController,
               confetti: this.confettiController
@@ -314,6 +315,8 @@ export struct MainHomePageTablet {
             backgroundColor: Color.Transparent,
             showClose: false
           })
+          .padding({ top: this.statusBarHeight })
+
           if (this.sdEnabled) {
             Divider()
               .vertical(true)
@@ -325,6 +328,7 @@ export struct MainHomePageTablet {
             SideDashboard()
               .width(108)
               .height('100%')
+              .padding({ top: this.statusBarHeight })
           }
         }
         .width('100%')
@@ -394,9 +398,10 @@ export struct MainHomePageTablet {
     }
     .titleBar({
       style: getImmersiveTitleBarStyle(true),
+      avoidLayoutSafeArea: true,
       content: {
         title: {
-          mainTitle: '清单',
+          mainTitle: 'Deadliner',
         },
         menu: {
           value: [
@@ -433,6 +438,5 @@ export struct MainHomePageTablet {
       title: { title: 'Lifi AI' }
     })
     .hideBackButton(true)
-    .padding({ top: this.statusBarHeight })
   }
 }
