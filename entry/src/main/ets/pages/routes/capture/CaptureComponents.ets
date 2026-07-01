@@ -122,7 +122,7 @@ export struct InspirationItemCard {
         top: 16,
         bottom: 16
       })
-      .attributeModifier(new BlurBackgroundModifier(!!this.customBg, $r('sys.color.comp_background_secondary'), BlurStyle.Thick))
+      .attributeModifier(new BlurBackgroundModifier(!!this.customBg, $r('app.color.background_secondary'), BlurStyle.Thick))
       .borderRadius(24)
     }
     .width('100%')
@@ -349,7 +349,7 @@ export struct InspirationSearchCard {
     }
     .width('100%')
     .padding(16)
-    .backgroundColor($r('sys.color.comp_background_secondary'))
+    .backgroundColor($r('app.color.background_secondary'))
     .borderRadius(22)
     .onClick((): void => this.onCardClick())
   }

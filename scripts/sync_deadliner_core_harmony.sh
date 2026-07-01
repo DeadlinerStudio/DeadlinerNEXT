@@ -232,6 +232,10 @@ elif key == "asset_api_url":
     if not asset:
         raise SystemExit(f"error: asset {asset_name} not found in release metadata")
     print(asset.get("url", ""))
+elif key == "asset_download_url":
+    if not asset:
+        raise SystemExit(f"error: asset {asset_name} not found in release metadata")
+    print(asset.get("browser_download_url", ""))
 elif key == "asset_fingerprint":
     if not asset:
         raise SystemExit(f"error: asset {asset_name} not found in release metadata")
@@ -247,21 +251,36 @@ PY
 download_release_asset() {
   local metadata_file="$1"
   local output_file="$2"
-  local asset_api_url
+  local asset_api_url asset_download_url temp_file
+
+  temp_file="${output_file}.part"
 
   echo "==> Downloading Harmony release asset"
+  rm -f "${temp_file}"
 
   if [[ "${GH_AVAILABLE}" == "true" ]]; then
-    rm -f "${output_file}"
-    gh release download "${RELEASE_TAG}" \
+    if gh release download "${RELEASE_TAG}" \
       --repo "${RELEASE_REPO}" \
       --pattern "${ARTIFACT_NAME}" \
-      --output "${output_file}" \
-      --clobber
-    return 0
+      --output "${temp_file}" \
+      --clobber; then
+      if [[ -s "${temp_file}" ]]; then
+        mv "${temp_file}" "${output_file}"
+        return 0
+      fi
+      echo "warning: gh release download produced no usable file, retrying with curl" >&2
+    else
+      echo "warning: gh release download failed, retrying with curl" >&2
+    fi
   fi
 
   if ! asset_api_url="$(release_metadata_value "${metadata_file}" "asset_api_url")"; then
+    rm -f "${temp_file}"
+    return 1
+  fi
+
+  if ! asset_download_url="$(release_metadata_value "${metadata_file}" "asset_download_url")"; then
+    rm -f "${temp_file}"
     return 1
   fi
 
@@ -281,8 +300,33 @@ download_release_asset() {
     curl_args+=(-H "Authorization: Bearer ${AUTH_TOKEN}")
   fi
 
-  curl_args+=("${asset_api_url}" -o "${output_file}")
-  curl "${curl_args[@]}"
+  if curl "${curl_args[@]}" "${asset_api_url}" -o "${temp_file}" && [[ -s "${temp_file}" ]]; then
+    mv "${temp_file}" "${output_file}"
+    return 0
+  fi
+
+  rm -f "${temp_file}"
+
+  curl_args=(
+    -fsSL
+    --connect-timeout "${GITHUB_CONNECT_TIMEOUT}"
+    --max-time "${GITHUB_MAX_TIME}"
+    --retry "${GITHUB_RETRY_COUNT}"
+    --retry-all-errors
+    -H "User-Agent: deadliner-core-harmony-sync"
+  )
+
+  if [[ -n "${AUTH_TOKEN}" ]]; then
+    curl_args+=(-H "Authorization: Bearer ${AUTH_TOKEN}")
+  fi
+
+  if curl "${curl_args[@]}" "${asset_download_url}" -o "${temp_file}" && [[ -s "${temp_file}" ]]; then
+    mv "${temp_file}" "${output_file}"
+    return 0
+  fi
+
+  rm -f "${temp_file}"
+  return 1
 }
 
 extract_release_artifact() {
@@ -290,6 +334,10 @@ extract_release_artifact() {
   local extract_dir="$2"
 
   echo "==> Extracting Harmony release archive"
+  if [[ ! -s "${archive_file}" ]]; then
+    echo "error: archive missing or empty: ${archive_file}" >&2
+    return 1
+  fi
   python3 - <<'PY' "${archive_file}" "${extract_dir}"
 from pathlib import Path
 import shutil

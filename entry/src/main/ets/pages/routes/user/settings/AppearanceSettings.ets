@@ -42,7 +42,8 @@ struct AppearanceSettings {
     }
   }
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @StorageLink(C.KEY_PROGRESS_DIRECTION) progressDir: boolean = false;
@@ -186,7 +187,7 @@ struct AppearanceSettings {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
 
           SettingsSection({ title: '个性化' }) {
@@ -257,16 +258,16 @@ struct AppearanceSettings {
             }
           }
 
-          if (this.api23 && deviceInfo.distributionOSApiVersion >= 60100) {
-            SettingsSection() {
-              SubSettingsSwitch({
-                title: "底栏 Lifi AI 入口",
-                subtitle: "使用底栏的悬浮迷你栏快速进入 Lifi AI",
-                isOn: this.showMiniBar,
-                onChange: (isOn): Promise<void> => LocalValues.getInstance().setMiniBar(this.showMiniBar)
-              })
-            }
-          }
+          // if (this.api23 && deviceInfo.distributionOSApiVersion >= 60100) {
+          //   SettingsSection() {
+          //     SubSettingsSwitch({
+          //       title: "底栏 Lifi AI 入口",
+          //       subtitle: "使用底栏的悬浮迷你栏快速进入 Lifi AI",
+          //       isOn: this.showMiniBar,
+          //       onChange: (isOn): Promise<void> => LocalValues.getInstance().setMiniBar(this.showMiniBar)
+          //     })
+          //   }
+          // }
 
           SettingsSection() {
             SubSettingsSwitch({
@@ -384,6 +385,7 @@ struct AppearanceSettings {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "显示与个性化" } }
     })

@@ -19,6 +19,9 @@ export struct LifiAISettingsPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+
+  readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   pageStack: NavPathStack = new NavPathStack();
 
@@ -56,7 +59,7 @@ export struct LifiAISettingsPage {
       Column() {
         Scroll() {
           Column({ space: 16 }) {
-            Blank().height(34)
+            Blank().height(this.isWideScreen ? this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + 34 : 34)
 
             Column({ space: 8 }) {
               Row() {
@@ -232,7 +235,8 @@ export struct LifiAISettingsPage {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
     }
     .titleBar({
-      style: getImmersiveTitleBarStyle(this.isWideScreen, false),
+      avoidLayoutSafeArea: this.isWideScreen,
+      style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: {
         title: {
           mainTitle: "Lifi AI 设置"

@@ -1,4 +1,4 @@
-import { LengthMetrics, mediaquery, promptAction, SymbolGlyphModifier } from '@kit.ArkUI';
+import { LengthMetrics, mediaquery, promptAction, SymbolGlyphModifier, display } from '@kit.ArkUI';
 import { LocalValues } from '../common/local/LocalValues';
 import { MainHomePage } from './routes/main/MainHomePage';
 import { OverviewPage } from './routes/overview/OverviewPage';
@@ -7,8 +7,6 @@ import { common } from '@kit.AbilityKit';
 import { TabAnimModifier } from '../utils/animation/TabAnimModifier';
 import { AiFlowBackground } from './common/AIFlowBackground';
 import { HuaweiAccountUtils } from '../utils/account/HuaweiAccountUtils';
-import { MainHomePageTablet } from './routes/main/MainHomePageTablet';
-import { OverviewPageTablet } from './routes/overview/OverviewPageTablet';
 import { SettingsConstants as C } from '../common/local/SettingsConstants';
 import { ITheme } from '../common/theme/ThemeModel';
 import { TaskRepository } from '../common/repository/TaskRepository';
@@ -18,6 +16,14 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 import { CapturePage } from './routes/capture/CapturePage';
 import { LottieOnboardingSheet } from './common/LottieOnboardingSheet';
 import { AISheetController } from './components/AISheetController';
+import { AIPage } from './routes/ai/AIPage';
+import {
+  AppBreakpoint,
+  APP_BREAKPOINT_DEFAULT,
+  APP_BREAKPOINT_ORDER,
+  APP_BREAKPOINT_STORAGE_KEY,
+  AppBreakpointUtils
+} from '../common/layout/AppBreakpoints';
 
 interface TabData {
   title: string,
@@ -54,18 +60,58 @@ struct Index {
     }
   }
 
-  @StorageLink('isWideScreen') isWideScreen: boolean = false;
+  @StorageLink('isWideScreen') @Watch('syncTopAvoidExtraHeight') isWideScreen: boolean = false;
+  @StorageLink(APP_BREAKPOINT_STORAGE_KEY) @Watch('syncTopAvoidExtraHeight')
+  currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
+  @StorageProp('statusBarHeight') @Watch('syncTopAvoidExtraHeight') statusBarHeight: number = 38;
+  @StorageProp('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   @StorageLink(C.KEY_ENABLE_TABLET_UI) tabletUi: boolean = true;
   @StorageProp(C.KEY_ENABLE_API23) enableApi23: boolean = false;
+  @StorageLink('NotificationPermissionRequestInProgress') @Watch('onNotificationPermissionFlowChange')
+  isNotificationPermissionRequestInProgress: boolean = false;
 
   getFloatingTabs(): boolean {
     return (deviceInfo.distributionOSApiVersion >= 60100) && this.enableApi23
   }
 
-  listener = mediaquery.matchMediaSync('(min-width: 840vp)');
+  private breakpointListeners: mediaquery.MediaQueryListener[] = [];
 
-  onPortrait(mediaQueryResult: mediaquery.MediaQueryResult) {
-    AppStorage.setOrCreate('isWideScreen', mediaQueryResult.matches);
+  private syncTopAvoidExtraHeight(): void {
+    const nextTopAvoidExtraHeight = AppBreakpointUtils.isWide(this.currentBreakpoint) ? this.statusBarHeight + 8 : 0;
+    if (this.topAvoidExtraHeight !== nextTopAvoidExtraHeight) {
+      AppStorage.setOrCreate('topAvoidExtraHeight', nextTopAvoidExtraHeight);
+    }
+  }
+
+  private applyBreakpoint(nextBreakpoint: AppBreakpoint): void {
+    AppStorage.setOrCreate(APP_BREAKPOINT_STORAGE_KEY, nextBreakpoint);
+    AppStorage.setOrCreate('isWideScreen', AppBreakpointUtils.isWide(nextBreakpoint));
+  }
+
+  private registerBreakpointListeners(): void {
+    this.unregisterBreakpointListeners();
+    const mediaQuery = this.getUIContext().getMediaQuery();
+
+    APP_BREAKPOINT_ORDER.forEach((breakpoint: AppBreakpoint) => {
+      const listener = mediaQuery.matchMediaSync(AppBreakpointUtils.mediaCondition(breakpoint));
+      listener.on('change', (result: mediaquery.MediaQueryResult) => {
+        if (result.matches) {
+          this.applyBreakpoint(breakpoint);
+        }
+      });
+      this.breakpointListeners.push(listener);
+
+      if (listener.matches) {
+        this.applyBreakpoint(breakpoint);
+      }
+    });
+  }
+
+  private unregisterBreakpointListeners(): void {
+    this.breakpointListeners.forEach((listener: mediaquery.MediaQueryListener) => {
+      listener.off('change');
+    });
+    this.breakpointListeners = [];
   }
 
   private context = getContext(this) as common.UIAbilityContext;
@@ -74,9 +120,46 @@ struct Index {
   @State isBlocking: boolean = false;
   @State isGuideSheetShow: boolean = false;
   private hasPresentedGuideSheet: boolean = false;
+  private isGuideSheetPresentationPending: boolean = false;
+  private shouldConsumeGuideNextLaunch: boolean = false;
+  private shouldConsumeFirstLaunch: boolean = false;
+  private guideOpenedForFirstLaunch: boolean = false;
+
+  @State deviceWidth: string | number = '100%';
+  @State deviceHeight: string | number = '100%';
+
+  private logGuideState(stage: string, extra?: string): void {
+    const message: string = `[GuideDebug][Index] ${stage} | dataReady=${this.isAppDataReady} ` +
+      `privacyAgreed=${this.privacyAgreed} showGuideNextLaunch=${this.showGuideNextLaunch} ` +
+      `isGuideSheetShow=${this.isGuideSheetShow} hasPresented=${this.hasPresentedGuideSheet} ` +
+      `pending=${this.isGuideSheetPresentationPending} blocking=${this.isBlocking} ` +
+      `notifRequesting=${this.isNotificationPermissionRequestInProgress} ` +
+      `pathStackSize=${this.appPathStack.size()} wideScreen=${this.isWideScreen} ` +
+      `breakpoint=${this.currentBreakpoint} tabletUi=${this.tabletUi}` +
+      `${extra ? ` | ${extra}` : ''}`;
+    console.info(message);
+  }
+
+  onNotificationPermissionFlowChange(): void {
+    this.logGuideState('onNotificationPermissionFlowChange', `value=${this.isNotificationPermissionRequestInProgress}`);
+    if (!this.isNotificationPermissionRequestInProgress && this.isAppDataReady) {
+      void this.maybeShowGuideSheet();
+    }
+  }
+
+  private initDisplayInfo() {
+    try {
+      const d = display.getDefaultDisplaySync();
+      this.deviceWidth = d.width;
+      this.deviceHeight = d.height;
+    } catch (e) {
+
+    }
+  }
 
   onDataReady() {
     if (this.isAppDataReady) {
+      this.logGuideState('onDataReady:begin');
       animateTo({ duration: 600, curve: Curve.EaseOut }, () => {
         this.isShowUI = true;
       });
@@ -86,12 +169,15 @@ struct Index {
   }
 
   aboutToAppear() {
-    AppStorage.setOrCreate('isWideScreen', this.listener.matches);
-    this.listener.on('change', (result) => this.onPortrait(result));
+    this.registerBreakpointListeners();
+    this.syncTopAvoidExtraHeight();
+    this.logGuideState('aboutToAppear');
 
     if (this.isAppDataReady) {
       this.onDataReady();
     }
+
+    this.initDisplayInfo();
 
     if (this.isLoggedIn) {
       this.checkAndRepairUserProfile();
@@ -107,9 +193,23 @@ struct Index {
   }
 
   onPageShow() {
+    this.logGuideState('onPageShow:enter');
+    if (this.isGuideSheetShow && !this.hasPresentedGuideSheet) {
+      this.logGuideState('onPageShow:resetHalfShownSheet');
+      this.isGuideSheetShow = false;
+    }
+
+    if (this.isAppDataReady) {
+      void this.maybeShowGuideSheet();
+    }
+
     if (this.isLoggedIn && !this.hasCheckedProfile) {
       this.checkAndRepairUserProfile();
     }
+  }
+
+  aboutToDisappear(): void {
+    this.unregisterBreakpointListeners();
   }
 
   onLoginStatusChange() {
@@ -150,7 +250,11 @@ struct Index {
   }
 
   private async maybeShowGuideSheet(): Promise<void> {
-    if (!this.isAppDataReady || this.hasPresentedGuideSheet || this.isGuideSheetShow) {
+    if (!this.isAppDataReady || this.hasPresentedGuideSheet || this.isGuideSheetShow || this.isGuideSheetPresentationPending) {
+      this.logGuideState(
+        'maybeShowGuideSheet:skip',
+        `reason=dataReady:${this.isAppDataReady},presented:${this.hasPresentedGuideSheet},shown:${this.isGuideSheetShow},pending:${this.isGuideSheetPresentationPending}`
+      );
       return;
     }
 
@@ -164,59 +268,111 @@ struct Index {
     const shouldShowForGuide = this.showGuideNextLaunch || isFirstLaunch;
 
     const shouldShowForPrivacy = !this.privacyAgreed;
+    this.logGuideState(
+      'maybeShowGuideSheet:evaluated',
+      `isFirstLaunch=${isFirstLaunch} shouldShowForGuide=${shouldShowForGuide} shouldShowForPrivacy=${shouldShowForPrivacy}`
+    );
+
+    if (this.isNotificationPermissionRequestInProgress) {
+      this.logGuideState('maybeShowGuideSheet:deferForNotificationPermission');
+      return;
+    }
 
     if (!shouldShowForPrivacy && !shouldShowForGuide) {
       this.isBlocking = false;
+      this.logGuideState('maybeShowGuideSheet:noNeedToShow');
       return;
     }
 
     if (!this.privacyAgreed || this.appPathStack.size() > 0) {
       if (!shouldShowForPrivacy) {
+        this.logGuideState('maybeShowGuideSheet:skipByPathOrPrivacy', 'reason=guideOnlyButPrivacy/pathCheckBlocked');
         return;
       }
     } else if (!shouldShowForPrivacy && this.appPathStack.size() > 0) {
+      this.logGuideState('maybeShowGuideSheet:skipByPath', 'reason=pathStackNotEmpty');
       return;
     }
 
-    this.hasPresentedGuideSheet = true;
-    
-    if (this.showGuideNextLaunch) {
-      await localValues.setShowGuideNextLaunch(false);
-    }
-    
-    if (isFirstLaunch) {
-      await localValues.setAppFirstLaunch(false);
-    }
-    
     if (shouldShowForPrivacy) {
         this.isBlocking = true;
     }
 
+    this.guideOpenedForFirstLaunch = isFirstLaunch;
+    this.isGuideSheetPresentationPending = true;
+    this.shouldConsumeGuideNextLaunch = this.showGuideNextLaunch;
+    this.shouldConsumeFirstLaunch = isFirstLaunch;
+    this.logGuideState(
+      'maybeShowGuideSheet:scheduleShow',
+      `consumeGuideNext=${this.shouldConsumeGuideNextLaunch} consumeFirstLaunch=${this.shouldConsumeFirstLaunch}`
+    );
+
     setTimeout(() => {
+      this.isGuideSheetPresentationPending = false;
+      this.logGuideState(
+        'maybeShowGuideSheet:timeoutFired',
+        `shouldShowForPrivacy=${shouldShowForPrivacy} shouldShowForGuide=${shouldShowForGuide}`
+      );
       if ((shouldShowForPrivacy || shouldShowForGuide) && this.appPathStack.size() === 0) {
         this.isGuideSheetShow = true;
+        this.logGuideState('maybeShowGuideSheet:setGuideSheetShowTrue');
+      } else {
+        this.logGuideState('maybeShowGuideSheet:timeoutSkipShow', `pathStackSize=${this.appPathStack.size()}`);
       }
     }, 100); // 缩短延迟，尽快弹出
+  }
+
+  private async onGuideSheetPresented(): Promise<void> {
+    if (this.hasPresentedGuideSheet) {
+      this.logGuideState('onGuideSheetPresented:skipAlreadyPresented');
+      return;
+    }
+
+    this.logGuideState('onGuideSheetPresented:begin');
+    this.guideOpenedForFirstLaunch = this.shouldConsumeFirstLaunch;
+    this.hasPresentedGuideSheet = true;
+    const localValues = LocalValues.getInstance();
+
+    if (this.shouldConsumeGuideNextLaunch) {
+      this.shouldConsumeGuideNextLaunch = false;
+      await localValues.setShowGuideNextLaunch(false);
+    }
+
+    if (this.shouldConsumeFirstLaunch) {
+      this.shouldConsumeFirstLaunch = false;
+      await localValues.setAppFirstLaunch(false);
+    }
+
+    this.logGuideState('onGuideSheetPresented:done');
   }
 
   @Builder
   onboardingSheet() {
     LottieOnboardingSheet({
       privacyRequired: !this.privacyAgreed,
+      openedForFirstLaunch: this.guideOpenedForFirstLaunch,
+      onPresented: (): void => {
+        void this.onGuideSheetPresented();
+      },
       onAgreePrivacy: async () => {
+        this.logGuideState('onboarding:onAgreePrivacy:before');
         await LocalValues.getInstance().setPrivacyAgreed();
         this.privacyAgreed = true;
         this.isBlocking = false;
+        this.logGuideState('onboarding:onAgreePrivacy:after');
       },
       onDeclinePrivacy: () => {
+        this.logGuideState('onboarding:onDeclinePrivacy');
         this.context.terminateSelf().catch(() => {
           console.error('Terminate failed');
         });
       },
       privacyUrl: this.privacyUrl,
       onClose: () => {
+        this.logGuideState('onboarding:onClose:before');
         this.isGuideSheetShow = false;
         this.isBlocking = false;
+        this.logGuideState('onboarding:onClose:after');
       }
     })
   }
@@ -239,14 +395,25 @@ struct Index {
     { title: '清单', icon: $r('sys.symbol.checkmark_circle_on_circle_fill'), index: 0 },
     { title: '概览', icon: $r('sys.symbol.data_proportion_fill'), index: 1 },
     { title: '灵感', icon: $r('sys.symbol.pencil_crcle_fill'), index: 2 },
-    { title: '我的', icon: $r('sys.symbol.person_crop_circle_fill_1'), index: 3 },
+    { title: 'AI', icon: $r('app.media.lifi'), index: 3 },
+    { title: '我的', icon: $r('sys.symbol.person_crop_circle_fill_1'), index: 4 },
   ]
 
-  private getTabBarStyle(item: TabData): BottomTabBarStyle {
+  private getTabBarStyle(item: TabData, isImage?: boolean): BottomTabBarStyle {
+    let symbol: boolean = true;
+    if (isImage === true) {
+      symbol = false;
+    }
+
     let style = BottomTabBarStyle.of(
-      this.getTabBarSymbol(item.icon),
+      symbol ? this.getTabBarSymbol(item.icon) : item.icon,
       item.title
     );
+
+    style.iconStyle({
+      selectedColor: this.theme.tabIcon,
+      unselectedColor: $r('app.color.font_secondary')
+    });
 
     style.labelStyle({
       selectedColor: this.theme.tabIcon,
@@ -318,31 +485,18 @@ struct Index {
           }) {
             // --- Tab 1: 主页 ---
             TabContent() {
-              if (!(this.isWideScreen && this.tabletUi)) {
-                MainHomePage({
-                  currentTabIndex: this.currentIndex,
-                  aiSheetController: this.aiSheetController
+              MainHomePage({
+                currentTabIndex: this.currentIndex,
+                aiSheetController: this.aiSheetController
+              })
+                .width("100%")
+                .height("100%")
+                .attributeModifier(new TabAnimModifier(0, this.currentIndex))
+                .animation({
+                  duration: 300, // 保持与 Tabs 动画时长一致
+                  curve: Curve.EaseInOut
                 })
-                  .width("100%")
-                  .height("100%")
-                  .attributeModifier(new TabAnimModifier(0, this.currentIndex))
-                  .animation({
-                    duration: 300, // 保持与 Tabs 动画时长一致
-                    curve: Curve.EaseInOut
-                  })
-              } else {
-                MainHomePageTablet({
-                  aiSheetController: this.aiSheetController
-                })
-                  .width("100%")
-                  .height("100%")
-                  .attributeModifier(new TabAnimModifier(0, this.currentIndex))
-                  .animation({
-                    duration: 300, // 保持与 Tabs 动画时长一致
-                    curve: Curve.EaseInOut
-                  })
-                  .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-              }
+                .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
             }
             .tabBar(this.getTabBarStyle(this.tabs[0]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
@@ -350,22 +504,13 @@ struct Index {
 
             // --- Tab 2: 概览 ---
             TabContent() {
-              if (!(this.isWideScreen && this.tabletUi)) {
-                OverviewPage({ currentTabIndex: this.currentIndex })
-                  .attributeModifier(new TabAnimModifier(1, this.currentIndex))
-                  .animation({
-                    duration: 300, // 保持与 Tabs 动画时长一致
-                    curve: Curve.EaseInOut
-                  })
-              } else {
-                OverviewPageTablet()
-                  .attributeModifier(new TabAnimModifier(1, this.currentIndex))
-                  .animation({
-                    duration: 300, // 保持与 Tabs 动画时长一致
-                    curve: Curve.EaseInOut
-                  })
-                  .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-              }
+              OverviewPage({ currentTabIndex: this.currentIndex })
+                .attributeModifier(new TabAnimModifier(1, this.currentIndex))
+                .animation({
+                  duration: 300, // 保持与 Tabs 动画时长一致
+                  curve: Curve.EaseInOut
+                })
+                .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
             }
             .tabBar(this.getTabBarStyle(this.tabs[1]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
@@ -384,9 +529,9 @@ struct Index {
             .tabBar(this.getTabBarStyle(this.tabs[2]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
 
-            // --- Tab 4: 我的 ---
+            // --- Tab 4: Lifi ---
             TabContent() {
-              UserPage()
+              AIPage({ currentTabIndex: this.currentIndex })
                 .attributeModifier(new TabAnimModifier(3, this.currentIndex))
                 .animation({
                   duration: 300, // 保持与 Tabs 动画时长一致
@@ -394,7 +539,20 @@ struct Index {
                 })
                 .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
             }
-            .tabBar(this.getTabBarStyle(this.tabs[3]))
+            .tabBar(this.getTabBarStyle(this.tabs[3], true))
+            .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+
+            // --- Tab 5: 我的 ---
+            TabContent() {
+              UserPage()
+                .attributeModifier(new TabAnimModifier(4, this.currentIndex))
+                .animation({
+                  duration: 300, // 保持与 Tabs 动画时长一致
+                  curve: Curve.EaseInOut
+                })
+                .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+            }
+            .tabBar(this.getTabBarStyle(this.tabs[4]))
             .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
             // .backgroundColor(this.theme.bgPrimary)
           }
@@ -409,7 +567,7 @@ struct Index {
 
       if (this.isAiFlowShown) {
         AiFlowBackground()
-          .height('110%')
+          .height('100%')
           .width('100%')
           .hitTestBehavior(HitTestMode.None)
           .zIndex(999)
@@ -431,12 +589,15 @@ struct Index {
       blurStyle: BlurStyle.Regular,
       backgroundColor: Color.Transparent,
       onDisappear: () => {
+        this.logGuideState('bindSheet:onDisappear:before');
         if (!this.privacyAgreed) {
           this.isGuideSheetShow = true;
           this.isBlocking = true;
+          this.logGuideState('bindSheet:onDisappear:reopenBecausePrivacyRequired');
           return;
         }
         this.isGuideSheetShow = false;
+        this.logGuideState('bindSheet:onDisappear:after');
       },
       onWillDismiss: () => {
       }

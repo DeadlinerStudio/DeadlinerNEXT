@@ -20,6 +20,7 @@ struct SchematicButton {
       case MainButtonType.ARCHIVE: return $r('sys.symbol.archivebox');
       case MainButtonType.AI: return $r('app.media.lifi');
       case MainButtonType.SEARCH: return $r('sys.symbol.magnifyingglass');
+      case MainButtonType.PROFILE: return $r('sys.symbol.person_crop_circle_fill_1');
       default: return $r('sys.symbol.square');
     }
   }
@@ -89,7 +90,8 @@ interface ButtonOption {
 struct MainPageButtonsSettings {
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @StorageLink(C.KEY_MAIN_LEFT_BUTTON) leftBtnType: MainButtonType = MainButtonType.ARCHIVE;
@@ -99,6 +101,7 @@ struct MainPageButtonsSettings {
     { text: '搜索', value: MainButtonType.SEARCH },
     { text: 'Lifi AI', value: MainButtonType.AI },
     { text: '归档箱', value: MainButtonType.ARCHIVE },
+    { text: '头像入口', value: MainButtonType.PROFILE },
   ];
 
   private getIcon(type: string): Resource {
@@ -106,6 +109,7 @@ struct MainPageButtonsSettings {
       case MainButtonType.SEARCH: return $r('sys.symbol.magnifyingglass');
       case MainButtonType.AI: return $r('app.media.lifi');
       case MainButtonType.ARCHIVE: return $r('sys.symbol.archivebox');
+      case MainButtonType.PROFILE: return $r('sys.symbol.person_crop_circle_fill_1');
       default: return $r('sys.symbol.square');
     }
   }
@@ -126,7 +130,7 @@ struct MainPageButtonsSettings {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
 
           SettingsSection() {
@@ -189,6 +193,7 @@ struct MainPageButtonsSettings {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "主页快捷功能" } }
     })

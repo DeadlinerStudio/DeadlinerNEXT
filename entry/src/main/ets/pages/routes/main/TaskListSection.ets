@@ -603,6 +603,7 @@ export struct TaskListSection {
               .padding({
                 start: LengthMetrics.vp(12), end: LengthMetrics.vp(12)
               })
+              .cachedCount(6, true)
               .clip(false)
             }
             .onRefreshing(async () => {

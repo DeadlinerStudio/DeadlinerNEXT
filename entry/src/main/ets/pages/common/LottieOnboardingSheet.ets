@@ -13,6 +13,8 @@ import { HelpDetailSheet } from '../routes/user/manual/HelpDetailSheet';
 
 @Component
 export struct LottieOnboardingSheet {
+  openedForFirstLaunch: boolean = false;
+  onPresented: () => void = () => {};
   onClose: () => void = () => {};
   onAgreePrivacy: () => void = () => {};
   onDeclinePrivacy: () => void = () => {};
@@ -26,14 +28,26 @@ export struct LottieOnboardingSheet {
   @State private lottieScenes: LottieSceneMeta[] = [];
   @State private isHelpSheetShow: boolean = false;
 
+  private logLifecycle(stage: string, extra?: string): void {
+    const pageIds: GuidePageId[] = this.pageIds();
+    console.info(
+      `[GuideDebug][Sheet] ${stage} | privacyRequired=${this.privacyRequired} ` +
+      `privacyAccepted=${this.privacyAccepted} currentIndex=${this.currentIndex} ` +
+      `pageCount=${pageIds.length}${extra ? ` | ${extra}` : ''}`
+    );
+  }
+
   aboutToAppear(): void {
     this.privacyAccepted = this.privacyRequired ? false : true;
+    this.logLifecycle('aboutToAppear');
+    this.onPresented();
     void this.loadScenes();
   }
 
   private async loadScenes(): Promise<void> {
     const resourceManager: RawFileResourceManager = getContext(this).resourceManager as RawFileResourceManager;
     this.lottieScenes = await loadGuideSceneConfigs(resourceManager);
+    this.logLifecycle('loadScenes:done', `sceneCount=${this.lottieScenes.length}`);
   }
 
   private pageIds(): GuidePageId[] {
@@ -115,9 +129,11 @@ export struct LottieOnboardingSheet {
 
   private handleNext(): void {
     const pageId: GuidePageId = this.currentPageId();
+    this.logLifecycle('handleNext', `pageId=${pageId}`);
 
     if (pageId === 'privacy') {
       if (!this.privacyAccepted) {
+        this.logLifecycle('handleNext:blockByPrivacyUnchecked');
         promptAction.showToast({ message: '请先勾选同意隐私协议' });
         return;
       }
@@ -128,9 +144,11 @@ export struct LottieOnboardingSheet {
 
     if (this.canGoNext()) {
       this.currentIndex += 1;
+      this.logLifecycle('handleNext:advance', `nextIndex=${this.currentIndex}`);
       return;
     }
 
+    this.logLifecycle('handleNext:close');
     this.onClose();
   }
 
@@ -166,7 +184,10 @@ export struct LottieOnboardingSheet {
         isActive: this.currentPageId() === pageId
       })
     } else if (pageId === 'notifications') {
-      NotificationPage({ isActive: this.currentPageId() === pageId })
+      NotificationPage({
+        isActive: this.currentPageId() === pageId,
+        autoRequestPermission: this.openedForFirstLaunch
+      })
     } else if (pageId === 'immersive') {
       ImmersiveEffectPage({ isActive: this.currentPageId() === pageId })
     } else if (pageId === 'sync') {
@@ -206,6 +227,7 @@ export struct LottieOnboardingSheet {
         .curve(Curve.EaseInOut)
         .onChange((index: number) => {
           this.currentIndex = index;
+          this.logLifecycle('swiper:onChange', `index=${index} pageId=${this.currentPageId()}`);
         })
         .width('100%')
         .layoutWeight(1)

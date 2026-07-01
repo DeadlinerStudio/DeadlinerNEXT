@@ -36,6 +36,7 @@ export struct HabitListSection {
 
   // 内存缓存
   private allHabitsCache: HabitWithDailyStatus[] = [];
+  private togglingHabitIds: Set<number> = new Set();
 
   // 交互模式状态（对应 selectionMode）
   @Link isSelectionMode: boolean;
@@ -315,47 +316,57 @@ export struct HabitListSection {
   }
 
   async onToggleHabit(item: HabitWithDailyStatus) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const currentSel = new Date(this.selectedDate);
-    currentSel.setHours(0, 0, 0, 0);
-
-    if (currentSel.getTime() > today.getTime()) {
+    if (this.togglingHabitIds.has(item.habit.id)) {
       return;
     }
 
-    // 艾宾浩斯非复习日阻断打卡
-    const ebState = this.getEbbinghausState(item.habit, this.selectedDate);
-    if (!ebState.isDue) {
-      promptAction.showToast({ message: '今天不是该记忆周期的复习日' });
-      return;
-    }
+    this.togglingHabitIds.add(item.habit.id);
 
-    if (this.isSelectionMode) {
-      this.toggleSelection(item.habit.ddlId);
-      return;
-    }
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const currentSel = new Date(this.selectedDate);
+      currentSel.setHours(0, 0, 0, 0);
 
-    VibrationUtils.vibrateShort();
-
-    const beforeRate = item.doneCount / item.targetCount;
-    
-    // 如果已经打满了，循环回到 0 (删除选中日期的记录)
-    if (item.doneCount >= item.targetCount) {
-      await this.repo.deleteRecordsForHabitOnDate(item.habit.id, this.selectedDate);
-    } else {
-      await this.repo.toggleRecord(item.habit.id, this.selectedDate);
-    }
-
-    await this.refreshAll(this.selectedDate);
-
-    const afterItem = this.allHabitsCache.find(it => it.habit.id === item.habit.id);
-    if (afterItem) {
-      const afterRate = afterItem.doneCount / afterItem.targetCount;
-      if (beforeRate < 1 && afterRate >= 1) {
-        console.info("🎉 Habit Completed!");
-        this.confetti.fire();
+      if (currentSel.getTime() > today.getTime()) {
+        return;
       }
+
+      // 艾宾浩斯非复习日阻断打卡
+      const ebState = this.getEbbinghausState(item.habit, this.selectedDate);
+      if (!ebState.isDue) {
+        promptAction.showToast({ message: '今天不是该记忆周期的复习日' });
+        return;
+      }
+
+      if (this.isSelectionMode) {
+        this.toggleSelection(item.habit.ddlId);
+        return;
+      }
+
+      VibrationUtils.vibrateShort();
+
+      const beforeRate = item.doneCount / item.targetCount;
+
+      // 如果已经打满了，循环回到 0 (删除选中日期的记录)
+      if (item.doneCount >= item.targetCount) {
+        await this.repo.deleteRecordsForHabitOnDate(item.habit.id, this.selectedDate);
+      } else {
+        await this.repo.toggleRecord(item.habit.id, this.selectedDate);
+      }
+
+      await this.refreshAll(this.selectedDate);
+
+      const afterItem = this.allHabitsCache.find(it => it.habit.id === item.habit.id);
+      if (afterItem) {
+        const afterRate = afterItem.doneCount / afterItem.targetCount;
+        if (beforeRate < 1 && afterRate >= 1) {
+          console.info("🎉 Habit Completed!");
+          this.confetti.fire();
+        }
+      }
+    } finally {
+      this.togglingHabitIds.delete(item.habit.id);
     }
   }
 

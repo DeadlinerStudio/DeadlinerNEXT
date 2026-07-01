@@ -230,13 +230,12 @@ export class SearchUtils {
   }
 
   private async buildHabitStatusForDate(habit: Habit, date: Date): Promise<HabitWithDailyStatus> {
-    // (保留原有代码逻辑)
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    let start = d;
-    let end = new Date(d); end.setHours(23, 59, 59);
+    const periodBounds = this.habitRepo.periodBounds(habit.period, date);
+    const start = periodBounds[0];
+    const end = periodBounds[1];
     const queryStart = habit.goalType === HabitGoalType.TOTAL ? new Date(0) : start;
-    const records = await this.habitRepo.getRecordsForHabitInRange(habit.id, queryStart, end);
+    const queryEnd = habit.goalType === HabitGoalType.TOTAL ? date : end;
+    const records = await this.habitRepo.getRecordsForHabitInRange(habit.id, queryStart, queryEnd);
     const done = records.filter(r => r.status === HabitRecordStatus.COMPLETED).reduce((sum, r) => sum + r.count, 0);
     let target = Math.max(1, habit.timesPerPeriod);
     if (habit.goalType === HabitGoalType.TOTAL) target = habit.totalTarget ? Math.max(1, habit.totalTarget) : Math.max(1, done);

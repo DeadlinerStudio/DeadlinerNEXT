@@ -35,7 +35,7 @@ export struct SearchPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
   @Consume('appPathStack') appPathStack: NavPathStack;
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
 
   @State bgColor: Resource | Color | ResourceColor = this.theme.bgPrimary;
   backAction?: () => void
@@ -56,6 +56,7 @@ export struct SearchPage {
 
   private scroller: Scroller = new Scroller();
   private confetti: ConfettiController = new ConfettiController();
+  private togglingHabitIds: Set<number> = new Set();
   @State isFirstLoad: boolean = true;
 
   @State isInspirationSheetShow: boolean = false;
@@ -168,6 +169,12 @@ export struct SearchPage {
   }
 
   private async onHabitToggle(item: HabitWithDailyStatus) {
+    if (this.togglingHabitIds.has(item.habit.id)) {
+      return;
+    }
+
+    this.togglingHabitIds.add(item.habit.id);
+
     VibrationUtils.vibrateShort();
     try {
       const today = new Date();
@@ -175,10 +182,12 @@ export struct SearchPage {
       if (!item.isCompleted && (item.doneCount + 1 >= item.targetCount)) {
         this.confetti.fire();
       }
-      this.handleSearch(this.searchText);
+      await this.handleSearch(this.searchText);
       getContext(this).eventHub.emit('sync_done');
     } catch (e) {
       console.error('Habit toggle failed', e);
+    } finally {
+      this.togglingHabitIds.delete(item.habit.id);
     }
   }
 

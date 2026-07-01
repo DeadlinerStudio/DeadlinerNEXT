@@ -16,6 +16,7 @@ import { SettingsConstants as C } from '../common/local/SettingsConstants';
 import { ThemeManager } from '../common/theme/ThemeManager';
 import { DynamicIconUtils } from '../utils/DynamicIconUtils';
 import { AIService } from '../ai/AIServcice';
+import { AppBreakpointUtils, APP_BREAKPOINT_STORAGE_KEY } from '../common/layout/AppBreakpoints';
 
 const DOMAIN = 0x0000;
 
@@ -75,6 +76,9 @@ export default class EntryAbility extends UIAbility {
 
     this.mainWindowClass = windowStage.getMainWindowSync();
 
+    let systemProperties = this.mainWindowClass.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
+    AppStorage.set("statusBarHeight", systemProperties.topRect.height);
+
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
         hilog.error(DOMAIN, 'testTag', 'Failed to load content: %{public}s', JSON.stringify(err));
@@ -90,7 +94,7 @@ export default class EntryAbility extends UIAbility {
         this.updateWindowMode(windowClass);
       });
 
-      this.requestNotificationPermission();
+      void this.requestNotificationPermissionIfNeeded();
     });
   }
 
@@ -102,12 +106,14 @@ export default class EntryAbility extends UIAbility {
   onForeground(): void {
     // Ability has brought to foreground
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
+    console.info('[GuideDebug][EntryAbility] onForeground');
     WidgetUpdater.updateAllWidgets(this.context)
   }
 
   onBackground(): void {
     // Ability has back to background
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
+    console.info('[GuideDebug][EntryAbility] onBackground');
     WidgetUpdater.updateAllWidgets(this.context)
   }
 
@@ -187,10 +193,12 @@ export default class EntryAbility extends UIAbility {
 
     let enableTabletUi = AppStorage.get<boolean>(C.KEY_ENABLE_TABLET_UI) ?? true;
 
-    // 判断界限：840vp (与你 Index.ets 中的媒体查询保持一致)
-    let isWideScreen = widthVp >= 840;
+    let breakpoint = AppBreakpointUtils.fromWidthVp(widthVp);
+    let isWideScreen = AppBreakpointUtils.isWide(breakpoint);
 
     let isDark = this.context.config.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+    AppStorage.setOrCreate(APP_BREAKPOINT_STORAGE_KEY, breakpoint);
+    AppStorage.setOrCreate('isWideScreen', isWideScreen);
 
     if (isWideScreen && enableTabletUi) {
       windowClass.setWindowLayoutFullScreen(true);
@@ -201,7 +209,7 @@ export default class EntryAbility extends UIAbility {
         isStatusBarLightIcon: isDark
       });
 
-      hilog.info(DOMAIN, 'testTag', `Width: ${widthVp}vp >= 840. Mode: Immersive`);
+      hilog.info(DOMAIN, 'testTag', `Width: ${widthVp}vp breakpoint=${breakpoint}. Mode: Immersive`);
     } else {
       windowClass.setWindowLayoutFullScreen(false);
       windowClass.setWindowSystemBarProperties({
@@ -211,7 +219,7 @@ export default class EntryAbility extends UIAbility {
         isStatusBarLightIcon: isDark
       });
 
-      hilog.info(DOMAIN, 'testTag', `Width: ${widthVp}vp < 840. Mode: Normal`);
+      hilog.info(DOMAIN, 'testTag', `Width: ${widthVp}vp breakpoint=${breakpoint}. Mode: Normal`);
     }
 
     this.updateAvoidRects(windowClass);
@@ -225,11 +233,36 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate('bottomRectHeight', bottomAvoidArea.bottomRect.height);
   }
 
+  private async requestNotificationPermissionIfNeeded(): Promise<void> {
+    const isFirstLaunch = await LocalValues.getInstance().getIsAppFirstLaunch();
+    console.info(`[GuideDebug][EntryAbility] requestNotificationPermissionIfNeeded isFirstLaunch=${isFirstLaunch}`);
+    AppStorage.setOrCreate('NotificationPermissionRequestInProgress', false);
+
+    if (isFirstLaunch) {
+      console.info('[GuideDebug][EntryAbility] requestNotificationPermissionIfNeeded:skipFirstLaunch');
+      return;
+    }
+
+    this.requestNotificationPermission();
+  }
+
   private requestNotificationPermission() {
+    console.info('[GuideDebug][EntryAbility] requestNotificationPermission:start');
+    AppStorage.setOrCreate('NotificationPermissionRequestInProgress', true);
+    notificationManager.isNotificationEnabled().then((enabled: boolean) => {
+      console.info(`[GuideDebug][EntryAbility] requestNotificationPermission:before enabled=${enabled}`);
+    }).catch((err: BusinessError) => {
+      console.error(`[GuideDebug][EntryAbility] requestNotificationPermission:beforeCheckFailed code=${err.code} message=${err.message}`);
+    });
+
     notificationManager.requestEnableNotification(this.context).then(() => {
       hilog.info(DOMAIN, 'testTag', '[ANS] requestEnableNotification success');
+      console.info('[GuideDebug][EntryAbility] requestNotificationPermission:success');
+      AppStorage.setOrCreate('NotificationPermissionRequestInProgress', false);
     }).catch((err: BusinessError) => {
       hilog.error(DOMAIN, 'testTag', '[ANS] requestEnableNotification failed, code is %{public}d', err.code);
+      console.error(`[GuideDebug][EntryAbility] requestNotificationPermission:failed code=${err.code} message=${err.message}`);
+      AppStorage.setOrCreate('NotificationPermissionRequestInProgress', false);
     });
   }
 }

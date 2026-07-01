@@ -27,7 +27,8 @@ export function SettingsWebDavBuilder(name: string, param: Object) {
 export struct SettingsWebDavPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   // Navigation 路由栈引用
@@ -67,7 +68,7 @@ export struct SettingsWebDavPage {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
           // 1. 同步主开关
           SettingsSection() {
@@ -218,6 +219,7 @@ export struct SettingsWebDavPage {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: {
         title: { mainTitle: "云同步设置" },

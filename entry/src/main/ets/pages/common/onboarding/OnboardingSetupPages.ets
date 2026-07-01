@@ -225,13 +225,15 @@ export struct HuaweiLoginPage {
 @Component
 export struct NotificationPage {
   @Prop @Watch('onActiveChanged') isActive: boolean = false;
+  autoRequestPermission: boolean = false;
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
   @State allowNotification: boolean = false;
   @StorageLink(C.KEY_NOTIFY_DDL_WARNING) ddlWarning: boolean = true;
   @State private visible: boolean = false;
+  @State private hasAutoRequestedPermission: boolean = false;
 
   aboutToAppear(): void {
-    void this.checkSystemPermission();
+    void this.syncPermissionStateAndMaybeAutoRequest();
     if (this.isActive) {
       this.triggerAnimation();
     }
@@ -240,6 +242,7 @@ export struct NotificationPage {
   onActiveChanged(): void {
     if (this.isActive) {
       this.triggerAnimation();
+      void this.syncPermissionStateAndMaybeAutoRequest();
     } else {
       this.visible = false;
     }
@@ -260,6 +263,24 @@ export struct NotificationPage {
     } catch (error) {
       console.error('[Guide] notification permission check failed:', error);
     }
+  }
+
+  private async syncPermissionStateAndMaybeAutoRequest(): Promise<void> {
+    await this.checkSystemPermission();
+
+    if (!this.isActive || !this.autoRequestPermission || this.allowNotification || this.hasAutoRequestedPermission) {
+      return;
+    }
+
+    this.hasAutoRequestedPermission = true;
+    console.info('[GuideDebug][NotificationPage] autoRequestPermission:start');
+    notificationManager.requestEnableNotification().then(() => {
+      this.allowNotification = true;
+      console.info('[GuideDebug][NotificationPage] autoRequestPermission:success');
+    }).catch((err: BusinessError) => {
+      this.allowNotification = false;
+      console.error(`[GuideDebug][NotificationPage] autoRequestPermission:failed code=${err.code} message=${err.message}`);
+    });
   }
 
   build() {

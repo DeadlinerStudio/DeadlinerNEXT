@@ -213,6 +213,26 @@ interface ValidateCreateHabitItemResult {
   normalized?: ValidatedCreateHabitItem;
 }
 
+class CreateTaskBatchSource {
+  key: string;
+  value: CreateTaskItemArgs[] | undefined;
+
+  constructor(key: string, value: CreateTaskItemArgs[] | undefined) {
+    this.key = key;
+    this.value = value;
+  }
+}
+
+class CreateHabitBatchSource {
+  key: string;
+  value: CreateHabitItemArgs[] | undefined;
+
+  constructor(key: string, value: CreateHabitItemArgs[] | undefined) {
+    this.key = key;
+    this.value = value;
+  }
+}
+
 class EmptyArgs {
 }
 
@@ -596,23 +616,31 @@ export class DeadlinerToolAdapter {
   }
 
   private resolveCreateTaskItems(rawArgs: CreateTaskArgs): ResolveCreateTaskItemsResult {
-    const items = rawArgs.tasks;
-    if (items !== undefined) {
-      if (!Array.isArray(items) || items.length === 0) {
-        return { ok: false, isBatch: true, items: [], message: 'create_task 的 tasks 不能为空数组' };
+    const batchSources: CreateTaskBatchSource[] = [
+      new CreateTaskBatchSource('tasks', rawArgs.tasks)
+    ];
+    for (const source of batchSources) {
+      if (source.value !== undefined) {
+        if (!Array.isArray(source.value) || source.value.length === 0) {
+          return { ok: false, isBatch: true, items: [], message: `create_task 的 ${source.key} 不能为空数组` };
+        }
+        return { ok: true, isBatch: true, items: source.value };
       }
-      return { ok: true, isBatch: true, items: items };
     }
     return { ok: true, isBatch: false, items: [rawArgs] };
   }
 
   private resolveCreateHabitItems(rawArgs: CreateHabitArgs): ResolveCreateHabitItemsResult {
-    const items = rawArgs.habits;
-    if (items !== undefined) {
-      if (!Array.isArray(items) || items.length === 0) {
-        return { ok: false, isBatch: true, items: [], message: 'create_habit 的 habits 不能为空数组' };
+    const batchSources: CreateHabitBatchSource[] = [
+      new CreateHabitBatchSource('habits', rawArgs.habits)
+    ];
+    for (const source of batchSources) {
+      if (source.value !== undefined) {
+        if (!Array.isArray(source.value) || source.value.length === 0) {
+          return { ok: false, isBatch: true, items: [], message: `create_habit 的 ${source.key} 不能为空数组` };
+        }
+        return { ok: true, isBatch: true, items: source.value };
       }
-      return { ok: true, isBatch: true, items: items };
     }
     return { ok: true, isBatch: false, items: [rawArgs] };
   }

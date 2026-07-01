@@ -241,7 +241,7 @@ export class DeadlinerCoreService {
             const parsedCall = this.buildToolCall(toolEvent);
             this.logInfo(`event toolRequest tool=${parsedCall.tool} id=${parsedCall.id ?? ''}`);
             this.emitProgress('thinking', this.toolCollaborationMessage(parsedCall.tool));
-            result.toolCalls = [parsedCall];
+            this.appendToolCall(result, parsedCall);
             sawToolRequest = true;
           } else if (eventType === 'thinking') {
             const thinkingEvent = event as CoreThinkingEvent;
@@ -408,6 +408,13 @@ export class DeadlinerCoreService {
       executionMode: executionMode
     };
     return toolCall;
+  }
+
+  private appendToolCall(result: EmptyMixedResult, toolCall: AIToolCall): void {
+    if (!result.toolCalls) {
+      result.toolCalls = [];
+    }
+    result.toolCalls.push(toolCall);
   }
 
   private parseToolArgsObject(argsJson: string): Object {

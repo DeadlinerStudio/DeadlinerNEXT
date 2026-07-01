@@ -11,7 +11,7 @@ export struct HelpCenterPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
   @Consume('appPathStack') appPathStack: NavPathStack;
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @State sections: ManualSection[] = [];
@@ -129,6 +129,7 @@ export struct HelpCenterPage {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: true,
       style: getImmersiveTitleBarStyle(false),
       content: { title: { mainTitle: "使用手册" } }
     })

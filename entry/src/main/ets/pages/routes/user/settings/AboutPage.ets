@@ -23,7 +23,8 @@ export struct AboutPage {
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
   @Consume('appPathStack') appPathStack: NavPathStack;
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   private context = getContext(this) as common.UIAbilityContext;
@@ -109,7 +110,7 @@ export struct AboutPage {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
           Column({ space: 8 }) {
             Image($r('app.media.icon'))
@@ -209,6 +210,7 @@ export struct AboutPage {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "关于与协议" } }
     })

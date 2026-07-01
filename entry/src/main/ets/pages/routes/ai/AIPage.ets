@@ -254,7 +254,7 @@ export struct AIPage {
     AIWorkspaceView({
       bypassHuaweiLogin: true,
       topAvoidHeight: this.workspaceTopAvoidHeight(),
-      bottomPadding: this.usesWideLayout() ? 8 : 40,
+      bottomPadding: this.usesWideLayout() ? 42 : 24,
       startNewChatSignal: this.newChatSignal,
       externalSessionSnapshot: this.selectedHistoryId ? null : this.currentSessionSnapshot,
       externalSessionVersion: this.workspaceSessionVersion,
@@ -299,6 +299,7 @@ export struct AIPage {
 
         if (active) {
           Image($r('app.media.lifi'))
+            .fillColor(this.theme.brand)
             .width(this.usesExtraWideLayout() ? 24 : 22)
             .height(this.usesExtraWideLayout() ? 24 : 22)
         } else {
@@ -567,7 +568,7 @@ export struct AIPage {
           value: [
             {
               content: {
-                icon: $r('sys.symbol.plus'),
+                icon: $r('sys.symbol.message_badge_plus'),
                 action: (): void => {
                   this.startNewConversation();
                 }

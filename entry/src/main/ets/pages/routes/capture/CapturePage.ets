@@ -303,6 +303,26 @@ export struct CapturePage {
     return this.currentBreakpoint === AppBreakpoint.XL ? '28%' : '34%';
   }
 
+  private wideContentTopPadding(): number {
+    return this.pageTopAvoidHeight();
+  }
+
+  private wideContentBottomPadding(): number {
+    return 112;
+  }
+
+  private portraitListCachedCount(): number {
+    return 6;
+  }
+
+  private mediumListCachedCount(): number {
+    return 4;
+  }
+
+  private wideGridCachedCount(): number {
+    return this.currentBreakpoint === AppBreakpoint.XL ? 12 : 8;
+  }
+
   @Builder
   private inputCardBuilder() {
     Column({ space: 14 }) {
@@ -485,6 +505,8 @@ export struct CapturePage {
       }
       .width('100%')
       .height('100%')
+      .cachedCount(this.portraitListCachedCount(), true)
+      .clip(false)
       .scrollBar(BarState.Off)
     }
   }
@@ -581,6 +603,9 @@ export struct CapturePage {
     .columnsTemplate(this.wideGridColumnsTemplate())
     .columnsGap(12)
     .rowsGap(12)
+    .padding({ top: this.wideContentTopPadding(), bottom: this.wideContentBottomPadding() })
+    .cachedCount(this.wideGridCachedCount(), true)
+    .clip(false)
     .scrollBar(BarState.Off)
   }
 
@@ -614,6 +639,8 @@ export struct CapturePage {
           }, (_rowItems: InspirationItem[], index: number) => `row_${index}`)
         }
         .width('100%')
+        .cachedCount(this.mediumListCachedCount(), true)
+        .clip(false)
         .scrollBar(BarState.Off)
       }
 
@@ -703,16 +730,14 @@ export struct CapturePage {
   @Builder
   private wideContentBuilder() {
     if (this.selectionMode) {
-      Column({ space: 16 }) {
+      Column() {
         this.wideGridBuilder()
-
-        Blank().height(96)
 
         this.sheetAnchorsBuilder()
       }
       .width('100%')
-      .height('100%')
-      .padding({ left: 16, right: 16, bottom: 16 })
+      .layoutWeight(1)
+      .padding({ left: 16, right: 16 })
     } else {
       Row({ space: 16 }) {
         Column({ space: 16 }) {
@@ -724,8 +749,9 @@ export struct CapturePage {
           maxWidth: this.currentBreakpoint === AppBreakpoint.XL ? 460 : 420
         })
         .height('100%')
+        .padding({ top: this.wideContentTopPadding() })
 
-        Column({ space: 16 }) {
+        Column() {
           if (!this.isLoading && this.items.length === 0) {
             Column() {
               this.emptyBuilder()
@@ -733,11 +759,10 @@ export struct CapturePage {
             .width('100%')
             .layoutWeight(1)
             .justifyContent(FlexAlign.Center)
+            .padding({ top: this.wideContentTopPadding(), bottom: this.wideContentBottomPadding() })
           } else {
             this.wideGridBuilder()
           }
-
-          Blank().height(96)
 
           this.sheetAnchorsBuilder()
         }
@@ -745,8 +770,8 @@ export struct CapturePage {
         .height('100%')
       }
       .width('100%')
-      .height('100%')
-      .padding({ left: 16, right: 16, bottom: 16 })
+      .layoutWeight(1)
+      .padding({ left: 16, right: 16 })
     }
   }
 
@@ -802,7 +827,7 @@ export struct CapturePage {
   build() {
     HdsNavigation() {
       TopSafeContainer({
-        topAvoidHeight: this.pageTopAvoidHeight(),
+        topAvoidHeight: this.usesWideLayout() ? 0 : this.pageTopAvoidHeight(),
         needBgTransparent: true,
         scrollable: !this.usesWideLayout()
       }) {
@@ -868,6 +893,7 @@ export struct CapturePage {
       }
     })
     .titleMode(HdsNavigationTitleMode.MINI)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .mode(NavigationMode.Stack)
     .hideBackButton(true)
   }
