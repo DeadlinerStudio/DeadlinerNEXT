@@ -9,6 +9,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { HudWidgetData } from '../widget/model/HudWidgetData';
 import { HabitRepository } from '../common/repository/HabitRepository';
 import { Habit, HabitRecordStatus, HabitStatus } from '../model/DDLModels';
+import { ThemeManager } from '../common/theme/ThemeManager';
 
 export class WidgetUpdater {
 
@@ -37,13 +38,22 @@ export class WidgetUpdater {
       // 过滤：未完成、未归档、未删除、非习惯
       const activeTasks = allTasks
         .filter(t => !t.isArchived && !t.deleted && t.type !== 'habit')
-        .sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime());
+        .sort((a, b) => {
+          const tA = new Date(a.endTime).getTime();
+          const tB = new Date(b.endTime).getTime();
+          const vA = isNaN(tA) ? Number.MAX_SAFE_INTEGER : tA;
+          const vB = isNaN(tB) ? Number.MAX_SAFE_INTEGER : tB;
+          return vA - vB;
+        });
 
       const validTasks = activeTasks
-        .filter(t => !t.isCompleted)
-        .sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime());
+        .filter(t => !t.isCompleted);
+      
+      // 这里的排序其实在 activeTasks 已经做过了，但为了保险（如果上面逻辑变了）也可以保留或合并
 
       const capsuleData = new CapsuleWidgetData();
+      const currentThemeKey = await ThemeManager.getPersistedUIThemeKey(context);
+      capsuleData.themeKey = currentThemeKey;
 
       // 1. activeCount: 所有活跃任务数 (即 validTasks 的总数)
       capsuleData.activeCount = activeTasks.length;
@@ -63,10 +73,11 @@ export class WidgetUpdater {
         capsuleData.summary = "今日无待办";
       } else {
         const firstTask = validTasks[0];
-        const end = new Date(firstTask.endTime).getTime();
-        const diffHours = (end - now) / (1000 * 60 * 60);
+        const tEnd = new Date(firstTask.endTime).getTime();
+        const diffHours = isNaN(tEnd) ? 999999 : (tEnd - now) / (1000 * 60 * 60);
 
-        if (diffHours < 0) capsuleData.summary = "有任务已逾期";
+        if (isNaN(tEnd)) capsuleData.summary = "有任务待处理";
+        else if (diffHours < 0) capsuleData.summary = "有任务已逾期";
         else if (diffHours < 24) capsuleData.summary = "近期有DDL";
         else capsuleData.summary = `有任务待完成`;
       }
@@ -127,6 +138,7 @@ export class WidgetUpdater {
       // --- B. 构建列表组件数据 (WidgetData) ---
       // 只有当存在列表组件时，才真正需要去处理图片（为了性能，其实可以先判断一下是否有 'widget' 类型的卡片，但这里为了逻辑清晰先直接构建）
       const widgetData = new WidgetData();
+      widgetData.themeKey = currentThemeKey;
       widgetData.totalCount = validTasks.length;
       widgetData.updateTime = new Date().toLocaleTimeString();
 
@@ -157,13 +169,16 @@ export class WidgetUpdater {
 
       // 构建任务列表项
       widgetData.tasks = validTasks.slice(0, 5).map(item => {
-        const end = new Date(item.endTime).getTime();
-        const diffHours = (end - now) / (1000 * 60 * 60);
+        const tEnd = new Date(item.endTime).getTime();
+        const diffHours = isNaN(tEnd) ? 999999 : (tEnd - now) / (1000 * 60 * 60);
 
         let timeText = '';
         let isUrgent = false;
 
-        if (diffHours < 0) {
+        if (isNaN(tEnd)) {
+          timeText = '未设截止';
+          isUrgent = false;
+        } else if (diffHours < 0) {
           timeText = '已逾期';
           isUrgent = true;
         } else if (diffHours < 24) {

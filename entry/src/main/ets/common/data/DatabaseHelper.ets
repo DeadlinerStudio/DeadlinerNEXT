@@ -4,14 +4,17 @@ import { util } from '@kit.ArkTS';
 import { DbConstants as C } from './DbConstants';
 import {
   DDLItem, DeadlineType, Habit, HabitPeriod, HabitGoalType, HabitStatus,
-  HabitRecord, HabitRecordStatus, Ver,
-  SubTask
+  HabitRecord, HabitRecordStatus, Ver, SubTask, resolveTaskState,
+  isTaskArchivedState, isTaskCompletedState
 } from '../../model/DDLModels';
+import { TaskState, TaskStateAction, TaskStateMachine } from '../../model/TaskStateMachine';
+import { InspirationItem } from '../../model/InspirationModels';
 
 export interface DDLInsertParams {
   name: string;
   startTime: string;
   endTime: string;
+  state?: TaskState;
   isCompleted: boolean;
   completeTime: string;
   note: string;
@@ -101,6 +104,7 @@ export class DatabaseHelper {
         ${C.COLUMN_NAME} TEXT NOT NULL,
         ${C.COLUMN_START_TIME} TEXT NOT NULL,
         ${C.COLUMN_END_TIME} TEXT NOT NULL,
+        ${C.COLUMN_STATE} TEXT NOT NULL DEFAULT 'active',
         ${C.COLUMN_IS_COMPLETED} INTEGER,
         ${C.COLUMN_COMPLETE_TIME} TEXT NOT NULL,
         ${C.COLUMN_NOTE} TEXT NOT NULL,
@@ -115,7 +119,10 @@ export class DatabaseHelper {
         ${C.COLUMN_DELETED} INTEGER NOT NULL DEFAULT 0,
         ${C.COLUMN_VER_TS} TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z',
         ${C.COLUMN_VER_CTR} INTEGER NOT NULL DEFAULT 0,
-        ${C.COLUMN_VER_DEV} TEXT NOT NULL DEFAULT ''
+        ${C.COLUMN_VER_DEV} TEXT NOT NULL DEFAULT '',
+        ${C.COLUMN_HABIT_APPLIED_VER_TS} TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z',
+        ${C.COLUMN_HABIT_APPLIED_VER_CTR} INTEGER NOT NULL DEFAULT 0,
+        ${C.COLUMN_HABIT_APPLIED_VER_DEV} TEXT NOT NULL DEFAULT ''
       )
     `;
     await store.executeSql(createDDLTable);
@@ -192,11 +199,25 @@ export class DatabaseHelper {
     `;
     await store.executeSql(createSubTaskSql);
     await store.executeSql(`CREATE INDEX IF NOT EXISTS idx_st_ddl_id ON ${C.TABLE_SUBTASK}(${C.ST_DDL_ID})`);
+
+    const createInspirationSql = `
+      CREATE TABLE IF NOT EXISTS ${C.TABLE_INSPIRATION} (
+        ${C.INSPIRATION_ID} INTEGER PRIMARY KEY AUTOINCREMENT,
+        ${C.INSPIRATION_TEXT} TEXT NOT NULL,
+        ${C.INSPIRATION_CREATED_AT} TEXT NOT NULL,
+        ${C.INSPIRATION_UPDATED_AT} TEXT NOT NULL
+      )
+    `;
+    await store.executeSql(createInspirationSql);
+    await store.executeSql(`CREATE INDEX IF NOT EXISTS idx_inspiration_updated_at ON ${C.TABLE_INSPIRATION}(${C.INSPIRATION_UPDATED_AT} DESC)`);
   }
 
   private async upgradeToV2(store: relationalStore.RdbStore) {
     // 1. 创建 SubTask 表
     await this.createV2Tables(store);
+
+    await this.ensureStateColumn(store);
+    await this.ensureHabitAppliedVersionColumns(store);
 
     // 2. 如果未来 Habit 表需要加字段（比如 ebbinghaus_state），在这里用 ALTER TABLE
     // 目前看 Habit 表够用，不需要 ALTER
@@ -258,6 +279,7 @@ export class DatabaseHelper {
         const predicates = new relationalStore.RdbPredicates(C.TABLE_SUBTASK);
         predicates.equalTo(C.ST_ID, insertId);
         await this.rdbStore.update(updateBucket, predicates);
+        await this.touchDDLVersion(item.ddlId, v);
       }
       return insertId;
     } catch (e) {
@@ -302,6 +324,11 @@ export class DatabaseHelper {
 
     // 1. 获取下一个同步版本号 (关键步骤)
     const v = await this.nextVersionUTC();
+    const ddlId = await this.getSubTaskDDLId(id);
+    if (ddlId === null) {
+      console.warn(`[DatabaseHelper] updateSubTaskStatus: Missing ddlId for subtask ${id}`);
+      return;
+    }
 
     // 2. 准备更新数据
     const bucket: relationalStore.ValuesBucket = {};
@@ -321,9 +348,79 @@ export class DatabaseHelper {
       const rows = await this.rdbStore.update(bucket, predicates);
       if (rows === 0) {
         console.warn(`[DatabaseHelper] updateSubTaskStatus: No rows updated for id ${id}`);
+        return;
       }
+      await this.touchDDLVersion(ddlId, v);
     } catch (e) {
       console.error(`[DatabaseHelper] updateSubTaskStatus failed: ${e}`);
+    }
+  }
+
+  /**
+   * 更新子任务内容
+   */
+  async updateSubTaskContent(id: number, content: string): Promise<void> {
+    if (!this.rdbStore) return;
+
+    const v = await this.nextVersionUTC();
+    const ddlId = await this.getSubTaskDDLId(id);
+    if (ddlId === null) {
+      console.warn(`[DatabaseHelper] updateSubTaskContent: Missing ddlId for subtask ${id}`);
+      return;
+    }
+
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.ST_CONTENT] = content;
+    bucket[C.ST_VER_TS] = v.ts;
+    bucket[C.ST_VER_CTR] = v.ctr;
+    bucket[C.ST_VER_DEV] = v.dev;
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_SUBTASK);
+    predicates.equalTo(C.ST_ID, id);
+
+    try {
+      const rows = await this.rdbStore.update(bucket, predicates);
+      if (rows === 0) {
+        console.warn(`[DatabaseHelper] updateSubTaskContent: No rows updated for id ${id}`);
+        return;
+      }
+      await this.touchDDLVersion(ddlId, v);
+    } catch (e) {
+      console.error(`[DatabaseHelper] updateSubTaskContent failed: ${e}`);
+    }
+  }
+
+  /**
+   * 软删除子任务（用于同步保留 tombstone）
+   */
+  async deleteSubTask(id: number): Promise<void> {
+    if (!this.rdbStore) return;
+
+    const v = await this.nextVersionUTC();
+    const ddlId = await this.getSubTaskDDLId(id);
+    if (ddlId === null) {
+      console.warn(`[DatabaseHelper] deleteSubTask: Missing ddlId for subtask ${id}`);
+      return;
+    }
+
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.ST_DELETED] = 1;
+    bucket[C.ST_VER_TS] = v.ts;
+    bucket[C.ST_VER_CTR] = v.ctr;
+    bucket[C.ST_VER_DEV] = v.dev;
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_SUBTASK);
+    predicates.equalTo(C.ST_ID, id);
+
+    try {
+      const rows = await this.rdbStore.update(bucket, predicates);
+      if (rows === 0) {
+        console.warn(`[DatabaseHelper] deleteSubTask: No rows updated for id ${id}`);
+        return;
+      }
+      await this.touchDDLVersion(ddlId, v);
+    } catch (e) {
+      console.error(`[DatabaseHelper] deleteSubTask failed: ${e}`);
     }
   }
 
@@ -346,13 +443,15 @@ export class DatabaseHelper {
     try {
       // 1. 准备插入数据 (暂时没有 UID)
       const bucket: relationalStore.ValuesBucket = {};
+      const canonicalState = item.state ?? this.legacyFlagsToState(item.isCompleted, item.isArchived);
       bucket[C.COLUMN_NAME] = item.name;
       bucket[C.COLUMN_START_TIME] = item.startTime;
       bucket[C.COLUMN_END_TIME] = item.endTime;
-      bucket[C.COLUMN_IS_COMPLETED] = item.isCompleted ? 1 : 0;
+      bucket[C.COLUMN_STATE] = canonicalState;
+      bucket[C.COLUMN_IS_COMPLETED] = isTaskCompletedState(canonicalState) ? 1 : 0;
       bucket[C.COLUMN_COMPLETE_TIME] = item.completeTime || "";
       bucket[C.COLUMN_NOTE] = item.note;
-      bucket[C.COLUMN_IS_ARCHIVED] = item.isArchived ? 1 : 0;
+      bucket[C.COLUMN_IS_ARCHIVED] = isTaskArchivedState(canonicalState) ? 1 : 0;
       bucket[C.COLUMN_IS_STARED] = item.isStared ? 1 : 0;
       bucket[C.COLUMN_TYPE] = item.type.toString().toLowerCase();
       bucket[C.COLUMN_HABIT_COUNT] = 0;
@@ -419,17 +518,53 @@ export class DatabaseHelper {
     return this.parseDDLResultSet(resultSet);
   }
 
+  async getMainListDDLsByType(type: DeadlineType): Promise<DDLItem[]> {
+    if (!this.rdbStore) return [];
+    const sql = `
+      SELECT *
+      FROM ${C.TABLE_NAME}
+      WHERE ${C.COLUMN_DELETED} = 0
+        AND ${C.COLUMN_TYPE} = ?
+        AND ${C.COLUMN_STATE} IN ('active', 'completed', 'abandoned')
+      ORDER BY CASE ${C.COLUMN_STATE}
+        WHEN 'active' THEN 0
+        WHEN 'completed' THEN 1
+        WHEN 'abandoned' THEN 2
+        ELSE 9
+      END ASC,
+      ${C.COLUMN_END_TIME} ASC
+    `;
+    const resultSet = await this.rdbStore.querySql(sql, [type.toString().toLowerCase()]);
+    return this.parseDDLResultSet(resultSet);
+  }
+
+  async getArchivedDDLs(): Promise<DDLItem[]> {
+    if (!this.rdbStore) return [];
+    const sql = `
+      SELECT *
+      FROM ${C.TABLE_NAME}
+      WHERE ${C.COLUMN_DELETED} = 0
+        AND ${C.COLUMN_STATE} IN ('archived', 'abandonedArchived')
+      ORDER BY ${C.COLUMN_COMPLETE_TIME} DESC,
+      ${C.COLUMN_ID} DESC
+    `;
+    const resultSet = await this.rdbStore.querySql(sql);
+    return this.parseDDLResultSet(resultSet);
+  }
+
   async updateDDL(item: DDLItem): Promise<void> {
     if (!this.rdbStore) return;
     const v = await this.nextVersionUTC();
+    const canonicalState = item.state;
     const bucket: relationalStore.ValuesBucket = {}
     bucket[C.COLUMN_NAME] = item.name;
     bucket[C.COLUMN_START_TIME] = item.startTime;
     bucket[C.COLUMN_END_TIME] = item.endTime;
-    bucket[C.COLUMN_IS_COMPLETED] = item.isCompleted ? 1 : 0;
+    bucket[C.COLUMN_STATE] = canonicalState;
+    bucket[C.COLUMN_IS_COMPLETED] = isTaskCompletedState(canonicalState) ? 1 : 0;
     bucket[C.COLUMN_COMPLETE_TIME] = item.completeTime;
     bucket[C.COLUMN_NOTE] = item.note;
-    bucket[C.COLUMN_IS_ARCHIVED] = item.isArchived ? 1 : 0;
+    bucket[C.COLUMN_IS_ARCHIVED] = isTaskArchivedState(canonicalState) ? 1 : 0;
     bucket[C.COLUMN_IS_STARED] = item.isStared ? 1 : 0;
     bucket[C.COLUMN_TYPE] = item.type.toString().toLowerCase();
     bucket[C.COLUMN_HABIT_COUNT] = item.habitCount;
@@ -459,6 +594,140 @@ export class DatabaseHelper {
     const predicates = new relationalStore.RdbPredicates(C.TABLE_NAME);
     predicates.equalTo(C.COLUMN_ID, id);
     await this.rdbStore.update(bucket, predicates);
+  }
+
+  async pruneExpiredDeletedDDLs(cutoffTs: string): Promise<number> {
+    if (!this.rdbStore || cutoffTs.length === 0) return 0;
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_NAME);
+    predicates.equalTo(C.COLUMN_DELETED, 1);
+    const resultSet = await this.rdbStore.query(predicates);
+
+    const expiredIds: number[] = [];
+    while (resultSet.goToNextRow()) {
+      const verTs = resultSet.getString(resultSet.getColumnIndex(C.COLUMN_VER_TS));
+      const parsedTs = Date.parse(verTs);
+      if (isNaN(parsedTs)) {
+        continue;
+      }
+      if (parsedTs < Date.parse(cutoffTs)) {
+        expiredIds.push(resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_ID)));
+      }
+    }
+    resultSet.close();
+
+    for (const id of expiredIds) {
+      const deletePredicates = new relationalStore.RdbPredicates(C.TABLE_NAME);
+      deletePredicates.equalTo(C.COLUMN_ID, id);
+      await this.rdbStore.delete(deletePredicates);
+    }
+
+    return expiredIds.length;
+  }
+
+  async getDDLById(id: number): Promise<DDLItem | null> {
+    if (!this.rdbStore) return null;
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_NAME);
+    predicates.equalTo(C.COLUMN_ID, id);
+    predicates.equalTo(C.COLUMN_DELETED, 0);
+
+    const resultSet = await this.rdbStore.query(predicates);
+    const items = this.parseDDLResultSet(resultSet);
+    return items.length > 0 ? items[0] : null;
+  }
+
+  async transitionDDLState(id: number, action: TaskStateAction): Promise<DDLItem> {
+    if (!this.rdbStore) {
+      throw new Error('[DatabaseHelper] DB not initialized');
+    }
+
+    const current = await this.getDDLById(id);
+    if (!current) {
+      throw new Error(`[DatabaseHelper] DDL not found: ${id}`);
+    }
+
+    const nextState = TaskStateMachine.nextState(current.state, action);
+    const actionTime = new Date().toISOString();
+    const v = await this.nextVersionUTC();
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.COLUMN_STATE] = nextState;
+    bucket[C.COLUMN_IS_COMPLETED] = isTaskCompletedState(nextState) ? 1 : 0;
+    bucket[C.COLUMN_IS_ARCHIVED] = isTaskArchivedState(nextState) ? 1 : 0;
+    if (action === TaskStateAction.RESTORE_ACTIVE) {
+      bucket[C.COLUMN_COMPLETE_TIME] = '';
+    } else if (nextState === TaskState.COMPLETED || nextState === TaskState.ABANDONED) {
+      bucket[C.COLUMN_COMPLETE_TIME] = actionTime;
+    }
+    bucket[C.COLUMN_VER_TS] = v.ts;
+    bucket[C.COLUMN_VER_CTR] = v.ctr;
+    bucket[C.COLUMN_VER_DEV] = v.dev;
+    bucket[C.COLUMN_TIMESTAMP] = this.formatLocalDateTime(new Date());
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_NAME);
+    predicates.equalTo(C.COLUMN_ID, id);
+    await this.rdbStore.update(bucket, predicates);
+
+    const updated = await this.getDDLById(id);
+    if (!updated) {
+      throw new Error(`[DatabaseHelper] Failed to reload DDL after transition: ${id}`);
+    }
+    return updated;
+  }
+
+  // ================= Inspiration Operations =================
+
+  async insertInspiration(text: string): Promise<number> {
+    if (!this.rdbStore) return -1;
+
+    const now = new Date().toISOString();
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.INSPIRATION_TEXT] = text;
+    bucket[C.INSPIRATION_CREATED_AT] = now;
+    bucket[C.INSPIRATION_UPDATED_AT] = now;
+
+    try {
+      return await this.rdbStore.insert(C.TABLE_INSPIRATION, bucket);
+    } catch (error) {
+      console.error(`[DatabaseHelper] insertInspiration failed: ${error}`);
+      return -1;
+    }
+  }
+
+  async getAllInspirations(): Promise<InspirationItem[]> {
+    if (!this.rdbStore) return [];
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_INSPIRATION);
+    predicates.orderByDesc(C.INSPIRATION_UPDATED_AT);
+    predicates.orderByDesc(C.INSPIRATION_ID);
+    const resultSet = await this.rdbStore.query(predicates);
+    return this.parseInspirationResultSet(resultSet);
+  }
+
+  async getInspirationById(id: number): Promise<InspirationItem | null> {
+    if (!this.rdbStore) return null;
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_INSPIRATION);
+    predicates.equalTo(C.INSPIRATION_ID, id);
+    const resultSet = await this.rdbStore.query(predicates);
+    const items = this.parseInspirationResultSet(resultSet);
+    return items.length > 0 ? items[0] : null;
+  }
+
+  async updateInspiration(item: InspirationItem): Promise<void> {
+    if (!this.rdbStore) return;
+
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.INSPIRATION_TEXT] = item.text;
+    bucket[C.INSPIRATION_UPDATED_AT] = new Date().toISOString();
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_INSPIRATION);
+    predicates.equalTo(C.INSPIRATION_ID, item.id);
+    await this.rdbStore.update(bucket, predicates);
+  }
+
+  async deleteInspiration(id: number): Promise<void> {
+    if (!this.rdbStore) return;
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_INSPIRATION);
+    predicates.equalTo(C.INSPIRATION_ID, id);
+    await this.rdbStore.delete(predicates);
   }
 
   // ================= Sync Utilities =================
@@ -532,21 +801,42 @@ export class DatabaseHelper {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   }
 
+  private formatHabitUpdatedAtFromVer(v: Ver): string {
+    if (v.ctr <= 0) {
+      return v.ts;
+    }
+
+    const match = v.ts.match(/^(.*?)(?:\.(\d+))?Z$/);
+    if (!match) {
+      return v.ts;
+    }
+
+    const prefix = match[1];
+    const fraction = (match[2] ?? '000').padEnd(3, '0');
+    return `${prefix}.${fraction}${v.ctr.toString().padStart(3, '0')}Z`;
+  }
+
   private parseDDLResultSet(resultSet: relationalStore.ResultSet): DDLItem[] {
     const list: DDLItem[] = [];
     while (resultSet.goToNextRow()) {
       const typeStr = resultSet.getString(resultSet.getColumnIndex(C.COLUMN_TYPE));
       const type = typeStr === 'habit' ? DeadlineType.HABIT : DeadlineType.TASK;
+      const state = resolveTaskState(
+        resultSet.getString(resultSet.getColumnIndex(C.COLUMN_STATE)),
+        resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_IS_COMPLETED)) === 1,
+        resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_IS_ARCHIVED)) === 1
+      );
 
       list.push({
         id: resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_ID)),
         name: resultSet.getString(resultSet.getColumnIndex(C.COLUMN_NAME)),
         startTime: resultSet.getString(resultSet.getColumnIndex(C.COLUMN_START_TIME)),
         endTime: resultSet.getString(resultSet.getColumnIndex(C.COLUMN_END_TIME)),
-        isCompleted: resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_IS_COMPLETED)) === 1,
+        state: state,
+        isCompleted: isTaskCompletedState(state),
         completeTime: resultSet.getString(resultSet.getColumnIndex(C.COLUMN_COMPLETE_TIME)),
         note: resultSet.getString(resultSet.getColumnIndex(C.COLUMN_NOTE)),
-        isArchived: resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_IS_ARCHIVED)) === 1,
+        isArchived: isTaskArchivedState(state),
         isStared: resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_IS_STARED)) === 1,
         type: type,
         habitCount: resultSet.getLong(resultSet.getColumnIndex(C.COLUMN_HABIT_COUNT)),
@@ -565,10 +855,138 @@ export class DatabaseHelper {
     return list;
   }
 
+  private parseInspirationResultSet(resultSet: relationalStore.ResultSet): InspirationItem[] {
+    const list: InspirationItem[] = [];
+    while (resultSet.goToNextRow()) {
+      list.push({
+        id: resultSet.getLong(resultSet.getColumnIndex(C.INSPIRATION_ID)),
+        text: resultSet.getString(resultSet.getColumnIndex(C.INSPIRATION_TEXT)),
+        createdAt: resultSet.getString(resultSet.getColumnIndex(C.INSPIRATION_CREATED_AT)),
+        updatedAt: resultSet.getString(resultSet.getColumnIndex(C.INSPIRATION_UPDATED_AT))
+      });
+    }
+    resultSet.close();
+    return list;
+  }
+
+  private async getSubTaskDDLId(subTaskId: number): Promise<number | null> {
+    if (!this.rdbStore) return null;
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_SUBTASK);
+    predicates.equalTo(C.ST_ID, subTaskId);
+
+    const resultSet = await this.rdbStore.query(predicates);
+    if (resultSet.goToFirstRow()) {
+      const ddlId = resultSet.getLong(resultSet.getColumnIndex(C.ST_DDL_ID));
+      resultSet.close();
+      return ddlId;
+    }
+    resultSet.close();
+    return null;
+  }
+
+  private async getHabitDDLId(habitId: number): Promise<number | null> {
+    if (!this.rdbStore) return null;
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_HABIT);
+    predicates.equalTo(C.HABIT_ID, habitId);
+
+    const resultSet = await this.rdbStore.query(predicates);
+    if (resultSet.goToFirstRow()) {
+      const ddlId = resultSet.getLong(resultSet.getColumnIndex(C.HABIT_DDL_ID));
+      resultSet.close();
+      return ddlId;
+    }
+    resultSet.close();
+    return null;
+  }
+
+  private async touchDDLVersion(ddlId: number, v: Ver): Promise<void> {
+    if (!this.rdbStore) return;
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.COLUMN_VER_TS] = v.ts;
+    bucket[C.COLUMN_VER_CTR] = v.ctr;
+    bucket[C.COLUMN_VER_DEV] = v.dev;
+    bucket[C.COLUMN_TIMESTAMP] = this.formatLocalDateTime(new Date());
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_NAME);
+    predicates.equalTo(C.COLUMN_ID, ddlId);
+    await this.rdbStore.update(bucket, predicates);
+  }
+
+  private async touchHabitAppliedVersion(ddlId: number, v: Ver): Promise<void> {
+    if (!this.rdbStore) return;
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.COLUMN_HABIT_APPLIED_VER_TS] = v.ts;
+    bucket[C.COLUMN_HABIT_APPLIED_VER_CTR] = v.ctr;
+    bucket[C.COLUMN_HABIT_APPLIED_VER_DEV] = v.dev;
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_NAME);
+    predicates.equalTo(C.COLUMN_ID, ddlId);
+    await this.rdbStore.update(bucket, predicates);
+  }
+
+  private async touchHabitUpdatedAt(ddlId: number, updatedAt: string): Promise<void> {
+    if (!this.rdbStore) return;
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket[C.HABIT_UPDATED_AT] = updatedAt;
+
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_HABIT);
+    predicates.equalTo(C.HABIT_DDL_ID, ddlId);
+    await this.rdbStore.update(bucket, predicates);
+  }
+
+  private async markHabitPayloadChanged(ddlId: number, v: Ver): Promise<void> {
+    await this.touchDDLVersion(ddlId, v);
+    await this.touchHabitAppliedVersion(ddlId, v);
+    await this.touchHabitUpdatedAt(ddlId, this.formatHabitUpdatedAtFromVer(v));
+  }
+
+  private async ensureStateColumn(store: relationalStore.RdbStore): Promise<void> {
+    try {
+      await store.executeSql(
+        `ALTER TABLE ${C.TABLE_NAME} ADD COLUMN ${C.COLUMN_STATE} TEXT NOT NULL DEFAULT 'active'`
+      );
+    } catch (e) {
+    }
+
+    await store.executeSql(`
+      UPDATE ${C.TABLE_NAME}
+      SET ${C.COLUMN_STATE} = CASE
+        WHEN COALESCE(${C.COLUMN_IS_ARCHIVED}, 0) = 1 THEN 'archived'
+        WHEN COALESCE(${C.COLUMN_IS_COMPLETED}, 0) = 1 THEN 'completed'
+        ELSE 'active'
+      END
+      WHERE ${C.COLUMN_STATE} IS NULL
+        OR ${C.COLUMN_STATE} = ''
+        OR ${C.COLUMN_STATE} NOT IN ('active', 'completed', 'archived', 'abandoned', 'abandonedArchived')
+    `);
+  }
+
+  private async ensureHabitAppliedVersionColumns(store: relationalStore.RdbStore): Promise<void> {
+    const ensureColumn = async (columnName: string, sqlType: string, defaultValue: string) => {
+      try {
+        await store.executeSql(
+          `ALTER TABLE ${C.TABLE_NAME} ADD COLUMN ${columnName} ${sqlType} NOT NULL DEFAULT ${defaultValue}`
+        );
+      } catch (e) {
+      }
+    };
+
+    await ensureColumn(C.COLUMN_HABIT_APPLIED_VER_TS, 'TEXT', `'1970-01-01T00:00:00Z'`);
+    await ensureColumn(C.COLUMN_HABIT_APPLIED_VER_CTR, 'INTEGER', '0');
+    await ensureColumn(C.COLUMN_HABIT_APPLIED_VER_DEV, 'TEXT', `''`);
+  }
+
+  private legacyFlagsToState(isCompleted: boolean, isArchived: boolean): TaskState {
+    if (isArchived) return TaskState.ARCHIVED;
+    if (isCompleted) return TaskState.COMPLETED;
+    return TaskState.ACTIVE;
+  }
+
   // ================= Habit Operations =================
 
   async insertHabit(habit: Habit): Promise<number> {
     if (!this.rdbStore) return -1;
+    const v = await this.nextVersionUTC();
 
     const bucket: relationalStore.ValuesBucket = {};
     bucket[C.HABIT_DDL_ID] = habit.ddlId;
@@ -581,13 +999,16 @@ export class DatabaseHelper {
     bucket[C.HABIT_GOAL_TYPE] = habit.goalType.toString();
     bucket[C.HABIT_TOTAL_TARGET] = habit.totalTarget; // null is allowed
     bucket[C.HABIT_CREATED_AT] = habit.createdAt;
-    bucket[C.HABIT_UPDATED_AT] = habit.updatedAt;
+    bucket[C.HABIT_UPDATED_AT] = this.formatHabitUpdatedAtFromVer(v);
     bucket[C.HABIT_STATUS] = habit.status.toString();
     bucket[C.HABIT_SORT_ORDER] = habit.sortOrder;
     bucket[C.HABIT_ALARM_TIME] = habit.alarmTime;
 
     try {
       const id = await this.rdbStore.insert(C.TABLE_HABIT, bucket);
+      if (id > 0) {
+        await this.markHabitPayloadChanged(habit.ddlId, v);
+      }
       return id;
     } catch (e) {
       console.error(`[DatabaseHelper] insertHabit failed: ${e}`);
@@ -597,6 +1018,7 @@ export class DatabaseHelper {
 
   async updateHabit(habit: Habit): Promise<void> {
     if (!this.rdbStore) return;
+    const v = await this.nextVersionUTC();
 
     const bucket: relationalStore.ValuesBucket = {};
     // DDL_ID 通常不更新
@@ -608,7 +1030,7 @@ export class DatabaseHelper {
     bucket[C.HABIT_TIMES_PER_PERIOD] = habit.timesPerPeriod;
     bucket[C.HABIT_GOAL_TYPE] = habit.goalType.toString();
     bucket[C.HABIT_TOTAL_TARGET] = habit.totalTarget;
-    bucket[C.HABIT_UPDATED_AT] = habit.updatedAt;
+    bucket[C.HABIT_UPDATED_AT] = this.formatHabitUpdatedAtFromVer(v);
     bucket[C.HABIT_STATUS] = habit.status.toString();
     bucket[C.HABIT_SORT_ORDER] = habit.sortOrder;
     bucket[C.HABIT_ALARM_TIME] = habit.alarmTime;
@@ -617,6 +1039,7 @@ export class DatabaseHelper {
     predicates.equalTo(C.HABIT_ID, habit.id);
 
     await this.rdbStore.update(bucket, predicates);
+    await this.markHabitPayloadChanged(habit.ddlId, v);
   }
 
   async getHabitByDdlId(ddlId: number): Promise<Habit | null> {
@@ -649,17 +1072,34 @@ export class DatabaseHelper {
     return this.parseHabitResultSet(resultSet);
   }
 
+  async getArchivedHabits(): Promise<Habit[]> {
+    if (!this.rdbStore) return [];
+    const predicates = new relationalStore.RdbPredicates(C.TABLE_HABIT);
+    predicates.equalTo(C.HABIT_STATUS, HabitStatus.ARCHIVED.toString());
+    predicates.orderByDesc(C.HABIT_UPDATED_AT);
+    predicates.orderByDesc(C.HABIT_ID);
+
+    const resultSet = await this.rdbStore.query(predicates);
+    return this.parseHabitResultSet(resultSet);
+  }
+
   async deleteHabitByDdlId(ddlId: number): Promise<void> {
     if (!this.rdbStore) return;
+    const v = await this.nextVersionUTC();
     const predicates = new relationalStore.RdbPredicates(C.TABLE_HABIT);
     predicates.equalTo(C.HABIT_DDL_ID, ddlId);
     await this.rdbStore.delete(predicates);
+    await this.touchDDLVersion(ddlId, v);
+    await this.touchHabitAppliedVersion(ddlId, v);
   }
 
   // ================= Habit Record Operations =================
 
   async insertHabitRecord(record: HabitRecord): Promise<number> {
     if (!this.rdbStore) return -1;
+    const v = await this.nextVersionUTC();
+    const ddlId = await this.getHabitDDLId(record.habitId);
+    if (ddlId === null) return -1;
 
     const bucket: relationalStore.ValuesBucket = {};
     bucket[C.HR_HABIT_ID] = record.habitId;
@@ -669,7 +1109,11 @@ export class DatabaseHelper {
     bucket[C.HR_CREATED_AT] = record.createdAt;
 
     try {
-      return await this.rdbStore.insert(C.TABLE_HABIT_RECORD, bucket);
+      const id = await this.rdbStore.insert(C.TABLE_HABIT_RECORD, bucket);
+      if (id > 0) {
+        await this.markHabitPayloadChanged(ddlId, v);
+      }
+      return id;
     } catch (e) {
       console.error(`[DatabaseHelper] insertHabitRecord failed: ${e}`);
       return -1;
@@ -713,10 +1157,14 @@ export class DatabaseHelper {
 
   async deleteHabitRecordsForHabitOnDate(habitId: number, date: string): Promise<void> {
     if (!this.rdbStore) return;
+    const v = await this.nextVersionUTC();
+    const ddlId = await this.getHabitDDLId(habitId);
+    if (ddlId === null) return;
     const predicates = new relationalStore.RdbPredicates(C.TABLE_HABIT_RECORD);
     predicates.equalTo(C.HR_HABIT_ID, habitId);
     predicates.equalTo(C.HR_DATE, date);
     await this.rdbStore.delete(predicates);
+    await this.markHabitPayloadChanged(ddlId, v);
   }
 
   // ================= Private Helper Parsing Methods =================
@@ -795,6 +1243,7 @@ export class DatabaseHelper {
     // 构建更新的数据桶
     const bucket: relationalStore.ValuesBucket = {};
     bucket[C.COLUMN_IS_ARCHIVED] = 1;
+    bucket[C.COLUMN_STATE] = TaskState.ARCHIVED;
     // 同步版本信息也需要更新，否则 WebDAV 不会同步归档状态
     bucket[C.COLUMN_VER_TS] = v.ts;
     bucket[C.COLUMN_VER_CTR] = v.ctr;

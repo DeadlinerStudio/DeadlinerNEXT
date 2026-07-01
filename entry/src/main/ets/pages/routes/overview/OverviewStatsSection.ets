@@ -38,32 +38,75 @@ export struct OverviewStatsSection {
   @Prop todayCompleted: number;
   @Prop todayTodo: number;
   @Prop todayOverdue: number;
+  @Prop activeAbandoned: number;
   @Prop historyStats: Map<string, number>;
   @Prop completionTimeStats: Array<[string, number]>;
   @Prop overdueItems: DDLItem[];
 
   @Prop cardOrder: OverviewCard[];
+  @Prop isMediumLayout: boolean = false;
+
+  private cardsForColumn(columnIndex: number): OverviewCard[] {
+    return this.cardOrder.filter((_: OverviewCard, index: number) => index % 2 === columnIndex);
+  }
+
+  private cardOrderIndex(cardId: OverviewCard): number {
+    return this.cardOrder.indexOf(cardId);
+  }
+
+  @Builder
+  private cardBuilder(cardId: OverviewCard) {
+    if (cardId === OverviewCard.ACTIVE_STATS) {
+      ActiveStatsCard({
+        completed: this.todayCompleted,
+        todo: this.todayTodo,
+        overdue: this.todayOverdue,
+        abandoned: this.activeAbandoned
+      })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    } else if (cardId === OverviewCard.COMPLETION_TIME) {
+      CompletionTimeCard({ completionTimeStats: $completionTimeStats })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    } else if (cardId === OverviewCard.HISTORY_STATS) {
+      HistoryStatsCard({ historyStats: $historyStats })
+        .attributeModifier(new FloatUpModifier(this.cardOrderIndex(cardId)))
+    }
+  }
 
   build() {
-    Column({ space: 8 }) {
-      ForEach(this.cardOrder, (cardId: OverviewCard, idx) => {
-        if (cardId === OverviewCard.ACTIVE_STATS) {
-          ActiveStatsCard({
-            completed: this.todayCompleted,
-            todo: this.todayTodo,
-            overdue: this.todayOverdue
-          })
-            .attributeModifier(new FloatUpModifier(idx))
-        } else if (cardId === OverviewCard.COMPLETION_TIME) {
-          CompletionTimeCard({ completionTimeStats: $completionTimeStats })
-            .attributeModifier(new FloatUpModifier(idx))
-        } else if (cardId === OverviewCard.HISTORY_STATS) {
-          HistoryStatsCard({ historyStats: $historyStats })
-            .attributeModifier(new FloatUpModifier(idx))
-        }
-      }, (item: string) => item)
+    Column() {
+      if (this.isMediumLayout) {
+        Row({ space: 12 }) {
+          Column({ space: 8 }) {
+            ForEach(this.cardsForColumn(0), (cardId: OverviewCard) => {
+              this.cardBuilder(cardId)
+            }, (item: OverviewCard) => item)
 
-      Blank().height(48)
+            Blank().height(72)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+
+          Column({ space: 8 }) {
+            ForEach(this.cardsForColumn(1), (cardId: OverviewCard) => {
+              this.cardBuilder(cardId)
+            }, (item: OverviewCard) => item)
+
+            Blank().height(72)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .alignItems(VerticalAlign.Top)
+      } else {
+        Column({ space: 8 }) {
+          ForEach(this.cardOrder, (cardId: OverviewCard) => {
+            this.cardBuilder(cardId)
+          }, (item: OverviewCard) => item)
+
+          Blank().height(72)
+        }
+      }
     }
     .justifyContent(FlexAlign.Start)
     .constraintSize({ minHeight: '100%' })
@@ -79,6 +122,7 @@ struct ActiveStatsCard {
   @Prop completed: number;
   @Prop todo: number;
   @Prop overdue: number;
+  @Prop abandoned: number;
 
   build() {
     StatsCardContainer() {
@@ -91,6 +135,7 @@ struct ActiveStatsCard {
         this.StatItem("今日完成", this.completed, this.theme.chartCompleted)
         this.StatItem("待办任务", this.todo, this.theme.chartTodo)
         this.StatItem("今日逾期", this.overdue, this.theme.chartOverdue)
+        this.StatItem("已放弃", this.abandoned, $r('sys.color.ohos_id_color_text_secondary'))
       }
     }
   }
@@ -331,13 +376,15 @@ struct HistoryStatsCard {
     const greenColor = ColorUtils.parseColor(getHexColorSync(ctx, this.theme.chartCompleted));
     const orangeColor = ColorUtils.parseColor(getHexColorSync(ctx, this.theme.chartTodo));
     const redColor = ColorUtils.parseColor(getHexColorSync(ctx, this.theme.chartOverdue));
+    const grayColor = ColorUtils.parseColor(getHexColorSync(ctx, $r('sys.color.ohos_id_color_text_secondary')));
     const txtColor = ColorUtils.parseColor(getHexColorSync(ctx, $r('app.color.font_secondary')));
 
     const completed = this.historyStats.get("累计完成") || 0;
     const todo = this.historyStats.get("当前待办") || 0;
+    const abandoned = this.historyStats.get("累计放弃") || 0;
     const overdue = this.historyStats.get("累计逾期") || 0;
 
-    this.totalCount = completed + todo + overdue;
+    this.totalCount = completed + todo + abandoned + overdue;
 
     const entries = new JArrayList<PieEntry>();
     const colors = new JArrayList<number>();
@@ -349,6 +396,10 @@ struct HistoryStatsCard {
     if (todo > 0) {
       entries.add(new PieEntry(todo, "待办"));
       colors.add(orangeColor);
+    }
+    if (abandoned > 0) {
+      entries.add(new PieEntry(abandoned, "放弃"));
+      colors.add(grayColor);
     }
     if (overdue > 0) {
       entries.add(new PieEntry(overdue, "逾期"));

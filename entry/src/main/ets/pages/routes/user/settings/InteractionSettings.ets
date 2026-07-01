@@ -34,15 +34,18 @@ struct InteractionSettings {
     }
   }
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @StorageLink(C.KEY_VIBRATION_ENABLE) vibrationEnable: boolean = true;
   @StorageLink(C.KEY_FULL_SCREEN_ADD) fullScreenAdd: boolean = false;
 
   @StorageLink(C.KEY_STARTUP_PAGE) startupPageType: number = 0;
+  @StorageLink(C.KEY_SHOW_GUIDE_NEXT_LAUNCH) showGuideNextLaunch: boolean = false;
   @StorageLink(C.KEY_SHOW_AI_INPUT) showAiInput: boolean = true;
   @StorageLink(C.KEY_DIRECT_ADD_ON_AI) directAdd: boolean = true;
+  @StorageLink(C.KEY_SHOW_PAPERTALK_SHARE) showPaperTalkShare: boolean = true;
 
   @StorageLink(C.KEY_AUTO_ARCHIVE_DAYS) autoArchiveDays: number = 3;
 
@@ -61,7 +64,7 @@ struct InteractionSettings {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
 
           SettingsSection({ title: '启动页' }) {
@@ -77,6 +80,15 @@ struct InteractionSettings {
               if (index < this.options.length - 1) {
                 SubSettingsDivider()
               }
+            })
+          }
+
+          SettingsSection() {
+            SubSettingsSwitch({
+              title: "下次启动显示功能引导",
+              subtitle: "仅在下一次开屏时弹出一次，展示后会自动关闭这个选项。",
+              isOn: this.showGuideNextLaunch,
+              onChange: (isOn): Promise<void> => LocalValues.getInstance().setShowGuideNextLaunch(isOn)
             })
           }
 
@@ -111,10 +123,19 @@ struct InteractionSettings {
             }
           }
 
+          SettingsSection() {
+            SubSettingsSwitch({
+              title: "显示纸语分享按钮",
+              subtitle: "在上月数据汇总右上角显示纸语打印入口，可用于体验推广联动。",
+              isOn: this.showPaperTalkShare,
+              onChange: (isOn): Promise<void> => LocalValues.getInstance().setShowPaperTalkShare(isOn)
+            })
+          }
+
           SettingsSection({ title: "AI 交互" }) {
             SubSettingsSwitch({
               title: "添加页面 AI 识别框",
-              subtitle: "在添加页面显示 Deadliner AI 任务提取识别框",
+              subtitle: "在添加页面显示 Lifi AI 任务提取识别框",
               isOn: this.directAdd,
               onChange: (isOn): Promise<void> => LocalValues.getInstance().setDirectAddOnAi(isOn)
             })
@@ -124,7 +145,7 @@ struct InteractionSettings {
 
             SubSettingsSwitch({
               title: "无感任务添加",
-              subtitle: "Deadliner AI 对话中点击“去添加”不跳转添加任务页",
+              subtitle: "Lifi AI 对话中点击“去添加”不跳转添加任务页",
               isOn: this.showAiInput,
               onChange: (isOn): Promise<void> => LocalValues.getInstance().setShowAiInput(isOn)
             })
@@ -161,6 +182,7 @@ struct InteractionSettings {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "交互与行为" } }
     })

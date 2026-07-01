@@ -7,11 +7,16 @@ import { SettingsDivider, SettingsSection, SettingsItem, SubSettingsSwitch,
   SettingsSelect} from '../../../components/SettingsComponents';
 import { HdsNavDestination, HdsNavDestinationAttribute } from '@kit.UIDesignKit';
 import { TopSafeContainer } from '../../../components/TopSafeContainer';
-import { common } from '@kit.AbilityKit';
+import { common, Want } from '@kit.AbilityKit';
 import { getImmersiveTitleBarStyle } from '../../../../common/style/NavStyles';
-import { window } from '@kit.ArkUI';
+import { promptAction, window } from '@kit.ArkUI';
 import { ThemeSelectSheet } from './components/ThemeSelectSheet';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import { ThemeManager } from '../../../../common/theme/ThemeManager';
+import { ITheme } from '../../../../common/theme/ThemeModel';
+import { ImageCropSheet } from './components/ImageCropSheet';
+import { IconSelectSheet } from './components/IconSelectSheet';
 
 @Builder
 export function AppearanceSettingsBuilder() {
@@ -24,6 +29,10 @@ struct AppearanceSettings {
   @Consume('userLocalPathStack') userLocalPathStack: NavPathStack = new NavPathStack();
 
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
+  @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
+  @StorageProp('currentTheme') currentTheme: ITheme = {} as ITheme;
+  @State initialThemeSnapshot: string = '';
+  @State restartRequested: boolean = false;
 
   private navigateTo(name: string) {
     if (this.isWideScreen) {
@@ -33,7 +42,8 @@ struct AppearanceSettings {
     }
   }
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @StorageLink(C.KEY_PROGRESS_DIRECTION) progressDir: boolean = false;
@@ -42,6 +52,9 @@ struct AppearanceSettings {
   @StorageLink(C.KEY_ENGLISH_SOMEWHERE) english: boolean = true;
   @StorageLink(C.KEY_ADD_SYMBOL_WEIGHT) weight: number = 600;
   @StorageLink(C.KEY_ENABLE_API23) api23: boolean = true;
+  @StorageLink(C.KEY_EXPERIMENTAL_COMPONENTS) experimentalComponents: boolean = true;
+
+  @StorageLink(C.KEY_SHOW_MINIBAR) showMiniBar: boolean = (deviceInfo.distributionOSApiVersion >= 60100);
 
   @StorageLink(C.KEY_ENABLE_TABLET_UI) tabletUi: boolean = true;
   @StorageLink(C.KEY_TABLET_SIDE_DASHBOARD) tabletSd: boolean = true;
@@ -54,6 +67,64 @@ struct AppearanceSettings {
     })
   }
 
+  @State isBackgroundSheetShow: boolean = false;
+  @State pickedImageUri: string = '';
+  @StorageProp('customBackgroundImage') currentBgUri: string = '';
+  @StorageProp('customBackgroundBlur') isBgBlur: boolean = false;
+
+
+  async pickImageFromGallery() {
+    try {
+      const photoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
+      photoSelectOptions.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+      photoSelectOptions.maxSelectNumber = 1; // 只能选一张
+
+      const photoViewPicker = new photoAccessHelper.PhotoViewPicker();
+      const photoSelectResult = await photoViewPicker.select(photoSelectOptions);
+
+      if (photoSelectResult && photoSelectResult.photoUris.length > 0) {
+        this.pickedImageUri = photoSelectResult.photoUris[0];
+        // 选图成功，触发裁剪 Sheet 显示
+        this.isBackgroundSheetShow = true;
+      }
+    } catch (err) {
+      console.error('[AppearanceSettings] Pick image failed:', err);
+    }
+  }
+
+  @Builder
+  cropSheetBuilder() {
+    ImageCropSheet({
+      // 把当前的背景图路径传进去，如果没有的话内部会显示“暂未选择”
+      sourceUri: this.currentBgUri,
+      initBlurState: this.isBgBlur,
+      title: '自定义背景',
+      enableCompression: false,
+      saveDirName: 'custom_backgrounds', // 换个文件夹存
+      cropRatio: undefined,
+      onCancel: () => {
+        this.isBackgroundSheetShow = false;
+      },
+      onComplete: (croppedUri: string, isBlur: boolean) => {
+        this.isBackgroundSheetShow = false;
+        ThemeManager.setCustomBackground(croppedUri, isBlur);
+        promptAction.showToast({ message: '自定义背景已生效' });
+      },
+      onClearBackground: () => {
+        // 用户点击了“恢复默认”
+        this.isBackgroundSheetShow = false;
+        ThemeManager.clearCustomBackground();
+        promptAction.showToast({ message: '已恢复默认背景' });
+      }
+    })
+  }
+
+  @State isIconSelectShow: boolean = false;
+  @Builder
+  iconSelectSheet() {
+    IconSelectSheet()
+  }
+
   @State menuOptions: SelectOption[] = [
     { value: '自适应' },
     { value: '流畅' },
@@ -64,17 +135,62 @@ struct AppearanceSettings {
 
   MATERIAL_LEVELS = ['ADAPTIVE', 'SMOOTH', 'GENTLE', 'EXQUISITE']
 
+  private buildThemeSnapshot(): string {
+    return JSON.stringify({
+      key: this.currentThemeKey,
+      brand: this.currentTheme.brand,
+      accent: this.currentTheme.accent,
+      bgPrimary: this.currentTheme.bgPrimary,
+      tabIcon: this.currentTheme.tabIcon,
+      useWhiteGlow: this.currentTheme.useWhiteGlow
+    });
+  }
+
+  private restartAppForThemeChange() {
+    if (this.restartRequested) {
+      return;
+    }
+
+    this.restartRequested = true;
+    const context = getContext(this) as common.UIAbilityContext;
+    const want: Want = {
+      bundleName: 'com.aritxonly.deadliner',
+      moduleName: 'entry',
+      abilityName: 'EntryAbility'
+    };
+
+    context.startAbility(want)
+      .then(() => {
+        context.terminateSelf().catch((err: BusinessError) => {
+          console.error('[AppearanceSettings] terminateSelf failed:', JSON.stringify(err));
+        });
+      })
+      .catch((err: BusinessError) => {
+        console.error('[AppearanceSettings] restart startAbility failed:', JSON.stringify(err));
+      });
+  }
+
   aboutToAppear(): void {
     const level = LocalValues.getInstance().getMaterialLevel()
     this.currentSelectIndex = this.MATERIAL_LEVELS.indexOf(level);
+    this.initialThemeSnapshot = this.buildThemeSnapshot();
+  }
+
+  aboutToDisappear(): void {
+    if (this.isWideScreen && this.tabletUi) {
+      return;
+    }
+    if (this.initialThemeSnapshot !== this.buildThemeSnapshot()) {
+      this.restartAppForThemeChange();
+    }
   }
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
 
-          SettingsSection({ title: '界面显示' }) {
+          SettingsSection({ title: '个性化' }) {
             SettingsItem({
               title: "个性化主题",
               subtitle: "自定义应用配色方案",
@@ -83,9 +199,31 @@ struct AppearanceSettings {
                 this.isThemeSelectSheetShow = true;
               }
             })
+
+            SettingsDivider()
+
+            SettingsItem({
+              title: "自定义背景",
+              subtitle: "自定义一级界面的背景图片",
+              icon: $r('sys.symbol.background_blurred'),
+              onItemClick: () => {
+                this.isBackgroundSheetShow = true;
+              }
+            })
           }
 
           SettingsSection() {
+            SettingsItem({
+              title: "自定义图标",
+              subtitle: "自定义应用图标，季节图标可选",
+              icon: $r('sys.symbol.square'),
+              onItemClick: () => {
+                this.isIconSelectShow = true;
+              }
+            })
+          }
+
+          SettingsSection({ title: '界面显示' }) {
             SubSettingsSwitch({
               title: "沉浸光感视效",
               subtitle: "API23以上可以打开该选项获得最佳的视觉体验 (需重启生效)。",
@@ -108,8 +246,28 @@ struct AppearanceSettings {
                   LocalValues.getInstance().setMaterialLevel(level)
                 }
               })
+
+              SubSettingsDivider()
+
+              SubSettingsSwitch({
+                title: '实验性组件',
+                subtitle: '开启后，主页顶部按钮将优先使用实验性的沉浸光感组件。',
+                isOn: this.experimentalComponents,
+                onChange: (isOn): Promise<void> => LocalValues.getInstance().setExperimentalComponents(isOn)
+              })
             }
           }
+
+          // if (this.api23 && deviceInfo.distributionOSApiVersion >= 60100) {
+          //   SettingsSection() {
+          //     SubSettingsSwitch({
+          //       title: "底栏 Lifi AI 入口",
+          //       subtitle: "使用底栏的悬浮迷你栏快速进入 Lifi AI",
+          //       isOn: this.showMiniBar,
+          //       onChange: (isOn): Promise<void> => LocalValues.getInstance().setMiniBar(this.showMiniBar)
+          //     })
+          //   }
+          // }
 
           SettingsSection() {
             SubSettingsSwitch({
@@ -192,14 +350,14 @@ struct AppearanceSettings {
 
           // --- 视觉反馈 ---
           SettingsSection({ title: '视觉反馈' }) {
-            SubSettingsSwitch({
-              title: "激励语句",
-              subtitle: "在首页标题栏显示随机的名言警句，为您的一天注入动力。",
-              isOn: this.excitementText,
-              onChange: (isOn): Promise<void> => LocalValues.getInstance().setExcitementText(isOn)
-            })
-
-            SubSettingsDivider()
+            // SubSettingsSwitch({
+            //   title: "激励语句",
+            //   subtitle: "在首页标题栏显示随机的名言警句，为您的一天注入动力。",
+            //   isOn: this.excitementText,
+            //   onChange: (isOn): Promise<void> => LocalValues.getInstance().setExcitementText(isOn)
+            // })
+            //
+            // SubSettingsDivider()
 
             SubSettingsSwitch({
               title: "任务完成礼花",
@@ -208,14 +366,26 @@ struct AppearanceSettings {
               onChange: (isOn): Promise<void> => LocalValues.getInstance().setConfettiAfterFinished(isOn)
             })
           }
+
+          Blank().height(0)
+            .bindSheet($$this.isIconSelectShow, this.iconSelectSheet(), {
+              blurStyle: BlurStyle.Regular,
+              backgroundColor: Color.Transparent,
+              detents: [SheetSize.MEDIUM],
+              title: { title: '自定义图标' }
+            })
         }
         .width('100%')
         .padding(16)
         .justifyContent(FlexAlign.Start)
         .constraintSize({ minHeight: '100%' })
+        .bindSheet($$this.isBackgroundSheetShow, this.cropSheetBuilder(), {
+          showClose: false
+        })
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "显示与个性化" } }
     })

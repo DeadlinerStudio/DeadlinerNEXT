@@ -2,9 +2,10 @@ import { promptAction, SegmentButton, SegmentButtonOptions, SegmentButtonItemTup
   SegmentButtonTextItem } from '@kit.ArkUI';
 import { TaskRepository } from '../../common/repository/TaskRepository';
 import { HabitRepository } from '../../common/repository/HabitRepository';
-import { DDLItem, Habit, HabitStatus, HabitPeriod, HabitGoalType } from '../../model/DDLModels';
+import { DDLItem, Habit, HabitPeriod, HabitGoalType } from '../../model/DDLModels';
 import { ArchivedDDLItemCard } from '../components/TaskItemCard';
 import { ITheme } from '../../common/theme/ThemeModel';
+import { TaskStateAction, TaskStateMachine } from '../../model/TaskStateMachine';
 
 @Component
 export struct ArchivePanelView {
@@ -44,25 +45,9 @@ export struct ArchivePanelView {
     this.isLoading = true;
     try {
       if (this.selectedIndexes[0] === 0) {
-        // --- 加载任务 ---
-        const allItems = await this.taskRepo.getAllDDLs();
-        this.archivedTasks = allItems
-          .filter(item => item.isArchived)
-          .sort((a, b) => {
-            const timeA = a.completeTime ? new Date(a.completeTime).getTime() : 0;
-            const timeB = b.completeTime ? new Date(b.completeTime).getTime() : 0;
-            return timeB - timeA;
-          });
+        this.archivedTasks = await this.taskRepo.getArchivedDDLs();
       } else {
-        // --- 加载习惯 ---
-        const allHabits = await this.habitRepo.getAllHabits();
-        this.archivedHabits = allHabits
-          .filter(h => h.status === HabitStatus.ARCHIVED)
-          .sort((a, b) => {
-            const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-            const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-            return timeB - timeA;
-          });
+        this.archivedHabits = await this.habitRepo.getArchivedHabits();
       }
 
     } catch (e) {
@@ -80,6 +65,17 @@ export struct ArchivePanelView {
     });
   }
 
+  async handleRestoreTask(item: DDLItem) {
+    try {
+      await this.taskRepo.transitionDDL(item.id, TaskStateAction.UNARCHIVE);
+      await this.refreshData();
+      promptAction.showToast({ message: '已恢复到主列表' });
+    } catch (e) {
+      console.error(`Restore task failed: ${e}`);
+      promptAction.showToast({ message: '恢复失败' });
+    }
+  }
+
   async handleDeleteHabit(item: Habit) {
     this.showDeleteDialog('习惯', item.name, async () => {
       // [关键] 使用 HabitListSection 中的删除 API
@@ -87,6 +83,17 @@ export struct ArchivePanelView {
       const index = this.archivedHabits.indexOf(item);
       if (index !== -1) this.archivedHabits.splice(index, 1);
     });
+  }
+
+  async handleRestoreHabit(item: Habit) {
+    try {
+      await this.habitRepo.unarchiveHabit(item.id);
+      await this.refreshData();
+      promptAction.showToast({ message: '习惯已恢复到主列表' });
+    } catch (e) {
+      console.error(`Restore habit failed: ${e}`);
+      promptAction.showToast({ message: '恢复失败' });
+    }
   }
 
   // 抽离通用的删除弹窗逻辑
@@ -205,6 +212,11 @@ export struct ArchivePanelView {
                     startTime: this.formatDate(item.startTime),
                     completeTime: this.formatDate(item.completeTime),
                     note: item.note,
+                    badgeText: TaskStateMachine.archiveBadgeText(item.state),
+                    showRestore: true,
+                    onRestore: () => {
+                      this.handleRestoreTask(item);
+                    },
                     onDelete: () => {
                       this.handleDeleteTask(item);
                     }
@@ -234,6 +246,11 @@ export struct ArchivePanelView {
                     startTime: this.formatHabitDetail(item),
                     completeTime: `归档于 ${this.formatDate(item.updatedAt)}`,
                     note: item.description || "无备注",
+                    badgeText: '习惯归档',
+                    showRestore: true,
+                    onRestore: () => {
+                      this.handleRestoreHabit(item);
+                    },
                     onDelete: () => {
                       this.handleDeleteHabit(item);
                     }

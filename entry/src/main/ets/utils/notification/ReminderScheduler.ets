@@ -5,41 +5,57 @@ import { DDLItem, Habit, HabitStatus } from '../../model/DDLModels';
 import { ReminderUtils } from './ReminderUtils';
 import { reminderAgentManager } from '@kit.BackgroundTasksKit';
 import { LocalValues } from '../../common/local/LocalValues';
+import { TaskState } from '../../model/TaskStateMachine';
 
 const MAX_DDL_SLOTS = 20;
 
+interface DDLReminderCandidate {
+  item: DDLItem;
+}
+
+export function collectDDLReminderCancelIds(taskId: number, reminderId?: number): number[] {
+  const ids = new Set<number>([taskId]);
+  if (reminderId !== undefined) {
+    ids.add(reminderId);
+  }
+  return Array.from(ids);
+}
+
 export class ReminderScheduler {
+  private static ddlRefreshQueue: Promise<void> = Promise.resolve();
+
+  static shouldScheduleDDLReminder(item: DDLItem): boolean {
+    return !item.deleted && item.state === TaskState.ACTIVE;
+  }
 
   /**
    * 核心方法：清洗“僵尸”数据
    * * 场景：用户卸载重装（保留数据）或系统清理了过期任务，导致 DB 有记录但系统无任务。
    * 作用：强制对账。如果 DB 里有，但系统里没有，则删除 DB 记录，迫使后续逻辑重新发布。
    */
-  private static async syncWithSystem(activeReminders: ActiveReminder[]) {
+  private static async syncWithSystem(activeReminders: ActiveReminder[]): Promise<string[]> {
     if (activeReminders.length === 0) return [];
 
     try {
       const systemReminders = await reminderAgentManager.getValidReminders();
-
-      const systemIds = new Set(systemReminders.map(r => r.notificationId));
-
-      const manager = ReminderDataManager.getInstance();
-      const removedIds: string[] = [];
-
-      for (const record of activeReminders) {
-        // 如果本地有 ID，但系统里没有
-        if (!systemIds.has(record.reminderId)) {
-          console.warn(`[Scheduler] Zombie reminder found! Target:${record.targetId} (ID:${record.reminderId}) is missing in system.`);
-
-          // 从 DB 移除
-          await manager.remove(record.targetId);
-          removedIds.push(record.targetId);
-        }
+      if (systemReminders.length === 0 && activeReminders.length > 0) {
+        // 如果系统返回空，但本地有记录，可能是接口延迟或权限问题，保守处理，暂不视为僵尸
+        console.warn(`[Scheduler] System returned 0 reminders but local has ${activeReminders.length}. Skipping sync.`);
+        return [];
       }
 
-      return removedIds;
+      const systemIds = new Set(systemReminders.map(r => r.notificationId));
+      const zombieIds: string[] = [];
+
+      for (const record of activeReminders) {
+        if (!systemIds.has(record.reminderId)) {
+          console.warn(`[Scheduler] Potential zombie found: ${record.targetId} (ID:${record.reminderId}).`);
+          zombieIds.push(record.targetId);
+        }
+      }
+      return zombieIds;
     } catch (e) {
-      console.error(`[Scheduler] Sync failed: ${e}. Assuming all local data is valid (safe fallback).`);
+      console.error(`[Scheduler] Sync failed: ${e}.`);
       return [];
     }
   }
@@ -48,31 +64,39 @@ export class ReminderScheduler {
   // 1. DDL 提醒 (单次 - 使用 Timer 伪装)
   // =========================================================
   static async refreshReminders(allDDLs: DDLItem[]) {
+    const task = ReminderScheduler.ddlRefreshQueue
+      .catch(() => {})
+      .then(async () => {
+        await ReminderScheduler.performDDLRefresh(allDDLs);
+      });
+
+    ReminderScheduler.ddlRefreshQueue = task.catch(() => {});
+    return task;
+  }
+
+  static async cancelDDLReminder(taskId: number): Promise<void> {
+    const targetId = taskId.toString();
+    const manager = ReminderDataManager.getInstance();
+    const existingRecord = manager.getByScopedTarget('DDL', targetId);
+    const idsToCancel = collectDDLReminderCancelIds(taskId, existingRecord?.reminderId);
+
+    for (const reminderId of idsToCancel) {
+      await ReminderUtils.cancel(reminderId);
+    }
+    await manager.removeScoped('DDL', targetId);
+  }
+
+  private static async performDDLRefresh(allDDLs: DDLItem[]) {
     console.info('[Scheduler] Start refreshing DDLs...');
 
     const isEnabled = LocalValues.getInstance().getDDLWarning();
     const manager = ReminderDataManager.getInstance();
 
-    let activeReminders = manager.getAll().filter(r => r.type === 'DDL');
-
-    await ReminderScheduler.syncWithSystem(activeReminders);
-
-    activeReminders = manager.getAll().filter(r => r.type === 'DDL');
-
     if (!isEnabled) {
-      if (activeReminders.length > 0) {
-        console.info('[Scheduler] DDL Warning is DISABLED. Clearing existing reminders...');
-        for (const record of activeReminders) {
-          await ReminderScheduler.cancelAndRemove(record.targetId, record.reminderId, "Feature disabled");
-        }
-      } else {
-        console.info('[Scheduler] DDL Warning is DISABLED. No actions needed.');
-      }
+      console.info('[Scheduler] DDL Warning is DISABLED. Clearing existing reminders...');
+      await ReminderScheduler.clearAllDDLReminders(manager.getAllByType('DDL'), []);
       return;
     }
-
-    const activeMap = new Map<string, ActiveReminder>();
-    activeReminders.forEach(r => activeMap.set(r.targetId, r));
 
     const now = Date.now();
 
@@ -83,7 +107,7 @@ export class ReminderScheduler {
     }
 
     const candidates: Candidate[] = allDDLs
-      .filter(item => !item.isCompleted && !item.deleted)
+      .filter(item => ReminderScheduler.shouldScheduleDDLReminder(item))
       .map((item: DDLItem): Candidate => {
         const date = DateTimeUtils.parseDateString(item.endTime);
         return {
@@ -97,29 +121,9 @@ export class ReminderScheduler {
       .sort((a, b) => a.timestamp - b.timestamp)
       .slice(0, MAX_DDL_SLOTS);
 
-    const candidateIds = new Set(candidates.map(c => c.item.id.toString()));
+    await ReminderScheduler.clearAllDDLReminders(manager.getAllByType('DDL'), candidates);
 
-    // --- 阶段 A: 清理 (不在 Top N 或时间变更) ---
-    for (const record of activeReminders) {
-      if (!candidateIds.has(record.targetId)) {
-        await ReminderScheduler.cancelAndRemove(record.targetId, record.reminderId, "Out of range / Completed");
-        continue;
-      }
-      const candidate = candidates.find(c => c.item.id.toString() === record.targetId);
-      // 如果截止时间变了，需要重新发布
-      if (candidate && Math.abs(candidate.timestamp - record.triggerTime) > 1000) {
-        await ReminderScheduler.cancelAndRemove(record.targetId, record.reminderId, "Time changed");
-        activeMap.delete(record.targetId);
-      }
-    }
-
-    // --- 阶段 B: 补录 ---
     for (const c of candidates) {
-      const idStr = c.item.id.toString();
-      // 如果 activeMap 里还有，说明不需要重新发布
-      if (activeMap.has(idStr)) continue;
-
-      // 这里直接传截止日期，publishAndRecord 内部会减去1天
       await ReminderScheduler.publishAndRecord(c.item, c.date!);
     }
   }
@@ -133,18 +137,23 @@ export class ReminderScheduler {
     const isEnabled = LocalValues.getInstance().getHabitReminder();
     const manager = ReminderDataManager.getInstance();
 
-    let activeReminders = manager.getAll().filter(r => r.type === 'HABIT');
-    await ReminderScheduler.syncWithSystem(activeReminders);
-    activeReminders = manager.getAll().filter(r => r.type === 'HABIT');
+    let activeReminders = manager.getAllByType('HABIT');
+    const zombieIds = await ReminderScheduler.syncWithSystem(activeReminders);
 
     const activeMap = new Map<string, ActiveReminder>();
-    activeReminders.forEach(r => activeMap.set(r.targetId, r));
+    for (const record of activeReminders) {
+      if (zombieIds.includes(record.targetId)) {
+        await manager.removeScoped(record.type, record.targetId);
+        continue;
+      }
+      activeMap.set(record.targetId, record);
+    }
 
     if (!isEnabled) {
       if (activeReminders.length > 0) {
         console.info('[Scheduler] Habit Reminder is DISABLED. Clearing existing reminders...');
         for (const record of activeReminders) {
-          await ReminderScheduler.cancelAndRemove(record.targetId, record.reminderId, "Feature disabled");
+          await ReminderScheduler.cancelAndRemove(record.type, record.targetId, record.reminderId, "Feature disabled");
         }
       }
       return;
@@ -162,7 +171,7 @@ export class ReminderScheduler {
     for (const record of activeReminders) {
       // 习惯已删除 或 已归档 或 删除了提醒时间
       if (!candidateIds.has(record.targetId)) {
-        await ReminderScheduler.cancelAndRemove(record.targetId, record.reminderId, "Habit deleted/archived/alarm removed");
+        await ReminderScheduler.cancelAndRemove(record.type, record.targetId, record.reminderId, "Habit deleted/archived/alarm removed");
         continue;
       }
 
@@ -177,7 +186,7 @@ export class ReminderScheduler {
         const recordDate = new Date(record.triggerTime);
 
         if (recordDate.getHours() !== targetHour || recordDate.getMinutes() !== targetMinute) {
-          await ReminderScheduler.cancelAndRemove(record.targetId, record.reminderId, "Time(HH:mm) changed");
+          await ReminderScheduler.cancelAndRemove(record.type, record.targetId, record.reminderId, "Time(HH:mm) changed");
           activeMap.delete(record.targetId);
         }
       }
@@ -196,29 +205,13 @@ export class ReminderScheduler {
   static async refreshDailySummary(summaryTimeStr: string | null) {
     const TARGET_ID = 'DAILY_SUMMARY';
     const manager = ReminderDataManager.getInstance();
-    let existingRecord = manager.getByTargetId(TARGET_ID);
-
-    // 在决定是否发布前，先确认现有的 ID 是否真的有效
-    if (existingRecord) {
-      try {
-        const systemReminders = await reminderAgentManager.getValidReminders();
-        const existsInSystem = systemReminders.some(r => r.notificationId === existingRecord!.reminderId);
-
-        if (!existsInSystem) {
-          console.warn('[Scheduler] Daily Summary zombie record found. Cleaning up...');
-          await manager.remove(TARGET_ID); // 只删 DB
-          existingRecord = undefined; // 标记为不存在
-        }
-      } catch (e) {
-        console.error('[Scheduler] System check failed for summary.');
-      }
-    }
+    let existingRecord = manager.getByScopedTarget('SUMMARY', TARGET_ID);
 
     // 如果 summaryTimeStr 为 null，或者 LocalValues 里关闭了 (双重保障)
     // Settings 页面传参时已经处理了逻辑，传 null 即表示关闭
     if (!summaryTimeStr) {
       if (existingRecord) {
-        await ReminderScheduler.cancelAndRemove(TARGET_ID, existingRecord.reminderId, "Feature disabled / turned off");
+        await ReminderScheduler.cancelAndRemove('SUMMARY', TARGET_ID, existingRecord.reminderId, "Feature disabled / turned off");
       }
       return;
     }
@@ -235,7 +228,7 @@ export class ReminderScheduler {
         console.info('[Scheduler] Daily Summary time unchanged. Skip.');
         return;
       }
-      await ReminderScheduler.cancelAndRemove(TARGET_ID, existingRecord.reminderId, "Time update");
+      await ReminderScheduler.cancelAndRemove('SUMMARY', TARGET_ID, existingRecord.reminderId, "Time update");
     }
 
     // 发布新提醒
@@ -249,7 +242,8 @@ export class ReminderScheduler {
         "回顾今天，规划明天。点击查看今日概览。",
         hour,
         minute,
-        daysOfWeek
+        daysOfWeek,
+        100000 // 固定 ID
       );
 
       const recordTime = new Date();
@@ -271,10 +265,45 @@ export class ReminderScheduler {
   // 内部辅助
   // ==========================================
 
-  private static async cancelAndRemove(targetId: string, reminderId: number, reason: string) {
-    console.info(`[Scheduler] Canceling ${targetId} (ID:${reminderId}). Reason: ${reason}`);
+  private static async cancelAndRemove(type: 'SUMMARY' | 'HABIT' | 'DDL', targetId: string, reminderId: number, reason: string) {
+    console.info(`[Scheduler] Canceling ${type}:${targetId} (ID:${reminderId}). Reason: ${reason}`);
     await ReminderUtils.cancel(reminderId);
-    await ReminderDataManager.getInstance().remove(targetId);
+    await ReminderDataManager.getInstance().removeScoped(type, targetId);
+  }
+
+  private static async clearAllDDLReminders(activeReminders: ActiveReminder[], candidates: DDLReminderCandidate[]): Promise<void> {
+    const manager = ReminderDataManager.getInstance();
+    const idsToCancel = new Set<number>();
+
+    for (const record of activeReminders) {
+      idsToCancel.add(record.reminderId);
+      idsToCancel.add(Number(record.targetId));
+    }
+    for (const candidate of candidates) {
+      idsToCancel.add(candidate.item.id);
+    }
+
+    try {
+      const systemReminders = await reminderAgentManager.getValidReminders();
+      for (const reminder of systemReminders) {
+        const title = typeof reminder.title === 'string' ? reminder.title : '';
+        const notificationId = reminder.notificationId;
+        if (title.startsWith('任务临近提醒:') || (notificationId !== undefined && idsToCancel.has(notificationId))) {
+          if (notificationId !== undefined) {
+            idsToCancel.add(notificationId);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[Scheduler] Failed to enumerate system DDL reminders: ${e}`);
+    }
+
+    for (const reminderId of idsToCancel) {
+      await ReminderUtils.cancel(reminderId);
+    }
+    for (const record of activeReminders) {
+      await manager.removeScoped(record.type, record.targetId);
+    }
   }
 
   private static async publishAndRecord(ddl: DDLItem, deadlineDate: Date) {
@@ -295,7 +324,8 @@ export class ReminderScheduler {
       const reminderId = await ReminderUtils.publishCalendar(
         `任务临近提醒: ${ddl.name}`,
         contentText,
-        remindTime
+        remindTime,
+        ddl.id // 使用业务 ID 确保覆盖
       );
 
       const newRecord: ActiveReminder = {
@@ -326,7 +356,8 @@ export class ReminderScheduler {
         `坚持就是胜利！该完成"${habit.name}"了。`,
         hour,
         minute,
-        daysOfWeek
+        daysOfWeek,
+        habit.id // 使用业务 ID 确保覆盖
       );
 
       const recordTime = new Date();

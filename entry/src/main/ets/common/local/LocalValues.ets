@@ -34,6 +34,9 @@ export class LocalValues {
       const basicMode = await this.pref.get(C.KEY_BASIC_MODE, false);
       AppStorage.setOrCreate(C.KEY_BASIC_MODE, basicMode);
 
+      const privacyAgreed = await this.pref.get(C.KEY_PRIVACY_AGREE, false);
+      AppStorage.setOrCreate(C.KEY_PRIVACY_AGREE, privacyAgreed);
+
       // --- 1. 普通数据 (Preferences) ---
       const syncEnable = await this.pref.get(C.KEY_CLOUD_SYNC_ENABLE, false);
       AppStorage.setOrCreate(C.KEY_CLOUD_SYNC_ENABLE, syncEnable);
@@ -49,6 +52,9 @@ export class LocalValues {
 
       const autoArchiveDays = await this.pref.get(C.KEY_AUTO_ARCHIVE_DAYS, 3);
       AppStorage.setOrCreate(C.KEY_AUTO_ARCHIVE_DAYS, autoArchiveDays);
+
+      const tombstoneRetentionDays = await this.pref.get(C.KEY_TOMBSTONE_RETENTION_DAYS, 30);
+      AppStorage.setOrCreate(C.KEY_TOMBSTONE_RETENTION_DAYS, tombstoneRetentionDays);
 
       const vibration = await this.pref.get(C.KEY_VIBRATION_ENABLE, true);
       AppStorage.setOrCreate(C.KEY_VIBRATION_ENABLE, vibration);
@@ -114,6 +120,12 @@ export class LocalValues {
       const startupPage = await this.pref.get(C.KEY_STARTUP_PAGE, 0);
       AppStorage.setOrCreate(C.KEY_STARTUP_PAGE, startupPage);
 
+      const showGuideNextLaunch = await this.pref.get(C.KEY_SHOW_GUIDE_NEXT_LAUNCH, false);
+      AppStorage.setOrCreate(C.KEY_SHOW_GUIDE_NEXT_LAUNCH, showGuideNextLaunch);
+
+      const isFirstLaunch = await this.pref.get(C.KEY_APP_FIRST_LAUNCH, true);
+      AppStorage.setOrCreate(C.KEY_APP_FIRST_LAUNCH, isFirstLaunch);
+
       const english = await this.pref.get(C.KEY_ENGLISH_SOMEWHERE, true);
       AppStorage.setOrCreate(C.KEY_ENGLISH_SOMEWHERE, english);
 
@@ -135,17 +147,35 @@ export class LocalValues {
       const directAddOnAi = await this.pref.get(C.KEY_DIRECT_ADD_ON_AI, true);
       AppStorage.setOrCreate(C.KEY_DIRECT_ADD_ON_AI, directAddOnAi);
 
+      const silentTaskAdd = await this.pref.get(C.KEY_AI_SILENT_TASK_ADD, true);
+      AppStorage.setOrCreate(C.KEY_AI_SILENT_TASK_ADD, silentTaskAdd);
+
+      const showPaperTalkShare = await this.pref.get(C.KEY_SHOW_PAPERTALK_SHARE, true);
+      AppStorage.setOrCreate(C.KEY_SHOW_PAPERTALK_SHARE, showPaperTalkShare);
+
       const enableApi23 = await this.pref.get(C.KEY_ENABLE_API23, true);
       AppStorage.setOrCreate(C.KEY_ENABLE_API23, enableApi23);
 
       const materialLevel = await this.pref.get(C.KEY_API23_MATERIAL_LEVEL, 'EXQUISITE');
       AppStorage.setOrCreate(C.KEY_API23_MATERIAL_LEVEL, materialLevel)
 
+      const minibar = await this.pref.get(C.KEY_SHOW_MINIBAR, (deviceInfo.distributionOSApiVersion >= 60100));
+      AppStorage.setOrCreate(C.KEY_SHOW_MINIBAR, minibar);
+
+      const experimentalComponents = await this.pref.get(C.KEY_EXPERIMENTAL_COMPONENTS, true);
+      AppStorage.setOrCreate(C.KEY_EXPERIMENTAL_COMPONENTS, experimentalComponents);
+
       const overviewOrder = await this.pref.get(C.KEY_OVERVIEW_CARD_ORDER, []) as string[];
       AppStorage.setOrCreate(C.KEY_OVERVIEW_CARD_ORDER, overviewOrder);
 
       const trendOrder = await this.pref.get(C.KEY_TREND_CARD_ORDER, []) as string[];
       AppStorage.setOrCreate(C.KEY_TREND_CARD_ORDER, trendOrder);
+
+      const monthlyAnalysis = await this.pref.get(C.KEY_MONTHLY_ANALYSIS, '');
+      AppStorage.setOrCreate(C.KEY_MONTHLY_ANALYSIS, monthlyAnalysis);
+
+      const lastAnalyzedMonth = await this.pref.get(C.KEY_LAST_ANALYZED_MONTH, '');
+      AppStorage.setOrCreate(C.KEY_LAST_ANALYZED_MONTH, lastAnalyzedMonth);
 
       AppStorage.setOrCreate('IsAppDataReady', true);
 
@@ -298,16 +328,24 @@ export class LocalValues {
    * 隐私协议相关
    */
   async getIsPrivacyAgreed(): Promise<boolean> {
+    const cached = AppStorage.get<boolean>(C.KEY_PRIVACY_AGREE);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     if (!this.pref) return false;
 
     try {
-      return await this.pref.get(C.KEY_PRIVACY_AGREE, false) as boolean;
+      const value = await this.pref.get(C.KEY_PRIVACY_AGREE, false) as boolean;
+      AppStorage.setOrCreate(C.KEY_PRIVACY_AGREE, value);
+      return value;
     } catch (_) {
       return false;
     }
   }
 
   async setPrivacyAgreed(): Promise<void> {
+    AppStorage.setOrCreate(C.KEY_PRIVACY_AGREE, true);
     if (!this.pref) return;
 
     try {
@@ -319,6 +357,7 @@ export class LocalValues {
   }
 
   async revokePrivacy(): Promise<void> {
+    AppStorage.setOrCreate(C.KEY_PRIVACY_AGREE, false);
     if (!this.pref) return;
 
     try {
@@ -480,6 +519,36 @@ export class LocalValues {
     await this.setValue(C.KEY_STARTUP_PAGE, index);
   }
 
+  getShowGuideNextLaunch(): boolean {
+    return AppStorage.get<boolean>(C.KEY_SHOW_GUIDE_NEXT_LAUNCH) ?? false;
+  }
+
+  async setShowGuideNextLaunch(enable: boolean) {
+    await this.setValue(C.KEY_SHOW_GUIDE_NEXT_LAUNCH, enable);
+  }
+
+  async getIsAppFirstLaunch(): Promise<boolean> {
+    const cached = AppStorage.get<boolean>(C.KEY_APP_FIRST_LAUNCH);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    if (!this.pref) return true;
+
+    try {
+      const value = await this.pref.get(C.KEY_APP_FIRST_LAUNCH, true) as boolean;
+      AppStorage.setOrCreate(C.KEY_APP_FIRST_LAUNCH, value);
+      return value;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  async setAppFirstLaunch(isFirst: boolean) {
+    AppStorage.setOrCreate(C.KEY_APP_FIRST_LAUNCH, isFirst);
+    await this.setValue(C.KEY_APP_FIRST_LAUNCH, isFirst);
+  }
+
   /**
    * 获取概览页卡片顺序
    */
@@ -506,6 +575,22 @@ export class LocalValues {
    */
   async setTrendCardOrder(order: string[]) {
     await this.setValue(C.KEY_TREND_CARD_ORDER, order);
+  }
+
+  getMonthlyAnalysis(): string {
+    return AppStorage.get<string>(C.KEY_MONTHLY_ANALYSIS) ?? '';
+  }
+
+  async setMonthlyAnalysis(json: string) {
+    await this.setValue(C.KEY_MONTHLY_ANALYSIS, json);
+  }
+
+  getLastAnalyzedMonth(): string {
+    return AppStorage.get<string>(C.KEY_LAST_ANALYZED_MONTH) ?? '';
+  }
+
+  async setLastAnalyzedMonth(month: string) {
+    await this.setValue(C.KEY_LAST_ANALYZED_MONTH, month);
   }
 
   /**
@@ -570,6 +655,14 @@ export class LocalValues {
     await this.setValue(C.KEY_DIRECT_ADD_ON_AI, enable);
   }
 
+  getShowPaperTalkShare(): boolean {
+    return AppStorage.get<boolean>(C.KEY_SHOW_PAPERTALK_SHARE) ?? true;
+  }
+
+  async setShowPaperTalkShare(enable: boolean) {
+    await this.setValue(C.KEY_SHOW_PAPERTALK_SHARE, enable);
+  }
+
   getAutoArchiveDays(): number {
     return AppStorage.get(C.KEY_AUTO_ARCHIVE_DAYS) ?? 3;
   }
@@ -578,12 +671,28 @@ export class LocalValues {
     await this.setValue(C.KEY_AUTO_ARCHIVE_DAYS, days);
   }
 
+  getTombstoneRetentionDays(): number {
+    return AppStorage.get(C.KEY_TOMBSTONE_RETENTION_DAYS) ?? 30;
+  }
+
+  async setTombstoneRetentionDays(days: number) {
+    await this.setValue(C.KEY_TOMBSTONE_RETENTION_DAYS, days);
+  }
+
   getApi23Enable(): boolean {
     return AppStorage.get(C.KEY_ENABLE_API23) ?? true;
   }
 
   async setApi23Enable(enable: boolean) {
     await this.setValue(C.KEY_ENABLE_API23, enable);
+  }
+
+  getExperimentalComponents(): boolean {
+    return AppStorage.get(C.KEY_EXPERIMENTAL_COMPONENTS) ?? true;
+  }
+
+  async setExperimentalComponents(enable: boolean) {
+    await this.setValue(C.KEY_EXPERIMENTAL_COMPONENTS, enable);
   }
 
   getSyncMode(): string {
@@ -602,5 +711,17 @@ export class LocalValues {
     const levels = ['ADAPTIVE', 'SMOOTH', 'GENTLE', 'EXQUISITE'];
     const actual = (levels.includes(level)) ? level : 'ADAPTIVE';
     await this.setValue(C.KEY_API23_MATERIAL_LEVEL, actual);
+  }
+
+  getMiniBar(): boolean {
+    return AppStorage.get(C.KEY_SHOW_MINIBAR) ?? (deviceInfo.distributionOSApiVersion >= 60100);
+  }
+
+  async setMiniBar(enable: boolean) {
+    if (deviceInfo.distributionOSApiVersion >= 60100) {
+      await this.setValue(C.KEY_SHOW_MINIBAR, enable);
+      return;
+    }
+    await this.setValue(C.KEY_SHOW_MINIBAR, false);
   }
 }

@@ -25,7 +25,7 @@ Deadliner 的诞生，源于 2024 年大二时，我和女朋友被各种 **Dead
 
 - **2024年12月**：Android 版 Deadliner v1 正式发布。我们坚持极简列表和原生设计。它，遇到了第一群你们。
 - **2025年4月**：**“与君一见，时光在心”。** v2 版本上线。概览统计登场，冰冷的任务变成了一条条优美的曲线。
-- **2025年8月**：**“遇见，你的 Deadliner”。** 这一次，我们重塑内在。WebDAV 同步、Deadliner AI 相继登场。我们致力于**缩短你在 App 上花费的时间，把每一秒都还给生活。**
+- **2025年8月**：**“遇见，你的 Deadliner”。** 这一次，我们重塑内在。WebDAV 同步、Lifi AI 相继登场。我们致力于**缩短你在 App 上花费的时间，把每一秒都还给生活。**
 - **2025年12月**：Android 版迎来流体云与实时通知。它在不断进化，但始终保持轻盈。
 
 **2026年1月1日。新年伊始。**
@@ -73,12 +73,15 @@ export function LetterPageBuilder() {
 export struct LetterPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
+
+  @StorageLink('isWideScreen') isWideScreen: boolean = false;
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column() {
           // 使用你现有的 MarkdownView 组件
           MarkdownView({
@@ -97,6 +100,7 @@ export struct LetterPage {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(false),
       content: { title: { mainTitle: "开发者说" } }
     })

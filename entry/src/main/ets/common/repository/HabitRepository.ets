@@ -3,6 +3,7 @@ import {
   Habit, HabitPeriod, HabitGoalType, HabitRecord, HabitRecordStatus, HabitStatus
 } from '../../model/DDLModels'; // 假设你的路径
 import { ReminderScheduler } from '../../utils/notification/ReminderScheduler';
+import { TaskRepository } from './TaskRepository';
 
 export class HabitRepository {
   private static instance: HabitRepository;
@@ -68,6 +69,7 @@ export class HabitRepository {
     };
     const id = await this.db.insertHabit(habit);
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
     return id;
   }
 
@@ -81,6 +83,10 @@ export class HabitRepository {
 
   async getAllHabits(): Promise<Habit[]> {
     return await this.db.getAllHabits();
+  }
+
+  async getArchivedHabits(): Promise<Habit[]> {
+    return await this.db.getArchivedHabits();
   }
 
   async updateHabit(habit: Habit): Promise<void> {
@@ -106,11 +112,42 @@ export class HabitRepository {
 
     await this.db.updateHabit(updated);
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
   }
 
   async deleteHabitByDdlId(ddlId: number): Promise<void> {
     await this.db.deleteHabitByDdlId(ddlId);
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
+  }
+
+  async unarchiveHabit(habitId: number): Promise<void> {
+    const habit = await this.db.getHabitById(habitId);
+    if (!habit) {
+      throw new Error(`[HabitRepository] Habit not found: ${habitId}`);
+    }
+
+    const updated: Habit = {
+      id: habit.id,
+      ddlId: habit.ddlId,
+      name: habit.name,
+      description: habit.description,
+      color: habit.color,
+      iconKey: habit.iconKey,
+      period: habit.period,
+      timesPerPeriod: habit.timesPerPeriod,
+      goalType: habit.goalType,
+      totalTarget: habit.totalTarget,
+      createdAt: habit.createdAt,
+      updatedAt: this.nowISO(),
+      status: HabitStatus.ACTIVE,
+      sortOrder: habit.sortOrder,
+      alarmTime: habit.alarmTime
+    };
+
+    await this.db.updateHabit(updated);
+    this.scheduleReminderRefresh();
+    this.triggerDataSync();
   }
 
   // ================= Habit 打卡记录 =================
@@ -149,11 +186,14 @@ export class HabitRepository {
       status: status,
       createdAt: this.nowISO()
     };
-    return await this.db.insertHabitRecord(record);
+    const id = await this.db.insertHabitRecord(record);
+    this.triggerDataSync();
+    return id;
   }
 
   async deleteRecordsForHabitOnDate(habitId: number, date: Date): Promise<void> {
     await this.db.deleteHabitRecordsForHabitOnDate(habitId, this.formatDate(date));
+    this.triggerDataSync();
   }
 
   async getCompletedIdsForDate(date: Date): Promise<Set<number>> {
@@ -206,12 +246,26 @@ export class HabitRepository {
       .filter(r => r.status === HabitRecordStatus.COMPLETED);
     const todayCount = recordsToday.reduce((sum, r) => sum + r.count, 0);
 
-    if (habit.period === HabitPeriod.DAILY ||
-      habit.period === HabitPeriod.ONCE ||
+    if (habit.period === HabitPeriod.DAILY) {
+      // === DAILY: 每日累积模式 ===
+      // 支持每日多次打卡（例如 timesPerPeriod=3），点击一次累加一次。
+      const target = Math.max(1, habit.timesPerPeriod);
+      if (todayCount >= target && habit.goalType === HabitGoalType.PER_PERIOD) {
+        // 每日目标已达标：保持现有策略，不再继续累加
+      } else {
+        await this.db.insertHabitRecord({
+          id: 0,
+          habitId: habitId,
+          date: this.formatDate(date),
+          count: 1,
+          status: HabitRecordStatus.COMPLETED,
+          createdAt: new Date().toISOString()
+        });
+      }
+    } else if (habit.period === HabitPeriod.ONCE ||
       habit.period === HabitPeriod.EBBINGHAUS) {
 
       // === 简单模式 (0/1) ===
-      // DAILY: 每天打一次
       // ONCE: 一次性任务，打完即止（但在 Repo 层我们只管记录状态，UI 层负责隐藏）
       // EBBINGHAUS: 到了节点打一次
 
@@ -271,6 +325,7 @@ export class HabitRepository {
 
     // 触发提醒更新
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
   }
 
   public async initialReminderCheck() {
@@ -286,6 +341,10 @@ export class HabitRepository {
     this.reminderUpdateTimer = setTimeout(() => {
       this.performReminderRefresh();
     }, 1000);
+  }
+
+  private triggerDataSync() {
+    TaskRepository.getInstance().triggerExternalUpdates();
   }
 
   /**

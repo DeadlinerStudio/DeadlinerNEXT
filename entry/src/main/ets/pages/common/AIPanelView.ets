@@ -6,68 +6,65 @@ import {
   AIToolRequest,
   AIToolResult,
   ReadTasksArgs,
-  ReadTasksResultPayload,
-  TaskDigestItem,
-  TaskSummary,
   MixedResult
 } from '../../ai/model/AIModels';
+import {
+  defaultToolReason,
+  habitProposalsFromToolRequest,
+  makeHabitKey,
+  makeTaskKey,
+  sanitizeReadTasksArgs,
+  taskProposalsFromToolRequest,
+  toolArgsDetail,
+  toolArgsSummary,
+  toolDisplayTitle,
+  toolResultSummary
+} from './ai/AIPanelToolUtils';
 import { ITheme } from '../../common/theme/ThemeModel';
-import { AddTaskParams } from '../routes/main/modify/task/AddTaskPage';
 import { LoginPanelView } from './LoginPanelView';
 import { SettingsConstants as C } from '../../common/local/SettingsConstants';
 import { TaskRepository } from '../../common/repository/TaskRepository';
 import { DateTimeUtils } from '../../utils/DateTimeUtils';
-import { DeadlineType, DDLItem } from '../../model/DDLModels';
+import { DeadlineType } from '../../model/DDLModels';
 import { MemoryBank } from '../../ai/model/MemoryModels';
 import { AIService } from '../../ai/AIServcice';
+import { DeadlinerCoreService } from '../../ai/core/DeadlinerCoreService';
+import {
+  AdapterCreateHabitPayload,
+  AdapterCreateTaskPayload
+} from '../../ai/core/DeadlinerToolAdapter';
+import {
+  AIConversationHistoryRecord,
+  AIWorkspaceSessionSnapshot,
+  DisplayItem,
+  DisplayItemType,
+  ProposalToolRequestLink,
+  restoreDisplayItems,
+  snapshotDisplayItem
+} from './ai/AIPanelModels';
 import { MemoryManageSheet } from './MemoryManageSheet';
 import { HabitFormHelper } from '../routes/main/modify/habit/HabitFormHelper';
-
-// ==========================================
-// MARK: - 对话流模型定义
-// ==========================================
-export enum DisplayItemType {
-  UserQuery,
-  AIChat,
-  AITask,
-  AIHabit,
-  AIMemory,
-  AIToolRequest,
-  AIToolResult
-}
-
-@Observed
-export class DisplayItem {
-  id: string;
-  type: DisplayItemType;
-  text?: string;
-  task?: AITask;
-  habit?: AIHabit;
-  toolReq?: AIToolRequest;
-  toolRes?: AIToolResult;
-
-  constructor(type: DisplayItemType, id?: string) {
-    this.type = type;
-    this.id = id || util.generateRandomUUID(true);
-  }
-}
-
-interface TaskAIDTO {
-  ddl: DDLItem;
-  due: Date;
-}
+import { Symbol } from '../components/infra/Symbol';
 
 // ==========================================
 // MARK: - 核心 UI 组件
 // ==========================================
 
 @Component
-export struct AIPanelView {
+export struct AIWorkspaceView {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
   @Consume('appPathStack') appPathStack: NavPathStack;
   @StorageProp(C.KEY_DIRECT_ADD_ON_AI) directAdd: boolean = true;
+  @StorageProp(C.KEY_AI_SILENT_TASK_ADD) silentTaskAdd: boolean = true;
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
-  @Require onDismissPanel: () => void;
+  @Prop bypassHuaweiLogin: boolean = false;
+  @Prop topAvoidHeight: number = 0;
+  @Prop @Watch('onStartNewChatSignal') startNewChatSignal: number = 0;
+  @Prop externalSessionSnapshot: AIWorkspaceSessionSnapshot | null = null;
+  @Prop @Watch('onExternalSessionVersionChange') externalSessionVersion: number = 0;
+  @Prop readonlyHistoryRecord: AIConversationHistoryRecord | null = null;
+  @Prop @Watch('onReadonlyHistoryVersionChange') readonlyHistoryVersion: number = 0;
+  @Require onSessionSnapshotChange: (snapshot: AIWorkspaceSessionSnapshot) => void;
 
   // --- 状态控制 ---
   @State inputText: string = '';
@@ -81,20 +78,65 @@ export struct AIPanelView {
 
   // UI 刷新辅助状态
   @State memoryProfileCount: number = 0;
+  @State currentProgressHint: string = '';
+  @State lastSubmittedToolName: string = '';
+  @State taskProposalToolRequests: ProposalToolRequestLink[] = [];
+  @State habitProposalToolRequests: ProposalToolRequestLink[] = [];
 
   private scroller: Scroller = new Scroller();
   private toolOriginalUserText: string = "";
+  private coreService: DeadlinerCoreService = DeadlinerCoreService.getInstance();
 
   @State showMemorySheet: boolean = false;
 
   @State hasUserProfile: boolean = false;
   @State memoryFragmentCount: number = 0;
+  @State isReadonlyHistoryMode: boolean = false;
+
+  @Prop bottomPadding: number = 0;
 
   aboutToAppear() {
     // 初始化记忆银行并触发 UI 更新
     MemoryBank.getInstance().init(getContext(this)).then(() => {
       this.refreshMemoryState();
     });
+    this.coreService.startUiSession();
+    this.coreService.setProgressHandler((update) => {
+      this.handleProgressUpdate(update.kind, update.message);
+    });
+    if (this.readonlyHistoryRecord) {
+      this.restoreReadonlyHistory(this.readonlyHistoryRecord);
+    } else if (this.externalSessionSnapshot) {
+      this.restoreWorkspaceSession(this.externalSessionSnapshot);
+    }
+  }
+
+  aboutToDisappear() {
+    if (!this.isReadonlyHistoryMode) {
+      this.emitSessionSnapshotChange();
+    }
+    this.coreService.setProgressHandler(undefined);
+  }
+
+  onStartNewChatSignal(): void {
+    if (this.startNewChatSignal <= 0) {
+      return;
+    }
+    this.resetWorkspaceSession();
+  }
+
+  onExternalSessionVersionChange(): void {
+    if (!this.externalSessionSnapshot) {
+      return;
+    }
+    this.restoreWorkspaceSession(this.externalSessionSnapshot);
+  }
+
+  onReadonlyHistoryVersionChange(): void {
+    if (!this.readonlyHistoryRecord) {
+      return;
+    }
+    this.restoreReadonlyHistory(this.readonlyHistoryRecord);
   }
 
   private refreshMemoryState() {
@@ -104,13 +146,92 @@ export struct AIPanelView {
     this.memoryProfileCount = mb.fragments.length + (this.hasUserProfile ? 1 : 0);
   }
 
+  private resetWorkspaceSession(): void {
+    this.inputText = '';
+    this.isParsing = false;
+    this.displayItems = [];
+    this.sessionSummary = '';
+    this.addedTaskKeys = [];
+    this.addedHabitKeys = [];
+    this.repoBusy = false;
+    this.currentProgressHint = '';
+    this.lastSubmittedToolName = '';
+    this.taskProposalToolRequests = [];
+    this.habitProposalToolRequests = [];
+    this.toolOriginalUserText = '';
+    this.showMemorySheet = false;
+    this.isReadonlyHistoryMode = false;
+    this.coreService.startUiSession();
+    this.refreshMemoryState();
+    this.scrollToBottom();
+    this.emitSessionSnapshotChange();
+  }
+
+  private restoreWorkspaceSession(snapshot: AIWorkspaceSessionSnapshot): void {
+    this.inputText = '';
+    this.isParsing = false;
+    this.repoBusy = false;
+    this.currentProgressHint = '';
+    this.showMemorySheet = false;
+    this.isReadonlyHistoryMode = false;
+    this.displayItems = restoreDisplayItems(snapshot.displayItems);
+    this.sessionSummary = snapshot.sessionSummary;
+    this.addedTaskKeys = [...snapshot.addedTaskKeys];
+    this.addedHabitKeys = [...snapshot.addedHabitKeys];
+    this.taskProposalToolRequests = [...snapshot.taskProposalToolRequests];
+    this.habitProposalToolRequests = [...snapshot.habitProposalToolRequests];
+    this.lastSubmittedToolName = snapshot.lastSubmittedToolName;
+    this.toolOriginalUserText = snapshot.toolOriginalUserText;
+    this.coreService.startUiSession();
+    this.scrollToBottom();
+  }
+
+  private restoreReadonlyHistory(record: AIConversationHistoryRecord): void {
+    this.inputText = '';
+    this.isParsing = false;
+    this.repoBusy = false;
+    this.currentProgressHint = '';
+    this.showMemorySheet = false;
+    this.isReadonlyHistoryMode = true;
+    this.displayItems = restoreDisplayItems(record.displayItems);
+    this.sessionSummary = '';
+    this.addedTaskKeys = [];
+    this.addedHabitKeys = [];
+    this.taskProposalToolRequests = [];
+    this.habitProposalToolRequests = [];
+    this.lastSubmittedToolName = '';
+    this.toolOriginalUserText = '';
+    this.scrollToBottom();
+  }
+
+  private buildSessionSnapshot(): AIWorkspaceSessionSnapshot {
+    return {
+      displayItems: this.displayItems.map((item) => snapshotDisplayItem(item)),
+      sessionSummary: this.sessionSummary,
+      addedTaskKeys: [...this.addedTaskKeys],
+      addedHabitKeys: [...this.addedHabitKeys],
+      taskProposalToolRequests: [...this.taskProposalToolRequests],
+      habitProposalToolRequests: [...this.habitProposalToolRequests],
+      lastSubmittedToolName: this.lastSubmittedToolName,
+      toolOriginalUserText: this.toolOriginalUserText,
+      updatedAt: Date.now()
+    };
+  }
+
+  private emitSessionSnapshotChange(): void {
+    if (this.isReadonlyHistoryMode) {
+      return;
+    }
+    this.onSessionSnapshotChange(this.buildSessionSnapshot());
+  }
+
   // ==========================================
   // MARK: - 业务逻辑 (Agent Core)
   // ==========================================
 
   async runSmartAgent(textToRun?: string) {
     const query = (textToRun || this.inputText).trim();
-    if (!query || this.isParsing) return;
+    if (!query || this.isParsing || this.isReadonlyHistoryMode) return;
 
     // 1. 上屏用户消息
     const userItem = new DisplayItem(DisplayItemType.UserQuery);
@@ -119,6 +240,7 @@ export struct AIPanelView {
     this.inputText = '';
     this.isParsing = true;
     this.scrollToBottom();
+    this.emitSessionSnapshotChange();
 
     try {
       const sysLang = i18n.System.getSystemLanguage();
@@ -132,26 +254,9 @@ export struct AIPanelView {
         this.sessionSummary = result.sessionSummary.substring(0, 600);
       }
 
-      // 2. 拦截 Tool Call (目前只处理 readTasks)
-      if (result.toolCalls && result.toolCalls.length > 0) {
+      // 2. 拦截 Tool Call
+      if (await this.handleToolCalls(result, query)) {
         this.isParsing = false;
-        const firstCall = result.toolCalls.find(c => c.tool === "readTasks");
-
-        if (firstCall) {
-          this.toolOriginalUserText = query;
-          const reqItem = new DisplayItem(DisplayItemType.AIToolRequest);
-          reqItem.toolReq = {
-            id: util.generateRandomUUID(true),
-            tool: "readTasks",
-            args: this.sanitizeReadTasksArgs(firstCall.args, query),
-            reason: firstCall.reason
-          };
-          this.displayItems.push(reqItem);
-        } else {
-          const chatItem = new DisplayItem(DisplayItemType.AIChat);
-          chatItem.text = "我需要调用一个暂不支持的本地工具。请更新版本或换个问法。";
-          this.displayItems.push(chatItem);
-        }
         this.scrollToBottom();
         return;
       }
@@ -168,6 +273,7 @@ export struct AIPanelView {
       this.isParsing = false;
       this.refreshMemoryState();
       this.scrollToBottom();
+      this.emitSessionSnapshotChange();
     }
   }
 
@@ -181,44 +287,39 @@ export struct AIPanelView {
     this.isParsing = true;
 
     try {
-      if (req.tool !== "readTasks") {
-        const errItem = new DisplayItem(DisplayItemType.AIChat);
-        errItem.text = `暂不支持的工具：${req.tool}`;
-        this.displayItems.push(errItem);
-        return;
-      }
-
-      // 1. 执行本地查询
-      const ddlTasks = await TaskRepository.getInstance().getDDLsByType(DeadlineType.TASK);
-      const payload = this.makeReadTasksPayload(ddlTasks, req.args);
-
-      const toolResult: AIToolResult = {
-        id: util.generateRandomUUID(true),
-        tool: "readTasks",
-        appliedArgs: req.args,
-        payload: payload,
-        generatedAt: new Date()
-      };
+      this.lastSubmittedToolName = req.tool;
+      const toolResult = await this.coreService.runToolCall({
+        id: req.id,
+        tool: req.tool,
+        args: req.args,
+        reason: req.reason,
+        executionMode: req.executionMode
+      });
 
       const resItem = new DisplayItem(DisplayItemType.AIToolResult, toolResult.id);
       resItem.toolRes = toolResult;
       this.displayItems.push(resItem);
+      this.markProposalApplied(req, toolResult);
       this.scrollToBottom();
 
       // 2. 二段回灌给 AI
-      const sysLang = i18n.System.getSystemLanguage();
-      const sessionCtx = this.buildSessionContextString();
-      const originalText = this.toolOriginalUserText || "（用户未提供原始问题）";
-
       const result2 = await AIService.getInstance().continueAfterTool(
-        originalText, toolResult, sysLang, sessionCtx, this.sessionSummary
+        this.toolOriginalUserText || '',
+        toolResult,
+        i18n.System.getSystemLanguage(),
+        this.buildSessionContextString(),
+        this.sessionSummary
       );
 
       if (result2.sessionSummary) {
         this.sessionSummary = result2.sessionSummary.substring(0, 600);
       }
 
+      if (await this.handleToolCalls(result2, this.toolOriginalUserText || '')) {
+        return;
+      }
       this.appendResultToUI(result2);
+      this.clearProposalToolRequest(req.tool, req.id);
 
     } catch (err) {
       console.error("[AIPanelView] Tool Error:", JSON.stringify(err));
@@ -228,8 +329,10 @@ export struct AIPanelView {
     } finally {
       this.repoBusy = false;
       this.isParsing = false;
+      this.currentProgressHint = '';
       this.refreshMemoryState();
       this.scrollToBottom();
+      this.emitSessionSnapshotChange();
     }
   }
 
@@ -245,14 +348,15 @@ export struct AIPanelView {
         this.displayItems.push(item);
       }
     }
-    if (result.tasks) {
+    const suppressProposalCards = this.shouldSuppressProposalCards();
+    if (result.tasks && !suppressProposalCards) {
       for (const task of result.tasks) {
         const item = new DisplayItem(DisplayItemType.AITask);
         item.task = task;
         this.displayItems.push(item);
       }
     }
-    if (result.habits) {
+    if (result.habits && !suppressProposalCards) {
       for (const habit of result.habits) {
         const item = new DisplayItem(DisplayItemType.AIHabit);
         item.habit = habit;
@@ -264,6 +368,55 @@ export struct AIPanelView {
       item.text = result.chatResponse;
       this.displayItems.push(item);
     }
+    this.lastSubmittedToolName = '';
+    this.emitSessionSnapshotChange();
+  }
+
+  private async handleToolCalls(result: MixedResult, query: string): Promise<boolean> {
+    if (!result.toolCalls || result.toolCalls.length === 0) {
+      return false;
+    }
+    this.toolOriginalUserText = query;
+    for (const call of result.toolCalls) {
+      if (!call) {
+        continue;
+      }
+      const toolReq: AIToolRequest = {
+        id: call.id || util.generateRandomUUID(true),
+        tool: call.tool,
+        args: call.tool === 'read_tasks'
+          ? sanitizeReadTasksArgs(call.args as ReadTasksArgs, query) as Object
+          : call.args,
+        reason: defaultToolReason(call.tool),
+        executionMode: call.executionMode
+      };
+
+      const proposalHandled = this.presentToolRequestAsProposal(toolReq);
+      if (proposalHandled) {
+        const normalizedTool = toolReq.tool.toLowerCase();
+        if (this.silentTaskAdd && (normalizedTool === 'create_task' || normalizedTool === 'create_habit')) {
+          this.handleProgressUpdate('thinking', '已开启静默添加，正在自动提交本批创建。');
+          await this.approveAndRunTool(toolReq);
+        }
+        continue;
+      }
+
+      if (toolReq.executionMode === 'AUTO') {
+        await this.approveAndRunTool(toolReq);
+      } else {
+        const reqItem = new DisplayItem(DisplayItemType.AIToolRequest);
+        reqItem.toolReq = toolReq;
+        this.displayItems.push(reqItem);
+      }
+    }
+    return true;
+  }
+
+  private shouldSuppressProposalCards(): boolean {
+    return this.lastSubmittedToolName === 'read_tasks' ||
+      this.lastSubmittedToolName === 'read_habits' ||
+      this.lastSubmittedToolName === 'create_task' ||
+      this.lastSubmittedToolName === 'create_habit';
   }
 
   private buildSessionContextString(maxChars: number = 1200): string {
@@ -274,11 +427,12 @@ export struct AIPanelView {
       switch (item.type) {
         case DisplayItemType.UserQuery: lines.push(`User: ${item.text}`); break;
         case DisplayItemType.AIChat: lines.push(`AI: ${item.text}`); break;
+        case DisplayItemType.AIThinking: lines.push(`Thinking: ${item.text}`); break;
         case DisplayItemType.AITask: lines.push(`PendingTask: ${item.task?.name} | due=${item.task?.dueTime || "无"}`); break;
         case DisplayItemType.AIHabit: lines.push(`PendingHabit: ${item.habit?.name} | ${item.habit?.period} x${item.habit?.timesPerPeriod}`); break;
         case DisplayItemType.AIMemory: lines.push(`MemoryCaptured: ${item.text}`); break;
         case DisplayItemType.AIToolRequest: lines.push(`ToolRequest: ${item.toolReq?.tool}`); break;
-        case DisplayItemType.AIToolResult: lines.push(`ToolResult: ${item.toolRes?.tool} count=${item.toolRes?.payload.summary.count}`); break;
+        case DisplayItemType.AIToolResult: lines.push(`ToolResult: ${toolResultSummary(item.toolRes as AIToolResult)}`); break;
       }
       if (lines.join("\n").length > maxChars) break;
     }
@@ -286,123 +440,18 @@ export struct AIPanelView {
   }
 
   // ==========================================
-  // MARK: - 工具数据处理 (Tool Call)
-  // ==========================================
-
-  private sanitizeReadTasksArgs(args: ReadTasksArgs, userQuery: string): ReadTasksArgs {
-    const days = Math.max(1, Math.min(args.timeRangeDays ?? 7, 30));
-    const limit = Math.max(1, Math.min(args.limit ?? 20, 50));
-    const status = (args.status ?? "OPEN").toUpperCase();
-    const sort = (args.sort ?? "DUE_ASC").toUpperCase();
-
-    // 清洗 AI 提取的关键词
-    let kws = (args.keywords ?? [])
-      .map(k => k.trim())
-      .filter(k => k.length > 0)
-      .slice(0, 3)
-      .map(k => k.substring(0, 12));
-
-    const q = userQuery.toLowerCase();
-    kws = kws.filter(k => q.includes(k.toLowerCase()));
-
-    // 泛查询屏蔽关键词
-    const patterns = ["这周", "本周", "最近", "有哪些任务", "有什么任务", "任务列表", "to do", "todo", "待办", "待办事项", "deadline", "ddl"];
-    const isGeneric = patterns.some(p => q.includes(p));
-    const explicitSignals = ["关于", "相关", "的任务", "的ddl", "的待办", "项目", "course", "project"];
-    const hasTopic = explicitSignals.some(s => q.includes(s));
-
-    if (isGeneric && !hasTopic) {
-      kws = [];
-    }
-
-    return { timeRangeDays: days, status, keywords: kws, limit, sort };
-  }
-
-  private makeReadTasksPayload(items: DDLItem[], args: ReadTasksArgs): ReadTasksResultPayload {
-    const now = new Date();
-    const days = args.timeRangeDays ?? 7;
-    const endMs = now.getTime() + (days * 86400 * 1000);
-    const keywords = (args.keywords ?? []).map(k => k.toLowerCase());
-    const wantStatus = (args.status ?? "OPEN").toUpperCase();
-
-    // 1. 过滤
-    let filteredItems: TaskAIDTO[] = [];
-
-    for (const t of items) {
-      if (t.isArchived) continue;
-      if (wantStatus === "OPEN" && t.isCompleted) continue;
-      if (wantStatus === "DONE" && !t.isCompleted) continue;
-
-      const dueStr = t.endTime?.trim();
-      if (!dueStr) continue; // 没有截止时间的不纳入未来范围计算
-
-      const due = DateTimeUtils.parseDateString(dueStr);
-      if (!due) continue;
-      if (due.getTime() < now.getTime() - 365 * 86400 * 1000) continue; // 极端脏数据
-      if (due.getTime() > endMs) continue; // 超过查询范围
-
-      if (keywords.length > 0) {
-        const hay = `${t.name} ${t.note || ''}`.toLowerCase();
-        const hit = keywords.some(k => hay.includes(k));
-        if (!hit) continue;
-      }
-
-      filteredItems.push({ ddl: t, due });
-    }
-
-    // 2. 排序
-    const sort = (args.sort ?? "DUE_ASC").toUpperCase();
-    filteredItems.sort((a, b) => {
-      return sort === "UPDATED_DESC"
-        ? b.due.getTime() - a.due.getTime()
-        : a.due.getTime() - b.due.getTime();
-    });
-
-    // 3. Limit
-    const limit = args.limit ?? 20;
-    if (filteredItems.length > limit) {
-      filteredItems = filteredItems.slice(0, limit);
-    }
-
-    // 4. 统计 Summary
-    let overdue = 0;
-    let dueSoon24h = 0;
-    for (const item of filteredItems) {
-      const due = item.due
-      if (due.getTime() < now.getTime()) overdue++;
-      else if (due.getTime() <= now.getTime() + 86400 * 1000) dueSoon24h++;
-    }
-
-    const digestTasks: TaskDigestItem[] = filteredItems.map((item): TaskDigestItem => ({
-      id: typeof item.ddl.id === 'number' ? item.ddl.id : 0,
-      name: item.ddl.name,
-      due: item.ddl.endTime || "",
-      status: item.ddl.isCompleted ? "DONE" : "OPEN",
-      notePreview: (item.ddl.note || "").substring(0, 40)
-    }));
-
-    return {
-      tasks: digestTasks,
-      summary: { count: digestTasks.length, overdue, dueSoon24h }
-    };
-  }
-
-  // ==========================================
   // MARK: - 任务创建
   // ==========================================
 
-  private makeTaskKey(task: AITask): string {
-    return `${task.name}#${task.dueTime || 'none'}`;
-  }
-
-  private makeHabitKey(habit: AIHabit): string {
-    return `${habit.name}#${habit.period}#${habit.timesPerPeriod}`;
-  }
-
   async createTaskFromProposal(task: AITask) {
     if (this.repoBusy) return;
-    this.repoBusy = true;
     try {
+      const linkedReq = this.findTaskProposalToolRequest(task);
+      if (linkedReq) {
+        await this.approveAndRunTool(linkedReq);
+        return;
+      }
+      this.repoBusy = true;
       // 显示二次确认 Dialog
       AlertDialog.show({
         title: '确认创建任务？',
@@ -424,7 +473,7 @@ export struct AIPanelView {
               name: task.name,
               note: task.note || "",
               startTime: DateTimeUtils.toLocalISOString(now),
-              endTime: task.dueTime ? DateTimeUtils.toLocalISOString(end) : "",
+              endTime: DateTimeUtils.toLocalISOString(end),
               isCompleted: false,
               completeTime: "",
               isArchived: false,
@@ -433,13 +482,14 @@ export struct AIPanelView {
               calendarEventId: null
             });
 
-            this.addedTaskKeys.push(this.makeTaskKey(task));
+            this.addedTaskKeys.push(makeTaskKey(task));
 
             const item = new DisplayItem(DisplayItemType.AIChat);
             item.text = `已添加任务：${task.name}`;
             this.displayItems.push(item);
             this.scrollToBottom();
             this.repoBusy = false;
+            this.emitSessionSnapshotChange();
           }
         }
       });
@@ -487,13 +537,16 @@ export struct AIPanelView {
       // Avatar
       Stack() {
         Circle().width(78).height(78).fillOpacity(0.1).fill(this.theme.brand)
-        SymbolGlyph($r('sys.symbol.wand_and_stars'))
-          .fontSize(30)
-          .fontColor([this.theme.brand])
+        Symbol({
+          icon: $r('app.media.lifi'),
+          isImage: true,
+          fontSize: 30,
+          fontColor: this.theme.brand
+        })
       }
       .margin({ top: 40 })
 
-      Text('Deadliner Agent')
+      Text('Lifi AI')
         .fontSize(20)
         .fontWeight(FontWeight.Medium)
       Text('一句话生成任务 / 习惯 / 记忆')
@@ -536,11 +589,17 @@ export struct AIPanelView {
       // 核心滚动区域
       List({ scroller: this.scroller }) {
         ListItem() {
+          Column().height(this.topAvoidHeight)
+        }
+
+        ListItem() {
           if (this.displayItems.length === 0) {
             this.InitialGuideView()
           } else {
             Column() {
-              this.MemoryHintView()
+              if (!this.isReadonlyHistoryMode) {
+                this.MemoryHintView()
+              }
 
               ForEach(this.displayItems, (item: DisplayItem) => {
                 this.RenderItem(item)
@@ -549,7 +608,7 @@ export struct AIPanelView {
               if (this.isParsing) {
                 Row({ space: 8 }) {
                   LoadingProgress().width(16).height(16).color(this.theme.brand)
-                  Text("Deadliner 正在思考...").fontSize(12).fontColor($r('sys.color.font_secondary'))
+                  Text(this.currentProgressHint || "Deadliner 正在思考...").fontSize(12).fontColor($r('sys.color.font_secondary'))
                 }
                 .width('100%')
                 .padding({ left: 16, top: 8, bottom: 8 })
@@ -562,15 +621,19 @@ export struct AIPanelView {
       .layoutWeight(1)
       .width('100%')
       .alignListItem(ListItemAlign.Center)
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
 
       // 输入区域
       Row() {
-        TextInput({ text: $$this.inputText, placeholder: '告诉 Deadliner 你的计划...' })
+        TextInput({
+          text: $$this.inputText,
+          placeholder: this.isReadonlyHistoryMode ? '历史对话仅供查看，请新建对话继续' : '告诉 Deadliner 你的计划...'
+        })
           .layoutWeight(1)
           .backgroundColor($r('sys.color.comp_background_tertiary'))
           .borderRadius(20)
           .height(40)
-          .enabled(!this.isParsing)
+          .enabled(!this.isParsing && !this.isReadonlyHistoryMode)
           .onSubmit(() => { this.runSmartAgent() })
 
         Button({ type: ButtonType.Circle }) {
@@ -581,14 +644,15 @@ export struct AIPanelView {
           }
         }
         .width(40).height(40).margin({ left: 12 })
-        .backgroundColor((this.inputText.trim().length > 0 && !this.isParsing) ? this.theme.brand : $r('sys.color.comp_background_tertiary'))
-        .enabled(!this.isParsing && this.inputText.trim().length > 0)
+        .backgroundColor((this.inputText.trim().length > 0 && !this.isParsing && !this.isReadonlyHistoryMode) ? this.theme.brand : $r('sys.color.comp_background_tertiary'))
+        .enabled(!this.isParsing && !this.isReadonlyHistoryMode && this.inputText.trim().length > 0)
         .onClick(() => { this.runSmartAgent() })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 36 })
+      .padding({ left: 16, right: 16, top: 12, bottom: 36 + this.bottomPadding })
     }
     .width('100%').height('100%')
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 
   @Builder
@@ -606,6 +670,18 @@ export struct AIPanelView {
           .padding(12).borderRadius({ topLeft: 16, topRight: 16, bottomLeft: 4, bottomRight: 16 })
         Blank()
       }.width('100%').padding({ top: 8, bottom: 8 })
+    }
+    else if (item.type === DisplayItemType.AIThinking) {
+      Row({ space: 8 }) {
+        SymbolGlyph($r('sys.symbol.data')).fontSize(14).fontColor([this.theme.brand])
+        Text(item.text).fontSize(12).fontColor($r('sys.color.font_secondary'))
+        Blank()
+      }
+      .width('100%')
+      .padding(12)
+      .backgroundColor('#100A59F7')
+      .borderRadius(16)
+      .margin({ top: 4, bottom: 4 })
     }
     else if (item.type === DisplayItemType.AIMemory) {
       Row({ space: 8 }) {
@@ -627,7 +703,7 @@ export struct AIPanelView {
     else if (item.type === DisplayItemType.AIToolResult && item.toolRes) {
       Row({ space: 8 }) {
         SymbolGlyph($r('sys.symbol.data')).fontSize(14).fontColor([Color.Orange])
-        Text(`已读取任务：${item.toolRes.payload.summary.count} 条（逾期 ${item.toolRes.payload.summary.overdue}）`)
+        Text(toolResultSummary(item.toolRes))
           .fontSize(12).fontColor($r('sys.color.font_secondary'))
         Blank()
       }.width('100%').padding(12).backgroundColor('#10FFA500').borderRadius(10).margin({ top: 4, bottom: 4 })
@@ -648,13 +724,13 @@ export struct AIPanelView {
         Text(task.dueTime).fontSize(14).fontColor(this.theme.accent).width('100%')
       }
 
-      Button(this.addedTaskKeys.includes(this.makeTaskKey(task)) ? "已添加" : "确认添加")
+      Button(this.addedTaskKeys.includes(makeTaskKey(task)) ? "已添加" : "确认添加")
         .type(ButtonType.Normal)
         .borderRadius(24)
         .width('100%')
-        .backgroundColor(this.addedTaskKeys.includes(this.makeTaskKey(task)) ? $r('sys.color.comp_background_tertiary') : this.theme.accent)
-        .fontColor(this.addedTaskKeys.includes(this.makeTaskKey(task)) ? $r('sys.color.font_secondary') : Color.White)
-        .enabled(!this.addedTaskKeys.includes(this.makeTaskKey(task)) && !this.repoBusy)
+        .backgroundColor(this.addedTaskKeys.includes(makeTaskKey(task)) ? $r('sys.color.comp_background_tertiary') : this.theme.accent)
+        .fontColor(this.addedTaskKeys.includes(makeTaskKey(task)) ? $r('sys.color.font_secondary') : Color.White)
+        .enabled(!this.addedTaskKeys.includes(makeTaskKey(task)) && !this.repoBusy)
         .onClick(() => { this.createTaskFromProposal(task); })
         .margin({ top: 8 })
     }
@@ -666,14 +742,30 @@ export struct AIPanelView {
     Column({ space: 12 }) {
       Row({ space: 6 }) {
         SymbolGlyph($r('sys.symbol.archivebox')).fontSize(14).fontColor([Color.Orange])
-        Text("需要读取任务列表").fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('sys.color.font_secondary'))
+        Text(toolDisplayTitle(req.tool)).fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('sys.color.font_secondary'))
         Blank()
       }.width('100%')
 
-      Text(req.reason || "为了回答你的问题，我需要查看你近期的任务。").fontSize(14).fontColor($r('sys.color.font_primary')).width('100%')
+      Text(req.reason || defaultToolReason(req.tool)).fontSize(14).fontColor($r('sys.color.font_primary')).width('100%')
 
-      Text(`范围：未来 ${req.args.timeRangeDays || 7} 天 · 状态：${req.args.status || "OPEN"}`)
+      Text(toolArgsSummary(req))
         .fontSize(12).fontColor($r('sys.color.font_secondary')).width('100%')
+
+      if (req.tool === 'create_task' || req.tool === 'create_habit') {
+        Scroll(this.scroller) {
+          Text(toolArgsDetail(req))
+            .fontSize(12)
+            .fontColor($r('sys.color.font_secondary'))
+            .width('100%')
+        }
+        .scrollable(ScrollDirection.Vertical)
+        .scrollBar(BarState.Auto)
+        .height(140)
+        .width('100%')
+        .padding(10)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(12)
+      }
 
       Row({ space: 12 }) {
         Button("拒绝")
@@ -681,9 +773,10 @@ export struct AIPanelView {
           .backgroundColor($r('sys.color.comp_background_tertiary')).fontColor($r('sys.color.font_primary'))
           .onClick(() => {
             const item = new DisplayItem(DisplayItemType.AIChat);
-            item.text = "好的，我不读取任务列表。你可以告诉我更具体的任务信息。";
+            item.text = "好的，这次我不执行这个本地操作。你也可以提供更明确的信息让我继续。";
             this.displayItems.push(item);
             this.scrollToBottom();
+            this.emitSessionSnapshotChange();
           })
 
         Button("允许一次")
@@ -714,9 +807,14 @@ export struct AIPanelView {
 
   async createHabitFromProposal(habit: AIHabit) {
     if (this.repoBusy) return;
-    this.repoBusy = true;
 
     try {
+      const linkedReq = this.findHabitProposalToolRequest(habit);
+      if (linkedReq) {
+        await this.approveAndRunTool(linkedReq);
+        return;
+      }
+      this.repoBusy = true;
       // 1. 映射 Period (周期) 到 pIndex
       let pIndex = 0; // 默认 DAILY
       if (habit.period === 'WEEKLY') pIndex = 1;
@@ -747,11 +845,12 @@ export struct AIPanelView {
 
       // 5. 只有保存成功，才更新界面的 AI 聊天流和按钮状态
       if (isSuccess) {
-        this.addedHabitKeys.push(this.makeHabitKey(habit));
+        this.addedHabitKeys.push(makeHabitKey(habit));
         const item = new DisplayItem(DisplayItemType.AIChat);
         item.text = `已开启习惯：${habit.name}`;
         this.displayItems.push(item);
         this.scrollToBottom();
+        this.emitSessionSnapshotChange();
       }
 
     } catch (err) {
@@ -775,22 +874,131 @@ export struct AIPanelView {
       Text(`${habit.period} / ${habit.timesPerPeriod}次`)
         .fontSize(14).fontColor(this.theme.accent).width('100%')
 
-      Button(this.addedHabitKeys.includes(this.makeHabitKey(habit)) ? "已开启" : "开启习惯")
+      Button(this.addedHabitKeys.includes(makeHabitKey(habit)) ? "已开启" : "开启习惯")
         .type(ButtonType.Normal)
         .borderRadius(24)
         .width('100%')
-        .backgroundColor(this.addedHabitKeys.includes(this.makeHabitKey(habit)) ? $r('sys.color.comp_background_tertiary') : this.theme.accent)
-        .fontColor(this.addedHabitKeys.includes(this.makeHabitKey(habit)) ? $r('sys.color.font_secondary') : Color.White)
-        .enabled(!this.addedHabitKeys.includes(this.makeHabitKey(habit)) && !this.repoBusy)
+        .backgroundColor(this.addedHabitKeys.includes(makeHabitKey(habit)) ? $r('sys.color.comp_background_tertiary') : this.theme.accent)
+        .fontColor(this.addedHabitKeys.includes(makeHabitKey(habit)) ? $r('sys.color.font_secondary') : Color.White)
+        .enabled(!this.addedHabitKeys.includes(makeHabitKey(habit)) && !this.repoBusy)
         .onClick(() => { this.createHabitFromProposal(habit); })
         .margin({ top: 8 })
     }
     .width('100%').padding(16).backgroundColor($r('sys.color.comp_background_secondary')).borderRadius(16).margin({ top: 8, bottom: 8 })
   }
 
+  private handleProgressUpdate(kind: string, message: string) {
+    if (!message || message.length === 0) {
+      return;
+    }
+    this.currentProgressHint = message;
+    if (!this.shouldAppendThinkingMessage(message)) {
+      return;
+    }
+    const item = new DisplayItem(DisplayItemType.AIThinking);
+    item.text = message;
+    this.displayItems.push(item);
+    this.scrollToBottom();
+    this.emitSessionSnapshotChange();
+  }
+
+  private shouldAppendThinkingMessage(message: string): boolean {
+    const lastItem = this.displayItems.length > 0 ? this.displayItems[this.displayItems.length - 1] : undefined;
+    if (!lastItem || lastItem.type !== DisplayItemType.AIThinking) {
+      return true;
+    }
+    return lastItem.text !== message;
+  }
+
+  private presentToolRequestAsProposal(req: AIToolRequest): boolean {
+    if (req.tool === 'create_task') {
+      const proposals = taskProposalsFromToolRequest(req);
+      if (proposals.length === 0) {
+        return false;
+      }
+      if (proposals.length > 1) {
+        return false;
+      }
+      for (const proposal of proposals) {
+        this.taskProposalToolRequests.push(new ProposalToolRequestLink(makeTaskKey(proposal), req));
+        const item = new DisplayItem(DisplayItemType.AITask);
+        item.task = proposal;
+        this.displayItems.push(item);
+      }
+      this.handleProgressUpdate('thinking', `Deadliner 已经整理好 ${proposals.length} 个待创建任务。`);
+      return true;
+    }
+    if (req.tool === 'create_habit') {
+      const proposals = habitProposalsFromToolRequest(req);
+      if (proposals.length === 0) {
+        return false;
+      }
+      if (proposals.length > 1) {
+        return false;
+      }
+      for (const proposal of proposals) {
+        this.habitProposalToolRequests.push(new ProposalToolRequestLink(makeHabitKey(proposal), req));
+        const item = new DisplayItem(DisplayItemType.AIHabit);
+        item.habit = proposal;
+        this.displayItems.push(item);
+      }
+      this.handleProgressUpdate('thinking', `Deadliner 已经整理好 ${proposals.length} 个待创建习惯。`);
+      return true;
+    }
+    return false;
+  }
+
+  private findTaskProposalToolRequest(task: AITask): AIToolRequest | null {
+    const key = makeTaskKey(task);
+    const found = this.taskProposalToolRequests.find((item) => item.key === key);
+    return found ? found.request : null;
+  }
+
+  private findHabitProposalToolRequest(habit: AIHabit): AIToolRequest | null {
+    const key = makeHabitKey(habit);
+    const found = this.habitProposalToolRequests.find((item) => item.key === key);
+    return found ? found.request : null;
+  }
+
+  private clearProposalToolRequest(toolName: string, requestId: string) {
+    if (toolName === 'create_task') {
+      this.taskProposalToolRequests = this.taskProposalToolRequests.filter((item) => item.request.id !== requestId);
+    }
+    if (toolName === 'create_habit') {
+      this.habitProposalToolRequests = this.habitProposalToolRequests.filter((item) => item.request.id !== requestId);
+    }
+  }
+
+  private markProposalApplied(req: AIToolRequest, result: AIToolResult) {
+    if (req.tool === 'create_task') {
+      const proposals = taskProposalsFromToolRequest(req);
+      const payload = result.payload as AdapterCreateTaskPayload;
+      const successCount = payload.summary?.successCount ?? (payload.ok ? proposals.length : 0);
+      for (let index = 0; index < Math.min(successCount, proposals.length); index++) {
+        const key = makeTaskKey(proposals[index]);
+        if (!this.addedTaskKeys.includes(key)) {
+          this.addedTaskKeys.push(key);
+        }
+      }
+      return;
+    }
+
+    if (req.tool === 'create_habit') {
+      const proposals = habitProposalsFromToolRequest(req);
+      const payload = result.payload as AdapterCreateHabitPayload;
+      const successCount = payload.summary?.successCount ?? (payload.ok ? proposals.length : 0);
+      for (let index = 0; index < Math.min(successCount, proposals.length); index++) {
+        const key = makeHabitKey(proposals[index]);
+        if (!this.addedHabitKeys.includes(key)) {
+          this.addedHabitKeys.push(key);
+        }
+      }
+    }
+  }
+
   build() {
     Column() {
-      if (this.isLoggedIn) {
+      if (this.isLoggedIn || this.bypassHuaweiLogin) {
         this.RealAIContent()
       } else {
         LoginPanelView()
@@ -812,5 +1020,26 @@ export struct AIPanelView {
       backgroundColor: Color.Transparent,
       showClose: false
     })
+  }
+}
+
+@Component
+export struct AIPanelView {
+  @Prop bypassHuaweiLogin: boolean = false;
+  @Prop topAvoidHeight: number = 0;
+  @Prop bottomPadding: number = 0;
+  @Prop startNewChatSignal: number = 0;
+  @Require onDismissPanel: () => void;
+
+  build() {
+    AIWorkspaceView({
+      bypassHuaweiLogin: this.bypassHuaweiLogin,
+      topAvoidHeight: this.topAvoidHeight,
+      bottomPadding: this.bottomPadding,
+      startNewChatSignal: this.startNewChatSignal,
+      onSessionSnapshotChange: (_snapshot: AIWorkspaceSessionSnapshot): void => {}
+    })
+      .width('100%')
+      .height('100%')
   }
 }

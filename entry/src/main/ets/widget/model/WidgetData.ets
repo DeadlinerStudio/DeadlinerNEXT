@@ -2,6 +2,9 @@ export class WidgetData {
   /** 任务列表 (最多传3-4个，传太多会超卡片内存限制) */
   tasks: Array<WidgetTaskItem> = [];
 
+  /** 当前主题 Key，用于卡片内做资源分发 */
+  themeKey: string = 'vibrant';
+
   /** 更新时间 (用于调试或显示) */
   updateTime: string = '';
 

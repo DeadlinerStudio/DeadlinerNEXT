@@ -17,6 +17,9 @@ export struct DevOptionsPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+
+  readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   // 辅助方法：生成 toast
   private toast(msg: string) {
@@ -27,6 +30,9 @@ export struct DevOptionsPage {
     HdsNavDestination() {
       Scroll() {
         Column({ space: 12 }) {
+          Blank()
+            .height(this.isWideScreen ? this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT : 68)
+            .width('100%')
 
           // =========================================================
           // 0. 清理环境
@@ -169,11 +175,12 @@ export struct DevOptionsPage {
 
         }
         .width('100%')
-        .padding({ top: 68, bottom: 50 })
+        .padding({ bottom: 50 })
         .justifyContent(FlexAlign.Start)
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: {
         title: {

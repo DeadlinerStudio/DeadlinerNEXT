@@ -18,7 +18,7 @@ export struct HelpDetailPage {
   @State markdownContent: string = '';
   @State title: string = '详情';
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   async loadMarkdown() {
@@ -37,6 +37,7 @@ export struct HelpDetailPage {
                 title: this.item.title,
                 subtitle: this.item.subtitle,
                 icon: this.item.icon ?? $r('sys.symbol.doc_text'),
+                isImage: this.item.isImage,
                 baseColor: this.item.themeColor,
               })
             }
@@ -68,6 +69,7 @@ export struct HelpDetailPage {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: true,
       content: { title: { mainTitle: this.title } },
       style: getImmersiveTitleBarStyle(false),
     })

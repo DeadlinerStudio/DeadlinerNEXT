@@ -27,7 +27,8 @@ struct NotificationSettings {
 
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   // --- 1. 系统权限状态 (Source of Truth 是 OS，所以用 @State) ---
@@ -76,7 +77,7 @@ struct NotificationSettings {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
 
           // =========================================================
@@ -226,6 +227,7 @@ struct NotificationSettings {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "通知与提醒" } }
     })

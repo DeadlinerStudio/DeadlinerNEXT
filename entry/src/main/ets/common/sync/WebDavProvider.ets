@@ -1,12 +1,16 @@
 import { ISyncProvider, SyncResultProvider } from './SyncProvider';
-import { SnapshotRoot } from './SyncService';
+import { HabitSnapshotRoot, SnapshotRoot, SnapshotRootV1, SyncService } from './SyncService';
 import { WebUtils, PreconditionFailedError } from '../network/WebUtils';
 import { util } from '@kit.ArkTS';
 
 export class WebDavProvider implements ISyncProvider {
   private web: WebUtils;
-  private readonly path = "Deadliner/snapshot-v1.json";
-  private currentEtag: string | null = null;
+  private readonly v2Path = 'Deadliner/snapshot-v2.json';
+  private readonly habitV2Path = 'Deadliner/habit-snapshot-v2.json';
+  private readonly v1Path = 'Deadliner/snapshot-v1.json';
+  private currentV2Etag: string | null = null;
+  private currentHabitV2Etag: string | null = null;
+  private currentV1Etag: string | null = null;
   private textDecoder = util.TextDecoder.create('utf-8');
   private textEncoder = new util.TextEncoder();
 
@@ -16,35 +20,60 @@ export class WebDavProvider implements ISyncProvider {
 
   async getRemoteSnapshot(): Promise<SyncResultProvider> {
     try {
-      // 省略部分错误捕获细节，照搬你原来的逻辑
-      const webHead = await this.web.head(this.path);
-      if ([404, 409, 410].includes(webHead.code)) {
-        return { success: true, snapshot: null }; // 需初始化
+      let ddlSnapshot: SnapshotRoot | null = null;
+      let habitSnapshot: HabitSnapshotRoot | null = null;
+
+      const v2Head = await this.web.head(this.v2Path);
+      if (![404, 409, 410].includes(v2Head.code)) {
+        const webBytes = await this.web.getBytes(this.v2Path);
+        this.currentV2Etag = webBytes.etag;
+        const jsonStr = this.textDecoder.decodeToString(webBytes.bytes);
+        ddlSnapshot = SyncService.normalizeSnapshotV2(JSON.parse(jsonStr) as SnapshotRoot);
       }
 
-      const webBytes = await this.web.getBytes(this.path);
-      this.currentEtag = webBytes.etag;
-      const jsonStr = this.textDecoder.decodeToString(webBytes.bytes);
-      const snapshot = JSON.parse(jsonStr) as SnapshotRoot;
+      if (ddlSnapshot === null) {
+        const v1Head = await this.web.head(this.v1Path);
+        if (![404, 409, 410].includes(v1Head.code)) {
+          const webBytes = await this.web.getBytes(this.v1Path);
+          this.currentV1Etag = webBytes.etag;
+          const jsonStr = this.textDecoder.decodeToString(webBytes.bytes);
+          ddlSnapshot = SyncService.upgradeV1ToV2(JSON.parse(jsonStr) as SnapshotRootV1);
+        }
+      }
 
-      if (!snapshot.items) snapshot.items = [];
-      return { success: true, snapshot: snapshot };
+      const habitHead = await this.web.head(this.habitV2Path);
+      if (![404, 409, 410].includes(habitHead.code)) {
+        const webBytes = await this.web.getBytes(this.habitV2Path);
+        this.currentHabitV2Etag = webBytes.etag;
+        const jsonStr = this.textDecoder.decodeToString(webBytes.bytes);
+        habitSnapshot = SyncService.normalizeHabitSnapshotV2(JSON.parse(jsonStr) as HabitSnapshotRoot);
+      }
 
+      return { success: true, ddlSnapshot, habitSnapshot };
     } catch (e) {
-      return { success: false, snapshot: null };
+      return { success: false, ddlSnapshot: null, habitSnapshot: null };
     }
   }
 
-  async putMergedSnapshot(merged: SnapshotRoot): Promise<boolean> {
+  async putMergedSnapshot(ddlMerged: SnapshotRoot, habitMerged: HabitSnapshotRoot): Promise<boolean> {
     try {
-      await this.web.ensureDir("Deadliner");
-      const jsonStr = JSON.stringify(merged);
-      const bytes = this.textEncoder.encodeInto(jsonStr);
-      await this.web.putBytes(this.path, bytes, this.currentEtag, false);
+      await this.web.ensureDir('Deadliner');
+
+      const normalized = SyncService.normalizeSnapshotV2(ddlMerged);
+      const v2Bytes = this.textEncoder.encodeInto(JSON.stringify(normalized));
+      await this.web.putBytes(this.v2Path, v2Bytes, this.currentV2Etag, false);
+
+      const v1Projection = SyncService.projectV2ToV1(normalized);
+      const v1Bytes = this.textEncoder.encodeInto(JSON.stringify(v1Projection));
+      await this.web.putBytes(this.v1Path, v1Bytes, this.currentV1Etag, false);
+
+      const normalizedHabit = SyncService.normalizeHabitSnapshotV2(habitMerged);
+      const habitBytes = this.textEncoder.encodeInto(JSON.stringify(normalizedHabit));
+      await this.web.putBytes(this.habitV2Path, habitBytes, this.currentHabitV2Etag, false);
       return true;
     } catch (e) {
       if (e instanceof PreconditionFailedError) {
-        console.warn("[WebDAV] Conflict 412");
+        console.warn('[WebDAV] Conflict 412');
       }
       return false;
     }

@@ -4,6 +4,8 @@ import { LoginPanelView } from "../common/LoginPanelView";
 import { authentication } from "@kit.AccountKit";
 import { HuaweiAccountUtils } from "../../utils/account/HuaweiAccountUtils";
 import { ITheme } from "../../common/theme/ThemeModel";
+import { BlurBackgroundModifier } from "../../utils/animation/BlurBackgroundModifier";
+import { Symbol } from "./infra/Symbol";
 
 /**
  * SettingsSection: 类似 Android 的 Surface 容器
@@ -11,10 +13,15 @@ import { ITheme } from "../../common/theme/ThemeModel";
  */
 @Component
 export struct SettingsSection {
+
+  @StorageProp('customBackgroundImage') customBg: string = '';
+
   title?: string | Resource;
   @BuilderParam content: () => void;
 
   @State bgColor: ResourceColor = $r('app.color.background_secondary');
+  @Prop mainUserPage: boolean = false;
+  marginHorizontal?: number = 16;
 
   build() {
     Column() {
@@ -33,11 +40,10 @@ export struct SettingsSection {
         this.content()
       }
       .width('100%')
-      // 核心样式：背景色 + 大圆角 (24vp)
-      .backgroundColor(this.bgColor)
+      .attributeModifier(new BlurBackgroundModifier((!!this.customBg && this.mainUserPage), this.bgColor, BlurStyle.Regular))
       .borderRadius(24)
       .padding(4) // 让内部 Item 离边缘有间隙 (对应 Android 的 container padding)
-      .margin({ left: 16, right: 16 }) // 卡片离屏幕两边的距离
+      .margin({ left: this.marginHorizontal, right: this.marginHorizontal }) // 卡片离屏幕两边的距离
     }
     .width('100%')
   }
@@ -52,6 +58,7 @@ export struct SettingsItem {
   title: string | Resource = '';
   subtitle?: string | Resource;
   icon?: Resource;
+  isImage?: boolean;
   onItemClick?: () => void;
 
   // 内部状态，用于处理按压效果
@@ -60,9 +67,10 @@ export struct SettingsItem {
   build() {
     Row() {
       if (this.icon) {
-        SymbolGlyph(this.icon) // 推荐使用 Symbol，如果用 PNG 改用 Image
-          .fontSize(24)
-          .fontColor([$r('app.color.font_primary')])
+        Symbol({
+          icon: this.icon,
+          isImage: this.isImage === true,
+        })
           .margin({ right: 16 })
       }
 
@@ -121,6 +129,7 @@ export struct SettingsGridItem {
   title: string | Resource = '';
   icon?: Resource;
   iconColor?: ResourceColor = $r('app.color.font_primary');
+  isImage?: boolean;
   onItemClick?: () => void;
 
   // 内部状态，用于处理按压效果
@@ -129,10 +138,13 @@ export struct SettingsGridItem {
   build() {
     Column() {
       if (this.icon) {
-        SymbolGlyph(this.icon)
-          .fontSize(28) // 图标稍微大一点
-          .fontColor([this.iconColor]) // 或者用 brand 颜色高亮：this.theme.brand
-          .margin({ bottom: 8 }) // 图标和文字的间距
+        Symbol({
+          icon: this.icon,
+          isImage: this.isImage,
+          fontColor: this.iconColor,
+          fontSize: 28
+        })
+          .margin({ bottom: 8 })
       }
 
       Text(this.title)
@@ -539,32 +551,54 @@ export struct SubSettingsSwitch {
 export struct SettingsCheckItem {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
-  title: string | Resource = '';
-  icon?: Resource;
+  @Prop title: string | Resource = '';
+  @Prop icon: Resource | undefined = undefined;
+  @Prop image: ResourceStr | undefined = undefined;
   @Prop isSelected: boolean = false;
+  @Prop isImage: boolean = false;
+
+  @Prop imageOpacity: number = 1;
+  @Prop imageScale: number = 1;
+
+  /**
+   * 用于强制刷新 Image 节点。
+   * 普通图标可以不传；动态轮播图标传 seasonPreviewKey。
+   */
+  @Prop imageKey: string = '';
+
   onItemClick?: () => void;
 
   @State isPressed: boolean = false;
 
   build() {
     Row() {
-      // 1. 左侧图标
       if (this.icon) {
-        SymbolGlyph(this.icon)
-          .fontSize(24)
-          .fontColor([$r('app.color.font_primary')])
+        Symbol({
+          icon: this.icon,
+          isImage: this.isImage
+        })
           .margin({ right: 16 })
+      } else if (this.image) {
+        Image(this.image)
+          .key(this.imageKey)
+          .size({ height: 40, width: 40 })
+          .margin({ right: 16 })
+          .borderRadius(10)
+          .clip(true)
+          .opacity(this.imageOpacity)
+          .scale({ x: this.imageScale, y: this.imageScale })
+          .animation({
+            duration: 180,
+            curve: Curve.EaseInOut
+          })
       }
 
-      // 2. 标题
       Text(this.title)
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.font_primary'))
         .layoutWeight(1)
 
-      // 3. 右侧 Checkbox
-      // hitTestBehavior(HitTestMode.None) 让点击事件穿透给 Row，体验更好
       Checkbox({ name: 'checkbox', group: 'group' })
         .select(this.isSelected)
         .selectedColor(this.theme.brand)
@@ -573,7 +607,7 @@ export struct SettingsCheckItem {
         .height(20)
     }
     .width('100%')
-    .height(56) // 标准列表高度
+    .height(56)
     .padding({ left: 12, right: 12 })
     .borderRadius(20)
     .backgroundColor(this.isPressed ? $r('sys.color.ohos_id_color_click_effect') : Color.Transparent)

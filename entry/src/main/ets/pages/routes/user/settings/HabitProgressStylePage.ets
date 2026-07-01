@@ -21,7 +21,8 @@ interface StyleOption {
 @Component
 struct HabitProgressStyleSettings {
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   // 双向绑定 AppStorage，确保选中状态 UI 自动刷新
@@ -45,7 +46,7 @@ struct HabitProgressStyleSettings {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
 
           // 1. 预览区域
@@ -105,6 +106,7 @@ struct HabitProgressStyleSettings {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "习惯进度展示样式" } }
     })

@@ -35,6 +35,8 @@ export class SettingsConstants {
   static readonly KEY_NOTIFY_SUMMARY_TIME = 'notify_summary_time';
 
   static readonly KEY_STARTUP_PAGE = 'startup_page';
+  static readonly KEY_SHOW_GUIDE_NEXT_LAUNCH = 'show_guide_next_launch';
+  static readonly KEY_APP_FIRST_LAUNCH = 'app_first_launch';
 
   static readonly KEY_ENGLISH_SOMEWHERE = 'english_somewhere';
   static readonly KEY_HABIT_PROGRESS_STYLE = 'habit_progress_style';
@@ -45,12 +47,20 @@ export class SettingsConstants {
 
   static readonly KEY_SHOW_AI_INPUT = 'show_ai_input';
   static readonly KEY_DIRECT_ADD_ON_AI = 'direct_add_on_ai';
+  static readonly KEY_AI_SILENT_TASK_ADD = 'ai_silent_task_add';
+  static readonly KEY_SHOW_PAPERTALK_SHARE = 'show_papertalk_share';
 
   static readonly KEY_AUTO_ARCHIVE_DAYS = 'auto_archive_days';
+  static readonly KEY_TOMBSTONE_RETENTION_DAYS = 'tombstone_retention_days';
 
   static readonly KEY_ENABLE_API23 = 'enable_api23';
   static readonly KEY_API23_MATERIAL_LEVEL = 'material_level';
+  static readonly KEY_EXPERIMENTAL_COMPONENTS = 'experimental_components';
 
   static readonly KEY_OVERVIEW_CARD_ORDER = 'overview_card_order';
   static readonly KEY_TREND_CARD_ORDER = 'trend_card_order';
+  static readonly KEY_MONTHLY_ANALYSIS = 'monthly_analysis';
+  static readonly KEY_LAST_ANALYZED_MONTH = 'last_analyzed_month';
+
+  static readonly KEY_SHOW_MINIBAR = 'show_minibar';
 }

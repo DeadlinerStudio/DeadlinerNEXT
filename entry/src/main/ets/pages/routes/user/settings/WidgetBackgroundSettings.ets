@@ -24,7 +24,8 @@ export function WidgetBackgroundSettingsBuilder() {
 
 @Component
 struct WidgetBackgroundSettings {
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   // 这里的 Link 会与传入的 storage 绑定，同时驱动预览组件的 Prop
@@ -37,6 +38,7 @@ struct WidgetBackgroundSettings {
 
   async aboutToAppear() {
     // 初始化模拟数据
+    this.widgetData.themeKey = AppStorage.get<string>('currentThemeKey') ?? 'vibrant';
     this.widgetData.totalCount = 3;
     this.widgetData.tasks = [
       { title: '完成图形学作业', timeDesc: '2小时', isUrgent: true },
@@ -239,7 +241,7 @@ struct WidgetBackgroundSettings {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
           SettingsSection() {
             Column() {
@@ -293,6 +295,7 @@ struct WidgetBackgroundSettings {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "小组件样式" } }
     })

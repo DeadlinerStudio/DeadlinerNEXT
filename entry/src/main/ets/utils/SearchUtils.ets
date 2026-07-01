@@ -1,9 +1,12 @@
 import { LocalValues } from "../common/local/LocalValues";
 import { HabitRepository } from "../common/repository/HabitRepository";
+import { InspirationRepository } from "../common/repository/InspirationRepository";
 import { TaskRepository } from "../common/repository/TaskRepository";
 import { DDLItem, DeadlineType, Habit, HabitGoalType, HabitRecordStatus, HabitStatus, HabitPeriod } from "../model/DDLModels";
+import { InspirationItem } from "../model/InspirationModels";
 import { DDLStatus } from "../model/DDLStatus";
 import { HabitWithDailyStatus } from "../pages/components/HabitComponents";
+import { TaskState, TaskStateMachine } from "../model/TaskStateMachine";
 
 export interface TaskUIModel {
   title: string;
@@ -13,6 +16,7 @@ export interface TaskUIModel {
   isStarred: boolean;
   status: DDLStatus;
   dbId: number;
+  taskState: TaskState;
   originalItem: DDLItem;
 }
 
@@ -23,6 +27,7 @@ export interface ArchivedSearchModel {
   detail1: string;        // 对应卡片的 startTime (左下角信息)
   detail2: string;        // 对应卡片的 completeTime (右下角信息)
   note: string;
+  badgeText: string;
   originalType: 'task' | 'habit';
   originalItem: DDLItem | Habit;
 }
@@ -30,6 +35,7 @@ export interface ArchivedSearchModel {
 interface SearchResult {
   tasks: TaskUIModel[];
   habits: HabitWithDailyStatus[];
+  inspirations: InspirationItem[];
   archived: ArchivedSearchModel[]; // [新增] 归档结果集
 }
 
@@ -37,9 +43,11 @@ export class SearchUtils {
   private static instance: SearchUtils;
   private taskRepo = TaskRepository.getInstance();
   private habitRepo = HabitRepository.getInstance();
+  private inspirationRepo = InspirationRepository.getInstance();
 
   private allTasksCache: DDLItem[] = [];
   private allHabitsCache: Habit[] = [];
+  private allInspirationsCache: InspirationItem[] = [];
 
   public static getInstance(): SearchUtils {
     if (!SearchUtils.instance) {
@@ -55,6 +63,9 @@ export class SearchUtils {
 
       const habits = await this.habitRepo.getAllHabits();
       this.allHabitsCache = habits; // 加载所有习惯
+
+      const inspirations = await this.inspirationRepo.getAllInspirations();
+      this.allInspirationsCache = inspirations;
     } catch (e) {
       console.error('[SearchLogic] Preload failed:', e);
     }
@@ -62,7 +73,7 @@ export class SearchUtils {
 
   async executeSearch(query: string): Promise<SearchResult> {
     if (!query || query.trim() === '') {
-      return { tasks: [], habits: [], archived: [] };
+      return { tasks: [], habits: [], inspirations: [], archived: [] };
     }
 
     const lowerValue = query.toLowerCase().trim();
@@ -83,13 +94,17 @@ export class SearchUtils {
       (item.description && item.description.toLowerCase().includes(lowerValue))
     );
 
+    const matchedInspirations = this.allInspirationsCache.filter(item =>
+      item.text.toLowerCase().includes(lowerValue)
+    );
+
     // ---------------------------------------------------------
     // 2. 分类处理 (活跃 vs 归档)
     // ---------------------------------------------------------
 
     // --- 活跃任务 ---
-    const activeTasks = matchedTasks.filter(t => !t.isArchived);
-    activeTasks.sort((a, b) => (Number(a.isCompleted) - Number(b.isCompleted)));
+    const activeTasks = matchedTasks.filter(t => TaskStateMachine.isVisibleInMainList(t.state));
+    activeTasks.sort((a, b) => this.taskPriority(a.state) - this.taskPriority(b.state));
     const taskResults = activeTasks.map(t => this.mapTaskToUI(t));
 
     // --- 活跃习惯 ---
@@ -100,7 +115,7 @@ export class SearchUtils {
     );
 
     // --- 归档内容 (混合任务和习惯) ---
-    const archivedTasks = matchedTasks.filter(t => t.isArchived);
+    const archivedTasks = matchedTasks.filter(t => TaskStateMachine.isVisibleInArchiveList(t.state));
     const archivedHabits = matchedHabits.filter(h => h.status === HabitStatus.ARCHIVED);
 
     const archivedResults: ArchivedSearchModel[] = [
@@ -112,7 +127,7 @@ export class SearchUtils {
     // 这里简单处理，如果需要更复杂的混合排序，可解析 detail2 中的日期
     archivedResults.sort((a, b) => b.id.localeCompare(a.id));
 
-    return { tasks: taskResults, habits: habitResults, archived: archivedResults };
+    return { tasks: taskResults, habits: habitResults, inspirations: matchedInspirations, archived: archivedResults };
   }
 
   // --- Helpers ---
@@ -125,6 +140,7 @@ export class SearchUtils {
       detail1: this.formatDate(item.startTime),
       detail2: this.formatDate(item.completeTime),
       note: item.note || "",
+      badgeText: TaskStateMachine.archiveBadgeText(item.state),
       originalType: 'task',
       originalItem: item
     };
@@ -146,6 +162,7 @@ export class SearchUtils {
       detail1: `${periodStr} · ${goalStr}`,
       detail2: `归档于 ${this.formatDate(item.updatedAt)}`,
       note: item.description || "无备注",
+      badgeText: '习惯归档',
       originalType: 'habit',
       originalItem: item
     };
@@ -172,19 +189,22 @@ export class SearchUtils {
     const start = item.startTime ? new Date(item.startTime).getTime() : 0;
     const end = item.endTime ? new Date(item.endTime).getTime() : 0;
     let status = DDLStatus.UNDERGO;
-    if (item.isCompleted) status = DDLStatus.COMPLETED;
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) status = DDLStatus.COMPLETED;
+    else if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) status = DDLStatus.ABANDONED;
     else if (now > end) status = DDLStatus.PASSED;
     else if ((end - now) < 24 * 60 * 60 * 1000) status = DDLStatus.NEAR;
 
     let progress = 0.0;
-    if (item.isCompleted) progress = 1.0;
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) progress = 1.0;
     else {
       const totalDuration = end - start;
       const elapsed = now - start;
       if (totalDuration > 0) progress = Math.max(0, Math.min(1, elapsed / totalDuration));
     }
 
-    let timeText = item.isCompleted ? "已完成" : "进行中"; // 简化示意
+    let timeText = "进行中";
+    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) timeText = "已完成";
+    if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) timeText = "已放弃";
 
     const progressDir = LocalValues.getInstance().getProgressDir();
     const displayProgress = progressDir ? progress : 1.0 - progress;
@@ -197,18 +217,25 @@ export class SearchUtils {
       isStarred: item.isStared,
       status: status,
       dbId: item.id,
+      taskState: item.state,
       originalItem: item
     };
   }
 
+  private taskPriority(state: TaskState): number {
+    if (state === TaskState.ACTIVE) return 0;
+    if (state === TaskState.COMPLETED) return 1;
+    if (state === TaskState.ABANDONED) return 2;
+    return 9;
+  }
+
   private async buildHabitStatusForDate(habit: Habit, date: Date): Promise<HabitWithDailyStatus> {
-    // (保留原有代码逻辑)
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    let start = d;
-    let end = new Date(d); end.setHours(23, 59, 59);
+    const periodBounds = this.habitRepo.periodBounds(habit.period, date);
+    const start = periodBounds[0];
+    const end = periodBounds[1];
     const queryStart = habit.goalType === HabitGoalType.TOTAL ? new Date(0) : start;
-    const records = await this.habitRepo.getRecordsForHabitInRange(habit.id, queryStart, end);
+    const queryEnd = habit.goalType === HabitGoalType.TOTAL ? date : end;
+    const records = await this.habitRepo.getRecordsForHabitInRange(habit.id, queryStart, queryEnd);
     const done = records.filter(r => r.status === HabitRecordStatus.COMPLETED).reduce((sum, r) => sum + r.count, 0);
     let target = Math.max(1, habit.timesPerPeriod);
     if (habit.goalType === HabitGoalType.TOTAL) target = habit.totalTarget ? Math.max(1, habit.totalTarget) : Math.max(1, done);

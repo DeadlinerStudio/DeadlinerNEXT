@@ -32,6 +32,46 @@
     { "name": "brand_tik_50", "value": "#80FF8B00" },
     { "name": "accent_tik", "value": "#FF8B00" },
 
+    { "name": "widget_bg_grad_start_classic", "value": "#FF1A1D21" },
+    { "name": "widget_bg_grad_end_classic", "value": "#FF141619" },
+    { "name": "widget_decor_classic", "value": "#FF7CA6D6" },
+
+    { "name": "widget_bg_grad_start_time", "value": "#FF1A1D21" },
+    { "name": "widget_bg_grad_end_time", "value": "#FF141619" },
+    { "name": "widget_decor_time", "value": "#FF7CA6D6" },
+
+    { "name": "widget_bg_grad_start_vibrant", "value": "#FF1D222B" },
+    { "name": "widget_bg_grad_end_vibrant", "value": "#FF14181E" },
+    { "name": "widget_decor_vibrant", "value": "#FF7A9BC8" },
+
+    { "name": "widget_bg_grad_start_nature", "value": "#FF1B2320" },
+    { "name": "widget_bg_grad_end_nature", "value": "#FF141916" },
+    { "name": "widget_decor_nature", "value": "#FF86A895" },
+
+    { "name": "widget_bg_grad_start_sunset", "value": "#FF241F1D" },
+    { "name": "widget_bg_grad_end_sunset", "value": "#FF191514" },
+    { "name": "widget_decor_sunset", "value": "#FFC4A195" },
+
+    { "name": "widget_bg_grad_start_lavender", "value": "#FF211D26" },
+    { "name": "widget_bg_grad_end_lavender", "value": "#FF171419" },
+    { "name": "widget_decor_lavender", "value": "#FFB19CC9" },
+
+    { "name": "widget_bg_grad_start_harmony", "value": "#FF1C222C" },
+    { "name": "widget_bg_grad_end_harmony", "value": "#FF14181E" },
+    { "name": "widget_decor_harmony", "value": "#FF7A95C7" },
+
+    { "name": "widget_bg_grad_start_galaxy", "value": "#FF1F1C2A" },
+    { "name": "widget_bg_grad_end_galaxy", "value": "#FF14131B" },
+    { "name": "widget_decor_galaxy", "value": "#FF9AA2D4" },
+
+    { "name": "widget_bg_grad_start_glacier", "value": "#FF1A242B" },
+    { "name": "widget_bg_grad_end_glacier", "value": "#FF13191D" },
+    { "name": "widget_decor_glacier", "value": "#FF7CA9C2" },
+
+    { "name": "widget_bg_grad_start_tiktick", "value": "#FF1C212B" },
+    { "name": "widget_bg_grad_end_tiktick", "value": "#FF14171E" },
+    { "name": "widget_decor_tiktick", "value": "#FF8E9DCC" },
+
     { "name": "func_archive", "value": "#FF7CA6D6"},
     { "name": "func_ai", "value": "#B39DDB" },
     { "name": "func_manual", "value": "#80CBC4" },
@@ -46,7 +86,37 @@
     { "name": "background_tertiary", "value": "#CC222222"},
     { "name": "background_emphasize", "value": "#474747"},
     { "name": "background_primary_30", "value": "#4D000000"},
+    { "name": "background_primary_50", "value": "#80000000"},
     { "name": "comp_divider", "value": "#3D3D3D"},
+    { "name": "ios_blue", "value": "#0A84FF" },
+    { "name": "ios_green", "value": "#30D158" },
+    { "name": "ios_indigo", "value": "#5E5CE6" },
+    { "name": "ios_orange", "value": "#FF9F0A" },
+    { "name": "ios_pink", "value": "#FF375F" },
+    { "name": "ios_purple", "value": "#BF5AF2" },
+    { "name": "ios_red", "value": "#FF453A" },
+    { "name": "ios_teal", "value": "#40C8E0" },
+    { "name": "ios_yellow", "value": "#FFD60A" },
+    { "name": "ios_brown", "value": "#AC8E68" },
+    { "name": "ios_mint", "value": "#63E6E2" },
+    { "name": "ios_cyan", "value": "#64D2FF" },
+
+    { "name": "ios_gray", "value": "#8E8E93" },
+    { "name": "ios_gray_2", "value": "#636366" },
+    { "name": "ios_gray_3", "value": "#48484A" },
+    { "name": "ios_gray_4", "value": "#3A3A3C" },
+    { "name": "ios_gray_5", "value": "#2C2C2E" },
+    { "name": "ios_gray_6", "value": "#1C1C1E" },
+
+    { "name": "ios_background", "value": "#000000" },
+    { "name": "ios_background_secondary", "value": "#1C1C1E" },
+    { "name": "ios_background_tertiary", "value": "#2C2C2E" },
+    { "name": "ios_grouped_background", "value": "#000000" },
+    { "name": "ios_grouped_background_secondary", "value": "#1C1C1E" },
+    { "name": "ios_grouped_background_tertiary", "value": "#2C2C2E" },
+    { "name": "ios_label", "value": "#FFFFFF" },
+    { "name": "ios_link", "value": "#0A84FF" },
+
     { "name": "interactive_active", "value": "#FFFFFF"},
     { "name": "interactive_select", "value": "#333333"},
     { "name": "interactive_pressed", "value": "#4D4D4D"},
@@ -55,6 +125,7 @@
 
     { "name": "chart_red", "value": "#FFF77E66"},
     { "name": "chart_green", "value": "#FFBFD1C4"},
+    { "name": "chart_yellow", "value": "#FFFED59E"},
     { "name": "chart_orange", "value": "#FFFED59E"},
     { "name": "chart_blue", "value": "#FFB3CAD8"},
 
@@ -182,6 +253,30 @@
     { "name": "indicator_retro_completed_70", "value": "#B38EBF9F" },
     { "name": "bg_retro_completed", "value": "#FF263830" },
     { "name": "bg_retro_completed_40", "value": "#66263830" },
+
+    { "name": "indicator_ios_undergo", "value": "#FF0A84FF" },
+    { "name": "indicator_ios_undergo_50", "value": "#800A84FF" },
+    { "name": "indicator_ios_undergo_70", "value": "#B30A84FF" },
+    { "name": "bg_ios_undergo", "value": "#FF252B35" },
+    { "name": "bg_ios_undergo_40", "value": "#66252B35" },
+
+    { "name": "indicator_ios_near", "value": "#FFFF9F0A" },
+    { "name": "indicator_ios_near_50", "value": "#80FF9F0A" },
+    { "name": "indicator_ios_near_70", "value": "#B3FF9F0A" },
+    { "name": "bg_ios_near", "value": "#FF38312A" },
+    { "name": "bg_ios_near_40", "value": "#6638312A" },
+
+    { "name": "indicator_ios_passed", "value": "#FFFF453A" },
+    { "name": "indicator_ios_passed_50", "value": "#80FF453A" },
+    { "name": "indicator_ios_passed_70", "value": "#B3FF453A" },
+    { "name": "bg_ios_passed", "value": "#FF35292B" },
+    { "name": "bg_ios_passed_40", "value": "#6635292B" },
+
+    { "name": "indicator_ios_completed", "value": "#FF30D158" },
+    { "name": "indicator_ios_completed_50", "value": "#8030D158" },
+    { "name": "indicator_ios_completed_70", "value": "#B330D158" },
+    { "name": "bg_ios_completed", "value": "#FF252F28" },
+    { "name": "bg_ios_completed_40", "value": "#66252F28" },
 
     { "name": "widget_bg_grad_start", "value": "#FF1A1D21" },
     { "name": "widget_bg_grad_end", "value": "#FF141619" },

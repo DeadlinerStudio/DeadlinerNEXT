@@ -15,7 +15,7 @@ struct CodeTextPage {
 
   pathStack: NavPathStack | null = null;
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   // 读取 RawFile 文件内容
@@ -51,6 +51,7 @@ struct CodeTextPage {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: true,
       style: {
         scrollEffectOpts: {
           enableScrollEffect: true,

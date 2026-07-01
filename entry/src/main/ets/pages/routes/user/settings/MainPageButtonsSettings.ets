@@ -5,6 +5,7 @@ import { TopSafeContainer } from '../../../components/TopSafeContainer';
 import { SettingsSection, SettingsDivider, SettingsCheckItem } from '../../../components/SettingsComponents'; // 确保引入了 CheckItem
 import { LocalValues } from '../../../../common/local/LocalValues';
 import { getImmersiveTitleBarStyle } from '../../../../common/style/NavStyles';
+import { Symbol } from '../../../components/infra/Symbol';
 
 /**
  * SchematicButton: 独立的按钮组件
@@ -17,8 +18,9 @@ struct SchematicButton {
   getIconResource(type: string): Resource {
     switch (type) {
       case MainButtonType.ARCHIVE: return $r('sys.symbol.archivebox');
-      case MainButtonType.AI: return $r('sys.symbol.wand_and_stars');
+      case MainButtonType.AI: return $r('app.media.lifi');
       case MainButtonType.SEARCH: return $r('sys.symbol.magnifyingglass');
+      case MainButtonType.PROFILE: return $r('sys.symbol.person_crop_circle_fill_1');
       default: return $r('sys.symbol.square');
     }
   }
@@ -30,9 +32,14 @@ struct SchematicButton {
         .height(48)
         .fill($r('sys.color.ohos_id_color_button_normal'))
 
-      SymbolGlyph(this.getIconResource(this.iconType))
-        .fontSize(24)
-        .fontColor([$r('sys.color.ohos_id_color_text_primary')])
+      // SymbolGlyph(this.getIconResource(this.iconType))
+      //   .fontSize(24)
+      //   .fontColor([$r('sys.color.ohos_id_color_text_primary')])
+      Symbol({
+        icon: this.getIconResource(this.iconType),
+        isImage: this.iconType === MainButtonType.AI,
+        fontColor: $r('sys.color.ohos_id_color_text_primary')
+      })
     }
     .width(48)
     .height(48)
@@ -83,7 +90,8 @@ interface ButtonOption {
 struct MainPageButtonsSettings {
   @StorageLink('isWideScreen') isWideScreen: boolean = false;
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @StorageLink(C.KEY_MAIN_LEFT_BUTTON) leftBtnType: MainButtonType = MainButtonType.ARCHIVE;
@@ -91,15 +99,17 @@ struct MainPageButtonsSettings {
 
   private readonly options: ButtonOption[] = [
     { text: '搜索', value: MainButtonType.SEARCH },
-    { text: 'AI 助理', value: MainButtonType.AI },
+    { text: 'Lifi AI', value: MainButtonType.AI },
     { text: '归档箱', value: MainButtonType.ARCHIVE },
+    { text: '头像入口', value: MainButtonType.PROFILE },
   ];
 
   private getIcon(type: string): Resource {
     switch (type) {
       case MainButtonType.SEARCH: return $r('sys.symbol.magnifyingglass');
-      case MainButtonType.AI: return $r('sys.symbol.wand_and_stars');
+      case MainButtonType.AI: return $r('app.media.lifi');
       case MainButtonType.ARCHIVE: return $r('sys.symbol.archivebox');
+      case MainButtonType.PROFILE: return $r('sys.symbol.person_crop_circle_fill_1');
       default: return $r('sys.symbol.square');
     }
   }
@@ -120,7 +130,7 @@ struct MainPageButtonsSettings {
 
   build() {
     HdsNavDestination() {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight }) {
         Column({ space: 16 }) {
 
           SettingsSection() {
@@ -138,6 +148,7 @@ struct MainPageButtonsSettings {
               SettingsCheckItem({
                 title: item.text,
                 icon: this.getIcon(item.value),
+                isImage: item.value === MainButtonType.AI,
                 isSelected: this.leftBtnType === item.value,
                 onItemClick: () => {
                   this.handleSelect(true, item.value);
@@ -154,6 +165,7 @@ struct MainPageButtonsSettings {
               SettingsCheckItem({
                 title: item.text,
                 icon: this.getIcon(item.value),
+                isImage: item.value === MainButtonType.AI,
                 isSelected: this.rightBtnType === item.value,
                 onItemClick: () => {
                   this.handleSelect(false, item.value);
@@ -181,6 +193,7 @@ struct MainPageButtonsSettings {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: this.isWideScreen,
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "主页快捷功能" } }
     })

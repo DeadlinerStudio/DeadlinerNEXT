@@ -11,7 +11,10 @@ export struct ArchivedDDLItemCard {
   @Prop startTime: string;   // 起始时间
   @Prop completeTime: string; // 完成时间
   @Prop note: string;
+  @Prop badgeText: string = '';
+  @Prop showRestore: boolean = true;
   onDelete: () => void = () => {}; // 删除回调
+  onRestore: () => void = () => {};
 
   // 主题颜色状态 - 固定为 Undergo 风格
   @State private indicatorColor: ResourceColor = this.theme.indicatorUndergo;
@@ -20,6 +23,8 @@ export struct ArchivedDDLItemCard {
   @State private noteColor: ResourceColor = Color.Gray;
   @State private timeColor: ResourceColor = Color.Gray; // 新增时间颜色
   @State private globalBgColor: ResourceColor = $r('app.color.background_secondary');
+
+  @State private isPopUpShow: boolean = false;
 
   onWillApplyTheme(theme: Theme) {
     this.titleColor = theme.colors.fontPrimary;
@@ -32,6 +37,19 @@ export struct ArchivedDDLItemCard {
     this.bgColor = $r('app.color.background_secondary');
   }
 
+  @Builder
+  notePopupBuilder() {
+    Column() {
+      Text(this.note)
+        .fontSize(14)
+        .fontColor(this.titleColor)
+        .lineHeight(20)
+    }
+    .padding(16)
+    .constraintSize({ maxWidth: 280 })
+    .borderRadius(16)
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Row()
@@ -42,13 +60,25 @@ export struct ArchivedDDLItemCard {
       Row() {
         Column() {
           // 标题
-          Text(this.title)
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.titleColor)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width('100%')
+          Row({ space: 8 }) {
+            Text(this.title)
+              .fontSize(18)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.titleColor)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .layoutWeight(1)
+
+            if (this.badgeText.length > 0) {
+              Text(this.badgeText)
+                .fontSize(10)
+                .fontColor(this.indicatorColor)
+                .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                .backgroundColor(this.addAlpha(this.indicatorColor, 0.12))
+                .borderRadius(10)
+            }
+          }
+          .width('100%')
 
           // 时间信息 (起始 - 完成)
           Text(`${this.startTime} - ${this.completeTime}`)
@@ -76,18 +106,34 @@ export struct ArchivedDDLItemCard {
         .height('100%')
 
         // 右侧：红色删除按钮
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.trash')) // 使用系统垃圾桶图标
-            .fontSize(20)
-            .fontColor([Color.White])
+        Row({ space: 8 }) {
+          if (this.showRestore) {
+            Button({ type: ButtonType.Circle, stateEffect: true }) {
+              SymbolGlyph($r('sys.symbol.arrowshape_turn_up_left'))
+                .fontSize(20)
+                .fontColor([Color.White])
+            }
+            .width(36)
+            .height(36)
+            .backgroundColor(this.theme.brand)
+            .onClick(() => {
+              this.onRestore()
+            })
+          }
+
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            SymbolGlyph($r('sys.symbol.trash')) // 使用系统垃圾桶图标
+              .fontSize(20)
+              .fontColor([Color.White])
+          }
+          .width(36)
+          .height(36)
+          .backgroundColor($r('app.color.warning')) // 红色背景
+          .onClick(() => {
+            this.onDelete()
+          })
         }
-        .width(36)
-        .height(36)
-        .backgroundColor($r('app.color.warning')) // 红色背景
         .margin({ left: 12 }) // 与左侧文字的间距
-        .onClick(() => {
-          this.onDelete()
-        })
       }
       .width('100%')
       .height('100%')
@@ -95,10 +141,28 @@ export struct ArchivedDDLItemCard {
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(84) // 稍微增加高度以容纳时间信息，如果想要紧凑点可以保持 76
+    .height(96)
     .borderRadius(24)
     .backgroundColor(this.globalBgColor)
     .clip(true)
+    .onClick(() => {
+      // 只有存在 note 内容时才弹出
+      if (this.note && this.note.length > 0) {
+        this.isPopUpShow = true;
+      }
+    })
+    // 3. 完善：绑定 Popup 属性
+    .bindPopup(this.isPopUpShow, {
+      builder: this.notePopupBuilder,     // 绑定的内容构建器
+      placement: Placement.Bottom,        // 弹出位置（可根据需要改成 Top）
+      enableArrow: true,                  // 是否显示箭头
+      onStateChange: (e) => {
+        // 关键：当用户点击弹窗外部导致弹窗关闭时，同步更新状态变量
+        if (!e.isVisible) {
+          this.isPopUpShow = false;
+        }
+      }
+    })
   }
 
   // 辅助函数：颜色透明度处理
@@ -161,6 +225,12 @@ export struct DDLItemCardSimplified {
       this.indicatorColor50 = this.theme.indicatorPassed50;
       this.indicatorColor70 = this.theme.indicatorPassed70;
       this.bgColor40 = this.theme.bgPassed40;
+
+    } else if (this.status === DDLStatus.ABANDONED) {
+      this.indicatorColor = $r('sys.color.ohos_id_color_text_tertiary');
+      this.indicatorColor50 = $r('sys.color.ohos_id_color_text_tertiary');
+      this.indicatorColor70 = $r('sys.color.ohos_id_color_text_tertiary');
+      this.bgColor40 = $r('app.color.background_tertiary');
 
     } else if (this.status === DDLStatus.COMPLETED) {
       this.indicatorColor = this.theme.indicatorCompleted;
@@ -240,8 +310,9 @@ export struct DDLItemCardSimplified {
     .width('100%')
     .height(76)
     .borderRadius(24)
-    .backgroundColor(this.globalBgColor)
+    // .backgroundColor(this.globalBgColor)
     .clip(true)
+    .backgroundBlurStyle(BlurStyle.Regular)
   }
 }
 
@@ -286,9 +357,6 @@ struct SelectionOverlay {
       }
       .width(24)
       .height(24)
-      // 左上角圆角处理：让打钩背景左上角是圆的，右下角也是圆的，或者保持圆形
-      // 如果你希望它是贴合卡片左上角的扇形，需要特殊处理；
-      // 这里保持你原来的圆形设计，稍微调整 margin
       .borderRadius(12)
       .backgroundColor(this.primaryColor)
       .shadow({ radius: 2 })
@@ -318,17 +386,19 @@ export struct DDLItemCardSwipeable {
 
   // 回调
   onClickItem?: () => void;
-  onComplete?: () => void;
-  onDelete?: () => void;
+  onPrimaryAction?: () => void;
+  onSecondaryAction?: () => void;
   onLongPressSelect?: () => void;
   onToggleSelect?: () => void;
+  @Prop primaryActionSymbol: Resource = $r('sys.symbol.checkmark_circle');
+  @Prop secondaryActionSymbol: Resource = $r('sys.symbol.trash');
+  @Prop secondaryActionColor: ResourceColor = $r('app.color.chart_red');
 
   // 内部状态
   @State offsetX: number = 0;
   @State cardWidth: number = 0;
 
   // 颜色状态
-  @State deleteColor: ResourceColor = $r('app.color.chart_red'); // R.color.chart_red
   @State completeColor: ResourceColor = $r('app.color.chart_green'); // R.color.chart_green
   @State surfaceVariant: ResourceColor = this.theme.bgPrimary;
   @State fontColor: ResourceColor = this.theme.bgPrimary
@@ -346,7 +416,7 @@ export struct DDLItemCardSwipeable {
             // 向右滑 -> 完成 (StartToEnd)
             Row() {
               Stack({ alignContent: Alignment.Center }) {
-                SymbolGlyph($r('sys.symbol.checkmark_circle'))
+                SymbolGlyph(this.primaryActionSymbol)
                   .fontSize(24) // 图标的实际大小
                   .fontColor([this.fontColor])
               }
@@ -361,27 +431,27 @@ export struct DDLItemCardSwipeable {
             .padding({ left: 20 })
             .justifyContent(FlexAlign.Start)
             .alignItems(VerticalAlign.Center)
-            .backgroundColor(this.surfaceVariant)
+            // .backgroundColor(this.surfaceVariant)
           } else {
             // 向左滑 -> 删除 (EndToStart)
             Row() {
               Stack({ alignContent: Alignment.Center }) {
-                SymbolGlyph($r('sys.symbol.trash'))
+                SymbolGlyph(this.secondaryActionSymbol)
                   .fontSize(24) // 图标的实际大小
                   .fontColor([this.fontColor])
               }
               .width(48)
               .height(48)
               .borderRadius(24) // 容器的圆形形状
-              .backgroundColor(this.deleteColor)
-              .shadow({ radius: 4, color: this.deleteColor });
+              .backgroundColor(this.secondaryActionColor)
+              .shadow({ radius: 4, color: this.secondaryActionColor });
             }
             .width('100%')
             .height('100%')
             .padding({ right: 20 })
             .justifyContent(FlexAlign.End)
             .alignItems(VerticalAlign.Center)
-            .backgroundColor(this.surfaceVariant)
+            // .backgroundColor(this.surfaceVariant)
           }
         }
         .width('100%')
@@ -440,12 +510,11 @@ export struct DDLItemCardSwipeable {
 
               if (this.offsetX > threshold) {
                 // 触发完成
-                if (this.onComplete) this.onComplete();
+                if (this.onPrimaryAction) this.onPrimaryAction();
                 // 动画回弹或保持(取决于你的业务逻辑，这里模拟 Compose 的回弹)
                 this.resetSwipe();
               } else if (this.offsetX < -threshold) {
-                // 触发删除
-                if (this.onDelete) this.onDelete();
+                if (this.onSecondaryAction) this.onSecondaryAction();
                 this.resetSwipe();
               } else {
                 // 未达到阈值，回弹

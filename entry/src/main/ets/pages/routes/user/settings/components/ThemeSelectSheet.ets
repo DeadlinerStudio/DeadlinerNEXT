@@ -4,8 +4,10 @@ import { ColorCustomizer } from './ColorCustomizer';
 import { HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigation, HdsNavigationTitleMode, HdsNavigationAttribute, HdsNavDestinationAttribute } from '@kit.UIDesignKit';
 import { TopSafeContainer } from '../../../../components/TopSafeContainer';
 import { FloatUpModifier } from '../../../../../utils/animation/FloatUpModifier';
-import { SettingsItem, SettingsSection } from '../../../../components/SettingsComponents';
+import { SettingsItem, SettingsSection, SettingsDivider, SubSettingsSwitch } from '../../../../components/SettingsComponents';
 import { IndicatorThemeSheet } from './IndicatorThemeSelect';
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { WidgetUpdater } from '../../../../../utils/WidgetUpdater';
 
 interface ThemeOption {
   key: string;
@@ -14,12 +16,12 @@ interface ThemeOption {
 }
 
 const THEME_OPTIONS: ThemeOption[] = [
-  { key: 'classic', name: '莫兰迪 (默认)', previewBg: $r('sys.color.search_container_focus_color') },
-  { key: 'time', name: '时光', previewBg: $r('sys.color.search_container_focus_color') },
-  { key: 'vibrant', name: '生动', previewBg: $r('sys.color.search_container_focus_color') },
+  { key: 'vibrant', name: '生动 (默认)', previewBg: $r('sys.color.search_container_focus_color') },
+  { key: 'classic', name: '莫兰迪', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'nature', name: '清新', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'sunset', name: '暖阳', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'lavender', name: '极光', previewBg: $r('sys.color.search_container_focus_color') },
+  { key: 'time', name: '时光', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'harmony', name: '鸿蒙', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'galaxy', name: '星河', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'glacier', name: '冰川', previewBg: $r('sys.color.search_container_focus_color') },
@@ -28,10 +30,20 @@ const THEME_OPTIONS: ThemeOption[] = [
 
 @Component
 export struct ThemeSelectSheet {
-  @Provide('navPathStack') navStack: NavPathStack = new NavPathStack();
-  @StorageProp('currentThemeKey') currentKey: string = 'classic';
+  @Provide('themeSelectPathStack') themeSelectPathStack: NavPathStack = new NavPathStack();
+  @StorageProp('currentThemeKey') currentKey: string = 'vibrant';
+  @StorageProp('currentTheme') @Watch('syncThemeWhiteGlow') theme: ITheme = {} as ITheme;
+  @State themeWhiteGlow: boolean = false;
 
   onDone?: () => void;
+
+  aboutToAppear(): void {
+    this.syncThemeWhiteGlow();
+  }
+
+  syncThemeWhiteGlow() {
+    this.themeWhiteGlow = this.theme.useWhiteGlow ?? false;
+  }
 
   @Builder
   navDestination(name: string) {
@@ -63,7 +75,7 @@ export struct ThemeSelectSheet {
       .titleMode(HdsNavDestinationTitleMode.MODAL)
       .backgroundColor(Color.Transparent)
       .onBackPressed(() => {
-        this.navStack.pop();
+        this.themeSelectPathStack.pop();
         return true;
       })
       .mode(NavDestinationMode.DIALOG)
@@ -95,7 +107,7 @@ export struct ThemeSelectSheet {
       .titleMode(HdsNavDestinationTitleMode.MODAL)
       .backgroundColor(Color.Transparent)
       .onBackPressed(() => {
-        this.navStack.pop();
+        this.themeSelectPathStack.pop();
         return true;
       })
       .mode(NavDestinationMode.DIALOG)
@@ -104,7 +116,7 @@ export struct ThemeSelectSheet {
   }
 
   build() {
-    HdsNavigation(this.navStack) {
+    HdsNavigation(this.themeSelectPathStack) {
       Column() {
         TopSafeContainer({ topAvoidHeight: 72, bgColor: Color.Transparent }) {
           SettingsSection({ bgColor: $r('sys.color.search_container_focus_color') }) {
@@ -113,9 +125,25 @@ export struct ThemeSelectSheet {
               subtitle: '自定义概览统计图表颜色',
               icon: $r('sys.symbol.data_proportion'),
               onItemClick: () => {
-                this.navStack.pushPath({ name: 'ChartCustomizer' })
+                this.themeSelectPathStack.pushPath({ name: 'ChartCustomizer' })
               }
             })
+          }
+
+          Column().height(12)
+
+          if (deviceInfo.distributionOSApiVersion >= 60100) {
+            SettingsSection({ bgColor: $r('sys.color.search_container_focus_color') }) {
+              SubSettingsSwitch({
+                title: '白光辉映',
+                subtitle: '控制沉浸光感标签栏是否显示白色高光；该设置跟随当前主题。',
+                isOn: $themeWhiteGlow,
+                onChange: async (isOn): Promise<void> => {
+                  this.themeWhiteGlow = isOn;
+                  await ThemeManager.setCurrentThemeWhiteGlow(isOn);
+                }
+              })
+            }
           }
 
           Column().height(12)
@@ -205,7 +233,7 @@ export struct ThemeSelectSheet {
       .borderRadius(24)
       .backgroundColor($r('sys.color.search_container_focus_color'))
       .onClick(() => {
-        this.navStack.pushPath({ name: 'ColorCustomizer' });
+        this.themeSelectPathStack.pushPath({ name: 'ColorCustomizer' });
       })
     }
   }
@@ -284,8 +312,12 @@ export struct ThemeSelectSheet {
         // 选中时边框变色，未选中透明
         color: this.currentKey === item.key ? ThemeMap[item.key].brand : Color.Transparent
       })
-      .onClick(() => {
-        ThemeManager.switchUITheme(item.key);
+      .onClick(async () => {
+        await ThemeManager.switchUITheme(item.key);
+        const context = this.getUIContext().getHostContext();
+        if (context) {
+          await WidgetUpdater.updateAllWidgets(context);
+        }
       })
 
       // 2. 选中态：右上角悬浮旗标 (Floating Circle)

@@ -19,6 +19,11 @@ import { SupportPanelView } from "../../common/SupportPanelView";
 import { getImmersiveTitleBarStyle } from "../../../common/style/NavStyles";
 import { ITheme } from "../../../common/theme/ThemeModel";
 import { FriendshipLinksPage } from "./settings/FriendshipLinksPage";
+import {
+  AppBreakpoint,
+  APP_BREAKPOINT_DEFAULT,
+  APP_BREAKPOINT_STORAGE_KEY
+} from "../../../common/layout/AppBreakpoints";
 
 const USER_ROUTE_WHITELIST: string[] = [
   'settingsAppearance',
@@ -42,23 +47,29 @@ export struct UserPage {
 
   @StorageLink('isWideScreen') @Watch('onScreenModeChange') isWideScreen: boolean = false;
   @StorageLink(C.KEY_ENABLE_TABLET_UI) @Watch('onScreenModeChange') tabletUi: boolean = true;
+  @StorageLink(APP_BREAKPOINT_STORAGE_KEY) @Watch('onScreenModeChange') currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
 
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @StorageLink(C.KEY_BASIC_MODE) isBasicMode: boolean = false;
 
   onScreenModeChange() {
-    console.info(`[UserPage] Screen Mode Change Detected. Wide: ${this.isWideScreen}`);
+    console.info(`[UserPage] Screen Mode Change Detected. Wide: ${this.isWideScreen}, breakpoint: ${this.currentBreakpoint}`);
 
     setTimeout(() => {
-      if ((this.isWideScreen && this.tabletUi)) {
+      if (this.usesSplitLayout()) {
         this.migrateToLocal();
       } else {
         this.migrateToGlobal();
       }
     }, 100);
+  }
+
+  private usesSplitLayout(): boolean {
+    return this.tabletUi && this.currentBreakpoint !== AppBreakpoint.SM;
   }
 
   /**
@@ -125,7 +136,7 @@ export struct UserPage {
       this.versionName = '1.0.0'; // 失败时的默认值
     }
 
-    if ((this.isWideScreen && this.tabletUi) && this.userLocalPathStack.size() === 0) {
+    if (this.usesSplitLayout() && this.userLocalPathStack.size() === 0) {
       this.userLocalPathStack.pushPath({ name: PLACEHOLDER_ROUTE_NAME }, false);
     }
   }
@@ -198,6 +209,7 @@ export struct UserPage {
   @Builder
   aiSheet() {
     AIPanelView({
+      bypassHuaweiLogin: true,
       onDismissPanel: () => {
         this.closeAiPanel();
       }
@@ -219,7 +231,7 @@ export struct UserPage {
   }
 
   private navigateTo(name: string) {
-    if ((this.isWideScreen && this.tabletUi)) {
+    if (this.usesSplitLayout()) {
       this.userLocalPathStack.pushPath({ name: name });
     } else {
       this.appPathStack.pushPath({ name: name });
@@ -234,15 +246,18 @@ export struct UserPage {
 
   build() {
     HdsNavigation(this.userLocalPathStack) {
-      TopSafeContainer({ topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT }) {
+      TopSafeContainer({
+        topAvoidHeight: this.statusBarHeight + this.TITLE_BAR_CONTENT_HEIGHT + this.topAvoidExtraHeight,
+        needBgTransparent: true
+      }) {
         Column({ space: 16 }) {
           if (!this.isBasicMode) {
-            SettingsSection() {
+            SettingsSection({ mainUserPage: true }) {
               SettingsUserProfile()
             }
           }
 
-          SettingsSection() {
+          SettingsSection({ mainUserPage: true }) {
             Row() {
               SettingsGridItem({
                 title: "归档管理",
@@ -253,16 +268,17 @@ export struct UserPage {
                 }
               })
 
-              SettingsVerticalDivider()
-
-              SettingsGridItem({
-                title: "AI 助理",
-                icon: $r('sys.symbol.wand_and_stars_fill'),
-                iconColor: $r('app.color.func_ai'),
-                onItemClick: () => {
-                  this.isAISheetShow = true;
-                }
-              })
+              // SettingsVerticalDivider()
+              //
+              // SettingsGridItem({
+              //   title: "Lifi AI",
+              //   icon: $r('app.media.lifi'),
+              //   iconColor: $r('app.color.func_ai'),
+              //   isImage: true,
+              //   onItemClick: () => {
+              //     this.isAISheetShow = true;
+              //   }
+              // })
 
               SettingsVerticalDivider()
 
@@ -278,7 +294,7 @@ export struct UserPage {
             .width('100%')
           }
 
-          SettingsSection({ title: '偏好设置' }) {
+          SettingsSection({ title: '偏好设置', mainUserPage: true }) {
             SettingsItem({
               title: "显示与个性化",
               subtitle: "界面布局 · 动画效果 · 小组件样式",
@@ -312,7 +328,7 @@ export struct UserPage {
           }
 
           if (!this.isBasicMode) {
-            SettingsSection({ title: '数据与服务' }) {
+            SettingsSection({ title: '数据与服务', mainUserPage: true }) {
               SettingsItem({
                 title: "数据同步与备份",
                 subtitle: "WebDAV 云同步 · 本地导入导出",
@@ -325,9 +341,10 @@ export struct UserPage {
               SettingsDivider()
 
               SettingsItem({
-                title: "AI 智能服务",
+                title: "Lifi AI 设置",
                 subtitle: "模型配置 · API Key",
-                icon: $r('sys.symbol.AI'),
+                icon: $r('app.media.lifi'),
+                isImage: true,
                 onItemClick: () => {
                   this.navigateTo('settingsAI')
                 }
@@ -350,7 +367,7 @@ export struct UserPage {
               })
             }
           } else {
-            SettingsSection({ title: '模式切换' }) {
+            SettingsSection({ title: '模式切换', mainUserPage: true }) {
               SettingsSwitch({
                 title: "基础模式",
                 subtitle: "仅保留核心任务管理功能",
@@ -367,7 +384,7 @@ export struct UserPage {
             }
           }
 
-          SettingsSection({ title: "更多" }) {
+          SettingsSection({ title: "更多", mainUserPage: true }) {
             SettingsItem({
               title: "关于与协议",
               subtitle: `版本 ${this.versionName} · 开发故事 · 隐私政策与许可`,
@@ -449,7 +466,8 @@ export struct UserPage {
       }
     }
     .titleBar({
-      style: getImmersiveTitleBarStyle((this.isWideScreen && this.tabletUi)),
+      avoidLayoutSafeArea: this.isWideScreen,
+      style: getImmersiveTitleBarStyle(this.usesSplitLayout()),
       content: {
         title: {
           mainTitle: '我的'
@@ -469,11 +487,10 @@ export struct UserPage {
       blurStyle: BlurStyle.Regular,
       backgroundColor: Color.Transparent,
       title: {
-        title: 'Deadliner AI',
+        title: 'Lifi AI',
       }
     })
-    .padding({ top: (this.isWideScreen && this.tabletUi) ? this.statusBarHeight : 0 })
-    .mode((this.isWideScreen && this.tabletUi) ? NavigationMode.Split : NavigationMode.Stack)
-    .navBarWidth((this.isWideScreen && this.tabletUi) ? '40%' : '100%')
+    .mode(this.usesSplitLayout() ? NavigationMode.Split : NavigationMode.Stack)
+    .navBarWidth(this.usesSplitLayout() ? '40%' : '100%')
   }
 }

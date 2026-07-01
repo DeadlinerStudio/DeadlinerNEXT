@@ -21,7 +21,7 @@ struct WebBrowserPage {
   private onCloseCallback?: () => void;
 
 
-  @StorageProp('statusBarHeight') statusBarHeight: number = 38;
+  @StorageLink('statusBarHeight') statusBarHeight: number = 38;
 
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
@@ -37,6 +37,7 @@ struct WebBrowserPage {
       }
     }
     .titleBar({
+      avoidLayoutSafeArea: true,
       style: {
         scrollEffectOpts: {
           enableScrollEffect: true,

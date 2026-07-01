@@ -1,0 +1,37 @@
+[
+  {
+    "id": "guide_scene_1",
+    "fileName": "Scene-1-Harmony.json",
+    "title": "轻扫，即可处理",
+    "subtitle": "左右轻扫任务，完成或归档一步到位。",
+    "detail": "常用操作留在列表中完成。"
+  },
+  {
+    "id": "guide_scene_2",
+    "fileName": "Scene-2-Harmony.json",
+    "title": "一点，灵感成形",
+    "subtitle": "打开 Lifi AI，将零散想法整理为可执行任务。",
+    "detail": "从念头到行动，更自然。"
+  },
+  {
+    "id": "guide_scene_4",
+    "fileName": "Scene-4-Harmony.json",
+    "title": "长按，批量完成",
+    "subtitle": "进入多选后，可批量完成、归档或删除。",
+    "detail": "清单收尾更从容。"
+  },
+  {
+    "id": "guide_scene_5",
+    "fileName": "Scene-5-Harmony.json",
+    "title": "轻点，深入任务",
+    "subtitle": "查看详情，补充信息并拆分子任务。",
+    "detail": "让复杂事项保持清晰。"
+  },
+  {
+    "id": "guide_scene_6",
+    "fileName": "Scene-6-Harmony.json",
+    "title": "一触，切换视图",
+    "subtitle": "通过底部导航，在核心页面间快速切换。",
+    "detail": "常用功能始终触手可及。"
+  }
+]

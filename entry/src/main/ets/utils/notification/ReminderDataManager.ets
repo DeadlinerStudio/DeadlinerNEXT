@@ -1,5 +1,5 @@
 import dataPreferences from '@ohos.data.preferences';
-import { ActiveReminder } from '../../model/ActiveReminder';
+import { ActiveReminder, ActiveReminderType, buildActiveReminderScopeKey } from '../../model/ActiveReminder';
 import common from '@ohos.app.ability.common';
 
 const PREF_NAME = 'deadline_reminder_pref';
@@ -72,6 +72,10 @@ export class ReminderDataManager {
     return [...this.memoryCache]; // 返回副本
   }
 
+  getAllByType(type: ActiveReminderType): ActiveReminder[] {
+    return this.memoryCache.filter(r => r.type === type);
+  }
+
   /**
    * 根据业务ID查找提醒记录
    */
@@ -79,17 +83,26 @@ export class ReminderDataManager {
     return this.memoryCache.find(r => r.targetId === targetId);
   }
 
+  getByScopedTarget(type: ActiveReminderType, targetId: string): ActiveReminder | undefined {
+    const scopeKey = buildActiveReminderScopeKey(type, targetId);
+    return this.memoryCache.find(r => buildActiveReminderScopeKey(r.type, r.targetId) === scopeKey);
+  }
+
   /**
    * 添加或更新记录
    * @param record
    */
   async addOrUpdate(record: ActiveReminder) {
-    // 先移除旧的（如果有）
-    this.memoryCache = this.memoryCache.filter(r => r.targetId !== record.targetId);
-    //以此 ID 为准加入新的
+    const recordKey = buildActiveReminderScopeKey(record.type, record.targetId);
+    const existing = this.memoryCache.find(r => buildActiveReminderScopeKey(r.type, r.targetId) === recordKey);
+    if (existing) {
+      console.info(`[ReminderData] Updating existing record: ${recordKey}. Old SystemID:${existing.reminderId} New SystemID:${record.reminderId}`);
+    } else {
+      console.info(`[ReminderData] Adding new record: ${recordKey} -> SystemID:${record.reminderId}`);
+    }
+    this.memoryCache = this.memoryCache.filter(r => buildActiveReminderScopeKey(r.type, r.targetId) !== recordKey);
     this.memoryCache.push(record);
     await this.saveToDisk();
-    console.info(`[ReminderData] Saved mapping: ${record.targetId} -> ID:${record.reminderId}`);
   }
 
   /**
@@ -100,8 +113,22 @@ export class ReminderDataManager {
     const before = this.memoryCache.length;
     this.memoryCache = this.memoryCache.filter(r => r.targetId !== targetId);
     if (this.memoryCache.length !== before) {
+      console.info(`[ReminderData] Removed record for: ${targetId}`);
       await this.saveToDisk();
-      console.info(`[ReminderData] Removed mapping for: ${targetId}`);
+    } else {
+      console.warn(`[ReminderData] Attempted to remove non-existent record: ${targetId}`);
+    }
+  }
+
+  async removeScoped(type: ActiveReminderType, targetId: string) {
+    const scopeKey = buildActiveReminderScopeKey(type, targetId);
+    const before = this.memoryCache.length;
+    this.memoryCache = this.memoryCache.filter(r => buildActiveReminderScopeKey(r.type, r.targetId) !== scopeKey);
+    if (this.memoryCache.length !== before) {
+      console.info(`[ReminderData] Removed record for: ${scopeKey}`);
+      await this.saveToDisk();
+    } else {
+      console.warn(`[ReminderData] Attempted to remove non-existent record: ${scopeKey}`);
     }
   }
 

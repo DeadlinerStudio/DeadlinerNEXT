@@ -1,5 +1,6 @@
-import { UIThemePalette, IndicatorSet, createUITheme, INDICATORS_MORANDI, INDICATORS_VIBRANT, ITheme, ThemeMap, IndicatorMap,
-  THEME_DEFAULT_INDICATOR_MAP } from "./ThemeModel";
+import { UIThemePalette, IndicatorSet, createUITheme, INDICATORS_IOS, ITheme, ThemeMap, IndicatorMap,
+  THEME_DEFAULT_INDICATOR_MAP,
+  INDICATORS_VIBRANT} from "./ThemeModel";
 import { ThemeControl } from "@kit.ArkUI";
 import { DeadlinerTheme } from "../../AppTheme";
 import { preferences } from '@kit.ArkData';
@@ -21,12 +22,16 @@ export class ThemeManager {
   private static readonly KEY_THEME_UI = 'key_current_theme_ui';        // 存 'classic', 'custom', 'lavender' 等
   private static readonly KEY_THEME_INDICATOR = 'key_current_theme_indicator'; // 存 'morandi', 'vibrant'
 
+  private static readonly KEY_CUSTOM_BACKGROUND = 'key_custom_background';
+  private static readonly KEY_CUSTOM_BACKGROUND_BLUR = 'key_custom_background_blur';
+
   // 自定义 UI 相关的 Key
   private static readonly KEY_CUSTOM_BRAND = 'key_custom_brand';
   private static readonly KEY_CUSTOM_ACCENT = 'key_custom_accent';
   private static readonly KEY_CUSTOM_TAB_ICON = 'key_custom_tab_icon';
   private static readonly KEY_PARAM_HUE = 'key_param_hue';
   private static readonly KEY_PARAM_STYLE = 'key_param_style';
+  private static readonly KEY_THEME_WHITE_GLOW_PREFIX = 'key_theme_white_glow_';
 
   // 兼容旧 Key
   private static readonly KEY_THEME_LEGACY = 'key_current_theme';
@@ -35,14 +40,23 @@ export class ThemeManager {
     try {
       ThemeManager.pref = await preferences.getPreferences(context, ThemeManager.STORE_NAME);
 
+      let bgUri = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_BACKGROUND, '') as string;
+      AppStorage.setOrCreate('customBackgroundImage', bgUri);
+
+      let bgBlur = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_BACKGROUND_BLUR, false) as boolean;
+      AppStorage.setOrCreate('customBackgroundBlur', bgBlur);
+
       // 1. 读取配置
       let uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_UI, '') as string;
-      // 默认指示器为 morandi
-      let indicatorKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_INDICATOR, 'morandi') as string;
+      let indicatorKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_INDICATOR, '') as string;
 
       // 兼容老数据迁移
       if (!uiKey) {
-        uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_LEGACY, 'classic') as string;
+        uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_LEGACY, 'vibrant') as string;
+      }
+
+      if (!indicatorKey) {
+        indicatorKey = THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'vibrant';
       }
 
       // 2. 初始化 AppStorage
@@ -54,8 +68,50 @@ export class ThemeManager {
 
     } catch (err) {
       console.error('[ThemeManager] Init failed:', err);
-      // 兜底：Classic + Morandi
-      ThemeManager.updateAppState(ThemeManager.mergeTheme(ThemeMap['classic'], INDICATORS_MORANDI));
+      // 兜底：Vibrant + iOS
+      ThemeManager.updateAppState(ThemeManager.mergeTheme(ThemeMap['vibrant'], INDICATORS_VIBRANT));
+    }
+  }
+
+  static async getPersistedUIThemeKey(context: Context): Promise<string> {
+    try {
+      const pref = ThemeManager.pref ?? await preferences.getPreferences(context, ThemeManager.STORE_NAME);
+      let uiKey = await pref.get(ThemeManager.KEY_THEME_UI, '') as string;
+
+      if (!uiKey) {
+        uiKey = await pref.get(ThemeManager.KEY_THEME_LEGACY, 'vibrant') as string;
+      }
+
+      return uiKey || 'vibrant';
+    } catch (err) {
+      console.error('[ThemeManager] Failed to read persisted UI theme key', err);
+      return AppStorage.get<string>('currentThemeKey') || 'vibrant';
+    }
+  }
+
+  static async setCustomBackground(uri: string, isBlur: boolean) {
+    console.info('[ThemeManager] Setting custom background:', uri);
+    // 立即更新内存，触发 UI 刷新
+    AppStorage.setOrCreate('customBackgroundImage', uri);
+    AppStorage.setOrCreate('customBackgroundBlur', isBlur);
+
+    // 异步持久化到本地
+    if (ThemeManager.pref) {
+      try {
+        await ThemeManager.pref.put(ThemeManager.KEY_CUSTOM_BACKGROUND, uri);
+        await ThemeManager.pref.put(ThemeManager.KEY_CUSTOM_BACKGROUND_BLUR, isBlur);
+        await ThemeManager.pref.flush();
+      } catch (e) {
+        console.error('[ThemeManager] Failed to save custom background', e);
+      }
+    }
+  }
+
+  static async clearCustomBackground() {
+    AppStorage.setOrCreate('customBackgroundImage', '');
+    if (ThemeManager.pref) {
+      await ThemeManager.pref.put(ThemeManager.KEY_CUSTOM_BACKGROUND, '');
+      await ThemeManager.pref.flush();
     }
   }
 
@@ -68,7 +124,7 @@ export class ThemeManager {
     let theme = AppStorage.get<ITheme>('currentTheme');
     if (!theme) {
       // 如果未初始化，返回默认兜底
-      return ThemeManager.mergeTheme(ThemeMap['classic'], INDICATORS_MORANDI);
+      return ThemeManager.mergeTheme(ThemeMap['vibrant'], INDICATORS_VIBRANT);
     }
     return theme;
   }
@@ -85,7 +141,10 @@ export class ThemeManager {
     saveToDisk: boolean = true
   ) {
     // 1. 创建 UI 部分 (内存中)
-    const customUI = ThemeManager.createCustomUITheme(brand, accent, tabIcon);
+    const customUI = await ThemeManager.resolveThemeGlow(
+      'custom',
+      ThemeManager.createCustomUITheme(brand, accent, tabIcon, hue)
+    );
 
     const targetIndicatorKey = indicatorKey;
     const indicatorSet = IndicatorMap[targetIndicatorKey];
@@ -123,10 +182,11 @@ export class ThemeManager {
    * 获取自定义配置回显 (供 ColorCustomizer 初始化)
    */
   static async getCustomConfig(): Promise<CustomThemeConfig> {
-    if (!ThemeManager.pref) return { hue: 210, styleStrength: 50, isCustom: false, brand: '', accent: '', indicatorKey: 'morandi' };
+    if (!ThemeManager.pref) return { hue: 210, styleStrength: 50, isCustom: false, brand: '', accent: '', indicatorKey: 'vibrant' };
 
-    const uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_UI, 'classic') as string;
-    const indKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_INDICATOR, 'morandi') as string; // 读取当前指示器
+    const uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_UI, 'vibrant') as string;
+    const indKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_INDICATOR,
+      THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'vibrant') as string;
 
     const hue = await ThemeManager.pref.get(ThemeManager.KEY_PARAM_HUE, 210) as number;
     const style = await ThemeManager.pref.get(ThemeManager.KEY_PARAM_STYLE, 50) as number;
@@ -153,7 +213,11 @@ export class ThemeManager {
       brand50: ui.brand50,
       accent: ui.accent,
       bgPrimary: ui.bgPrimary,
+      widgetBgStart: ui.widgetBgStart,
+      widgetBgEnd: ui.widgetBgEnd,
+      widgetDecor: ui.widgetDecor,
       tabIcon: ui.tabIcon,
+      useWhiteGlow: ui.useWhiteGlow,
 
       chartInfo: ind.chartInfo,
       chartCompleted: ind.chartCompleted,
@@ -192,10 +256,12 @@ export class ThemeManager {
     if (uiKey === 'custom') {
       uiPalette = await ThemeManager.loadCustomUIFromDisk();
     } else {
-      uiPalette = ThemeMap[uiKey] || ThemeMap['classic'];
+      uiPalette = ThemeMap[uiKey] || ThemeMap['vibrant'];
     }
 
-    const indicatorSet = IndicatorMap[indicatorKey] || IndicatorMap['morandi'];
+    uiPalette = await ThemeManager.resolveThemeGlow(uiKey, uiPalette);
+
+    const indicatorSet = IndicatorMap[indicatorKey] || IndicatorMap['vibrant'];
     const fullTheme = ThemeManager.mergeTheme(uiPalette, indicatorSet);
 
     ThemeManager.updateAppState(fullTheme);
@@ -221,7 +287,7 @@ export class ThemeManager {
   static async switchUITheme(uiKey: string) {
     console.info('[ThemeManager]', `Switching UI to: ${uiKey}`);
 
-    const defaultIndicatorKey = THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'morandi';
+    const defaultIndicatorKey = THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'vibrant';
 
     AppStorage.set('currentThemeKey', uiKey);
     AppStorage.set('currentIndicatorKey', defaultIndicatorKey);
@@ -247,7 +313,7 @@ export class ThemeManager {
     console.info('[ThemeManager]', `Switching Indicators to: ${indicatorKey}`);
     AppStorage.set('currentIndicatorKey', indicatorKey);
 
-    const currentUIKey = AppStorage.get<string>('currentThemeKey') || 'classic';
+    const currentUIKey = AppStorage.get<string>('currentThemeKey') || 'vibrant';
 
     await ThemeManager.combineAndApplyTheme(currentUIKey, indicatorKey);
 
@@ -259,27 +325,75 @@ export class ThemeManager {
 
   // 辅助方法：从磁盘读取自定义 UI 配置
   private static async loadCustomUIFromDisk(): Promise<UIThemePalette> {
-    if (!ThemeManager.pref) return ThemeMap['classic'];
+    if (!ThemeManager.pref) return ThemeMap['vibrant'];
 
     const brand = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_BRAND, '#FF0A59F7') as string;
     const accent = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_ACCENT, '#FF0A59F7') as string;
     const tabIcon = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_TAB_ICON, '') as string;
+    const hue = await ThemeManager.pref.get(ThemeManager.KEY_PARAM_HUE, 210) as number;
 
-    return ThemeManager.createCustomUITheme(brand, accent, tabIcon || undefined);
+    return ThemeManager.createCustomUITheme(brand, accent, tabIcon || undefined, hue);
   }
 
   // 纯内存操作：创建 UI 部分
-  private static createCustomUITheme(brand: string, accent: string, tabIcon?: string | ResourceColor): UIThemePalette {
+  private static createCustomUITheme(
+    brand: string,
+    accent: string,
+    tabIcon?: string | ResourceColor,
+    hue?: number
+  ): UIThemePalette {
     const withAlpha = (hex: string, alpha: string) => {
       if (hex.length === 9) return hex;
       return hex.replace('#', '#' + alpha);
     };
+
+    const resolvedHue = hue ?? 210;
     return createUITheme(
       brand,
       withAlpha(brand, "80"),
       accent,
       $r('app.color.background_primary'),
-      tabIcon
+      withAlpha(brand, "33"),
+      $r('app.color.background_primary'),
+      brand,
+      tabIcon,
+      ThemeManager.isCoolHue(resolvedHue)
     );
+  }
+
+  private static isCoolHue(hue: number): boolean {
+    return hue >= 160 && hue <= 260;
+  }
+
+  private static async resolveThemeGlow(uiKey: string, uiPalette: UIThemePalette): Promise<UIThemePalette> {
+    if (!ThemeManager.pref) {
+      return uiPalette;
+    }
+
+    const prefKey = `${ThemeManager.KEY_THEME_WHITE_GLOW_PREFIX}${uiKey}`;
+    const storedValue = await ThemeManager.pref.get(prefKey, uiPalette.useWhiteGlow) as boolean;
+    return {
+      brand: uiPalette.brand,
+      brand50: uiPalette.brand50,
+      accent: uiPalette.accent,
+      bgPrimary: uiPalette.bgPrimary,
+      widgetBgStart: uiPalette.widgetBgStart,
+      widgetBgEnd: uiPalette.widgetBgEnd,
+      widgetDecor: uiPalette.widgetDecor,
+      tabIcon: uiPalette.tabIcon,
+      useWhiteGlow: storedValue
+    };
+  }
+
+  static async setCurrentThemeWhiteGlow(enable: boolean) {
+    const currentUIKey = AppStorage.get<string>('currentThemeKey') || 'vibrant';
+    const currentIndicatorKey = AppStorage.get<string>('currentIndicatorKey') || (THEME_DEFAULT_INDICATOR_MAP[currentUIKey] || 'vibrant');
+
+    if (ThemeManager.pref) {
+      await ThemeManager.pref.put(`${ThemeManager.KEY_THEME_WHITE_GLOW_PREFIX}${currentUIKey}`, enable);
+      await ThemeManager.pref.flush();
+    }
+
+    await ThemeManager.combineAndApplyTheme(currentUIKey, currentIndicatorKey);
   }
 }

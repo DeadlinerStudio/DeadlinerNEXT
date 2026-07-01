@@ -10,6 +10,7 @@ export interface ManualItem {
   fileName: string;   // MD 文件名
   content?: string;   // 运行时加载的 MD 内容
   themeColor?: string;
+  isImage?: boolean;
 }
 
 export interface ManualSection {
@@ -23,7 +24,7 @@ const ICON_MAP: Record<string, Resource> = {
   // 原有的
   'lightbulb': $r('sys.symbol.lightbulb'),
   'plus_circle': $r('sys.symbol.plus_circle'),
-  'wand_and_stars': $r('sys.symbol.wand_and_stars'),
+  'lifi': $r('app.media.lifi'),
   'archivebox': $r('sys.symbol.archivebox'),
   'hand_draw': $r('sys.symbol.hand_draw'),             // 手势
   'chart_bar': $r('sys.symbol.data_proportion'),             // 统计

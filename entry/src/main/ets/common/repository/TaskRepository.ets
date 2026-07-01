@@ -3,6 +3,7 @@ import { SyncService } from '../sync/SyncService';
 import { WebUtils } from '../network/WebUtils';
 import { LocalValues } from '../local/LocalValues';
 import { DDLItem, DeadlineType, SubTask } from '../../model/DDLModels';
+import { TaskStateAction } from '../../model/TaskStateMachine';
 import { common } from '@kit.AbilityKit';
 import { WidgetUpdater } from '../../utils/WidgetUpdater';
 import { ReminderScheduler } from '../../utils/notification/ReminderScheduler';
@@ -167,6 +168,10 @@ export class TaskRepository {
     this.scheduleReminderRefresh();
   }
 
+  public triggerExternalUpdates() {
+    this.triggerUpdates();
+  }
+
   // ==========================================
   // 增删改查
   // ==========================================
@@ -209,12 +214,16 @@ export class TaskRepository {
   async updateDDL(item: DDLItem): Promise<void> {
     await this.ensureDbReady();
     await this.db.updateDDL(item);
+    if (!ReminderScheduler.shouldScheduleDDLReminder(item)) {
+      await ReminderScheduler.cancelDDLReminder(item.id);
+    }
     this.triggerUpdates();
   }
 
   async deleteDDL(id: number): Promise<void> {
     await this.ensureDbReady();
     await this.db.deleteDDL(id);
+    await ReminderScheduler.cancelDDLReminder(id);
     this.triggerUpdates();
   }
 
@@ -226,6 +235,31 @@ export class TaskRepository {
   async getDDLsByType(type: DeadlineType): Promise<DDLItem[]> {
     await this.ensureDbReady();
     return this.db.getDDLsByType(type);
+  }
+
+  async getMainListDDLsByType(type: DeadlineType): Promise<DDLItem[]> {
+    await this.ensureDbReady();
+    return this.db.getMainListDDLsByType(type);
+  }
+
+  async getArchivedDDLs(): Promise<DDLItem[]> {
+    await this.ensureDbReady();
+    return this.db.getArchivedDDLs();
+  }
+
+  async getDDLById(id: number): Promise<DDLItem | null> {
+    await this.ensureDbReady();
+    return this.db.getDDLById(id);
+  }
+
+  async transitionDDL(id: number, action: TaskStateAction): Promise<DDLItem> {
+    await this.ensureDbReady();
+    const item = await this.db.transitionDDLState(id, action);
+    if (!ReminderScheduler.shouldScheduleDDLReminder(item)) {
+      await ReminderScheduler.cancelDDLReminder(item.id);
+    }
+    this.triggerUpdates();
+    return item;
   }
 
   private scheduleWidgetUpdate() {
@@ -271,6 +305,18 @@ export class TaskRepository {
 
     await this.db.updateSubTaskStatus(subTask.id, !subTask.isCompleted);
 
+    this.triggerUpdates();
+  }
+
+  async deleteSubTask(subTaskId: number): Promise<void> {
+    await this.ensureDbReady();
+    await this.db.deleteSubTask(subTaskId);
+    this.triggerUpdates();
+  }
+
+  async updateSubTaskContent(subTaskId: number, content: string): Promise<void> {
+    await this.ensureDbReady();
+    await this.db.updateSubTaskContent(subTaskId, content);
     this.triggerUpdates();
   }
 
@@ -378,6 +424,7 @@ export class TaskRepository {
         // 3. 触发同步和 Widget 更新
         this.scheduleSync();
         this.scheduleWidgetUpdate();
+        this.scheduleReminderRefresh();
       }
     } catch (e) {
       console.error(`[TaskRepo] checkAndAutoArchive failed: ${e}`);

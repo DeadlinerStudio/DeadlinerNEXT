@@ -19,16 +19,15 @@ export function getImmersiveTitleBarStyle(
   if (deviceInfo.distributionOSApiVersion >= 60100 && LocalValues.getInstance().getApi23Enable()) {
     return {
       scrollEffectOpts: {
-        enableScrollEffect: !isWideScreen,
+        // enableScrollEffect: !isWideScreen,
+        enableScrollEffect: true,
         scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR,
         blurEffectiveStartOffset: LengthMetrics.vp(0),
         blurEffectiveEndOffset: LengthMetrics.vp(10),
       },
       originalStyle: {
         backgroundStyle: {
-          backgroundColor: isWideScreen ?
-            ThemeManager.getCurrentTheme().bgPrimary :
-            $r('sys.color.ohos_id_color_background_transparent'),
+          backgroundColor: $r('sys.color.ohos_id_color_background_transparent'),
         },
         contentStyle: {
           titleStyle: {
@@ -41,10 +40,8 @@ export function getImmersiveTitleBarStyle(
       },
       scrollEffectStyle: {
         backgroundStyle: {
-          backgroundColor: isWideScreen ?
-            ThemeManager.getCurrentTheme().bgPrimary :
-            $r('sys.color.ohos_id_color_navigation_background_blur'),
-          blurRadius: 32
+          backgroundColor: $r('app.color.background_primary_50'),
+          // blurRadius: 32
         },
         contentStyle: {
           titleStyle: {

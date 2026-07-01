@@ -123,6 +123,7 @@ export struct SortSheet {
       case TrendCard.DAILY_TREND: return '本周完成情况';
       case TrendCard.MONTHLY_TREND: return '每月趋势';
       case TrendCard.WEEKLY_TREND: return '近4周完成';
+      case TrendCard.CONTRIBUTION_HEATMAP: return '活跃热力图';
       default: return '未知卡片';
     }
   }
