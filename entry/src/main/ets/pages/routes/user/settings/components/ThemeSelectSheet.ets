@@ -17,6 +17,7 @@ interface ThemeOption {
 
 const THEME_OPTIONS: ThemeOption[] = [
   { key: 'vibrant', name: '生动 (默认)', previewBg: $r('sys.color.search_container_focus_color') },
+  { key: 'colorful', name: '多彩', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'classic', name: '莫兰迪', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'nature', name: '清新', previewBg: $r('sys.color.search_container_focus_color') },
   { key: 'sunset', name: '暖阳', previewBg: $r('sys.color.search_container_focus_color') },

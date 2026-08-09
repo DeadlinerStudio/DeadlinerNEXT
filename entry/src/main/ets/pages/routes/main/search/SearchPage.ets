@@ -446,7 +446,7 @@ export struct SearchPage {
       return items;
     }
 
-    items.push(new SearchImageHeaderItem('header_inspirations', '灵感', $r('app.media.capture')));
+    items.push(new SearchImageHeaderItem('header_inspirations', '灵感', $r('app.media.capture_mo')));
     this.visibleResults.inspirations.forEach((inspiration: InspirationItem) => {
       items.push(new SearchInspirationItem(`inspiration_${inspiration.id}`, inspiration));
     });

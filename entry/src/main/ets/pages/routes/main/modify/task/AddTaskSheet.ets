@@ -1,6 +1,7 @@
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { TaskFormView } from './TaskFormView';
 import { TaskFormHelper } from './TaskFormHelper';
+import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
 
 export interface AddTaskParams {
   name: string;
@@ -20,6 +21,7 @@ export struct AddTaskSheet {
   @State note: string = '';
   @State startTime: Date = new Date();
   @State endTime: Date = new Date(new Date().getTime() + 60 * 60 * 1000);
+  @State categoryUid: string | null = null;
 
   @State aiInputText: string = '';
   @State isAILoading: boolean = false;
@@ -42,7 +44,7 @@ export struct AddTaskSheet {
 
   private async saveTask() {
     const isSuccess = await TaskFormHelper.saveNewTask(
-      this.name, this.note, this.startTime, this.endTime
+      this.name, this.note, this.startTime, this.endTime, this.categoryUid
     );
 
     if (isSuccess) {
@@ -86,6 +88,9 @@ export struct AddTaskSheet {
           onAITriggered: (): Promise<void> => this.onAITriggered(),
           showAIInput: true
         }).padding({ left: 16, right: 16 })
+
+        CategoryAssignmentField({ categoryUid: $categoryUid })
+          .margin({ left: 16, right: 16, top: 12 })
       }
       .width('100%')
       .height('100%')

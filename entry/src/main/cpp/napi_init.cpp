@@ -21,13 +21,20 @@ using ZeroArgumentFunction = int (*)();
 
 struct PersistenceApi {
     void* handle = nullptr;
+    std::string loadError;
     InitializeFunction initialize = nullptr;
+    TaskListViewModelJsonFunction lastInitializationError = nullptr;
     ImportLegacyV2Function importLegacyV2 = nullptr;
     ImportJsonFunction importCapturesJson = nullptr;
     DiagnosticsJsonFunction diagnosticsJson = nullptr;
     MergeLegacyV2JsonFunction mergeLegacyV2Json = nullptr;
     SyncWebDavChangeLogJsonFunction syncWebDavChangeLogJson = nullptr;
     TaskListViewModelJsonFunction taskListViewModelJson = nullptr;
+    TaskListViewModelJsonFunction categoryCatalogJson = nullptr;
+    TaskMutationJsonFunction categoryCreateJson = nullptr;
+    TaskMutationJsonFunction categoryUpdateJson = nullptr;
+    TaskKeyMutationJsonFunction categoryDeleteJson = nullptr;
+    TaskListViewModelJsonFunction categoryRestorePresetsJson = nullptr;
     TaskListViewModelJsonFunction overviewViewModelJson = nullptr;
     TaskMutationJsonFunction taskCreateJson = nullptr;
     TaskMutationJsonFunction taskUpdateJson = nullptr;
@@ -36,6 +43,7 @@ struct PersistenceApi {
     TaskListViewModelJsonFunction habitStateJson = nullptr;
     TaskMutationJsonFunction habitCreateJson = nullptr;
     TaskMutationJsonFunction habitUpdateJson = nullptr;
+    TaskMutationJsonFunction habitCategoryUpdateJson = nullptr;
     TaskKeyMutationJsonFunction habitStatusActionJson = nullptr;
     TaskKeyMutationJsonFunction habitToggleRecordJson = nullptr;
     TaskMutationJsonFunction habitSaveRecordJson = nullptr;
@@ -66,22 +74,30 @@ struct PersistenceApi {
 PersistenceApi& GetPersistenceApi()
 {
     static PersistenceApi api;
-    if (api.handle != nullptr) {
+    if (api.handle != nullptr || !api.loadError.empty()) {
         return api;
     }
 
     api.handle = dlopen("libDeadlinerCore.so", RTLD_NOW | RTLD_LOCAL);
     if (api.handle == nullptr) {
+        const char* error = dlerror();
+        api.loadError = error == nullptr ? "Unable to load libDeadlinerCore.so" : error;
         return api;
     }
 
     api.initialize = reinterpret_cast<InitializeFunction>(dlsym(api.handle, "deadliner_persistence_initialize"));
+    api.lastInitializationError = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_last_initialization_error"));
     api.importLegacyV2 = reinterpret_cast<ImportLegacyV2Function>(dlsym(api.handle, "deadliner_persistence_import_legacy_v2"));
     api.importCapturesJson = reinterpret_cast<ImportJsonFunction>(dlsym(api.handle, "deadliner_persistence_import_captures_json"));
     api.diagnosticsJson = reinterpret_cast<DiagnosticsJsonFunction>(dlsym(api.handle, "deadliner_persistence_diagnostics_json"));
     api.mergeLegacyV2Json = reinterpret_cast<MergeLegacyV2JsonFunction>(dlsym(api.handle, "deadliner_persistence_merge_legacy_v2_json"));
     api.syncWebDavChangeLogJson = reinterpret_cast<SyncWebDavChangeLogJsonFunction>(dlsym(api.handle, "deadliner_persistence_sync_webdav_changelog_json"));
     api.taskListViewModelJson = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_task_list_view_model_json"));
+    api.categoryCatalogJson = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_category_catalog_json"));
+    api.categoryCreateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_category_create_json"));
+    api.categoryUpdateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_category_update_json"));
+    api.categoryDeleteJson = reinterpret_cast<TaskKeyMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_category_delete_json"));
+    api.categoryRestorePresetsJson = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_category_restore_presets_json"));
     api.overviewViewModelJson = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_overview_view_model_json"));
     api.taskCreateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_task_create_json"));
     api.taskUpdateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_task_update_json"));
@@ -90,6 +106,7 @@ PersistenceApi& GetPersistenceApi()
     api.habitStateJson = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_state_json"));
     api.habitCreateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_create_json"));
     api.habitUpdateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_update_json"));
+    api.habitCategoryUpdateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_category_update_json"));
     api.habitStatusActionJson = reinterpret_cast<TaskKeyMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_status_action_json"));
     api.habitToggleRecordJson = reinterpret_cast<TaskKeyMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_toggle_record_json"));
     api.habitSaveRecordJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_save_record_json"));
@@ -118,7 +135,9 @@ PersistenceApi& GetPersistenceApi()
 
     if (api.initialize == nullptr || api.importLegacyV2 == nullptr || api.importCapturesJson == nullptr || api.diagnosticsJson == nullptr || api.mergeLegacyV2Json == nullptr || api.syncWebDavChangeLogJson == nullptr || api.taskListViewModelJson == nullptr || api.overviewViewModelJson == nullptr || api.taskCreateJson == nullptr || api.taskUpdateJson == nullptr || api.taskActionJson == nullptr || api.taskDeleteJson == nullptr || api.habitStateJson == nullptr || api.habitCreateJson == nullptr || api.habitUpdateJson == nullptr || api.habitStatusActionJson == nullptr || api.habitToggleRecordJson == nullptr || api.habitSaveRecordJson == nullptr || api.habitClearRecordsJson == nullptr || api.habitDeleteJson == nullptr || api.captureStateJson == nullptr || api.captureCreateJson == nullptr || api.captureUpdateJson == nullptr || api.captureDeleteJson == nullptr || api.memoryProfileStateJson == nullptr || api.importMemoryProfileJson == nullptr || api.memorySaveJson == nullptr || api.memoryDeleteJson == nullptr || api.profileSaveJson == nullptr || api.lifiProcessInput == nullptr || api.lifiSubmitToolResult == nullptr || api.lifiExtractTasksJson == nullptr || api.lifiExtractHabitsJson == nullptr || api.lifiGenerateMonthlyAnalysisJson == nullptr || api.lifiDrainEventsJson == nullptr || api.lifiPendingEventCount == nullptr || api.lifiReset == nullptr || api.close == nullptr || api.health == nullptr || api.bridgeVersion == nullptr) {
         dlclose(api.handle);
-        api = PersistenceApi();
+        PersistenceApi unavailable;
+        unavailable.loadError = "libDeadlinerCore.so is missing a required persistence symbol";
+        api = unavailable;
     }
     return api;
 }
@@ -446,6 +465,30 @@ napi_value OverviewViewModelJson(napi_env env, napi_callback_info info)
     return RunZeroArgumentJson(env, info, GetPersistenceApi().overviewViewModelJson);
 }
 
+napi_value CategoryCatalogJson(napi_env env, napi_callback_info info)
+{
+  return RunZeroArgumentJson(env, info, GetPersistenceApi().categoryCatalogJson);
+}
+
+napi_value LastInitializationError(napi_env env, napi_callback_info info)
+{
+    return RunZeroArgumentJson(env, info, GetPersistenceApi().lastInitializationError);
+}
+
+napi_value BridgeLoadError(napi_env env, napi_callback_info info)
+{
+    size_t argc = 0;
+    if (napi_get_cb_info(env, info, &argc, nullptr, nullptr, nullptr) != napi_ok || argc != 0) {
+        napi_value empty = nullptr;
+        napi_create_string_utf8(env, "", NAPI_AUTO_LENGTH, &empty);
+        return empty;
+    }
+    PersistenceApi& api = GetPersistenceApi();
+    napi_value value = nullptr;
+    napi_create_string_utf8(env, api.loadError.c_str(), NAPI_AUTO_LENGTH, &value);
+    return value;
+}
+
 struct ZeroArgumentJsonAsyncContext {
     TaskListViewModelJsonFunction function = nullptr;
     napi_async_work work = nullptr;
@@ -766,6 +809,8 @@ napi_value RunTaskMutation(napi_env env, napi_callback_info info, TaskMutationJs
 
 napi_value TaskCreateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().taskCreateJson); }
 napi_value TaskUpdateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().taskUpdateJson); }
+napi_value CategoryCreateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().categoryCreateJson); }
+napi_value CategoryUpdateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().categoryUpdateJson); }
 
 napi_value RunTaskKeyMutation(napi_env env, napi_callback_info info, TaskKeyMutationJsonFunction function)
 {
@@ -798,6 +843,8 @@ napi_value RunTaskKeyMutation(napi_env env, napi_callback_info info, TaskKeyMuta
 
 napi_value TaskActionJson(napi_env env, napi_callback_info info) { return RunTaskKeyMutation(env, info, GetPersistenceApi().taskActionJson); }
 napi_value TaskDeleteJson(napi_env env, napi_callback_info info) { return RunTaskKeyMutation(env, info, GetPersistenceApi().taskDeleteJson); }
+napi_value CategoryDeleteJson(napi_env env, napi_callback_info info) { return RunTaskKeyMutation(env, info, GetPersistenceApi().categoryDeleteJson); }
+napi_value CategoryRestorePresetsJson(napi_env env, napi_callback_info info) { return RunZeroArgumentJson(env, info, GetPersistenceApi().categoryRestorePresetsJson); }
 
 napi_value HabitStateJson(napi_env env, napi_callback_info info)
 {
@@ -832,6 +879,7 @@ napi_value HabitStateJson(napi_env env, napi_callback_info info)
 
 napi_value HabitCreateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().habitCreateJson); }
 napi_value HabitUpdateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().habitUpdateJson); }
+napi_value HabitCategoryUpdateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().habitCategoryUpdateJson); }
 napi_value HabitStatusActionJson(napi_env env, napi_callback_info info) { return RunTaskKeyMutation(env, info, GetPersistenceApi().habitStatusActionJson); }
 napi_value HabitToggleRecordJson(napi_env env, napi_callback_info info) { return RunTaskKeyMutation(env, info, GetPersistenceApi().habitToggleRecordJson); }
 napi_value HabitSaveRecordJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().habitSaveRecordJson); }
@@ -907,6 +955,8 @@ static napi_value Init(napi_env env, napi_value exports)
 {
     napi_property_descriptor descriptors[] = {
         { "initialize", nullptr, Initialize, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "lastInitializationError", nullptr, LastInitializationError, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "bridgeLoadError", nullptr, BridgeLoadError, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "importLegacyV2", nullptr, ImportLegacyV2, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "importCapturesJson", nullptr, ImportCapturesJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "diagnosticsJson", nullptr, DiagnosticsJson, nullptr, nullptr, nullptr, napi_default, nullptr },
@@ -914,6 +964,11 @@ static napi_value Init(napi_env env, napi_value exports)
         { "syncWebDavChangeLogJson", nullptr, SyncWebDavChangeLogJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "syncWebDavChangeLogJsonAsync", nullptr, SyncWebDavChangeLogJsonAsync, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "taskListViewModelJson", nullptr, TaskListViewModelJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "categoryCatalogJson", nullptr, CategoryCatalogJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "categoryCreateJson", nullptr, CategoryCreateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "categoryUpdateJson", nullptr, CategoryUpdateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "categoryDeleteJson", nullptr, CategoryDeleteJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "categoryRestorePresetsJson", nullptr, CategoryRestorePresetsJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "overviewViewModelJson", nullptr, OverviewViewModelJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "overviewViewModelJsonAsync", nullptr, OverviewViewModelJsonAsync, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "taskCreateJson", nullptr, TaskCreateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
@@ -923,6 +978,7 @@ static napi_value Init(napi_env env, napi_value exports)
         { "habitStateJson", nullptr, HabitStateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitCreateJson", nullptr, HabitCreateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitUpdateJson", nullptr, HabitUpdateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "habitCategoryUpdateJson", nullptr, HabitCategoryUpdateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitStatusActionJson", nullptr, HabitStatusActionJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitToggleRecordJson", nullptr, HabitToggleRecordJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitSaveRecordJson", nullptr, HabitSaveRecordJson, nullptr, nullptr, nullptr, napi_default, nullptr },

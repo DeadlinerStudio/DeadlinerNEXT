@@ -1,7 +1,9 @@
 import {
   BottomBuilderShowType,
+  HdsNavDestination,
   HdsNavigation,
   HdsNavigationMenuItemOptions,
+  HdsNavDestinationTitleMode,
   HdsNavigationTitleMode
 } from "@kit.UIDesignKit";
 import { TopSafeContainer } from "../../components/TopSafeContainer";
@@ -64,6 +66,7 @@ export struct OverviewPage {
   }
 
   @Prop @Watch('onTabSwitch') currentTabIndex: number = 0;
+  @Prop isNavDestination: boolean = false;
 
   readonly TARGET_INDEX: number = 1;
 
@@ -663,102 +666,128 @@ export struct OverviewPage {
     }
   }
 
+  @Builder
+  private compactContentBuilder() {
+    Stack() {
+      if (!this.isLoading) {
+        TopSafeContainer({
+          topAvoidHeight: this.usesMediumLayout() ? this.getMiniTopAvoidHeight() : this.getBottomSegmentTopAvoidHeight(),
+          needBgTransparent: true
+        }) {
+          if (this.selectedIndexes[0] === 0) {
+            OverviewStatsSection({
+              todayCompleted: this.viewModel.todayCompleted,
+              todayTodo: this.viewModel.todayTodo,
+              todayOverdue: this.viewModel.todayOverdue,
+              activeAbandoned: this.viewModel.activeAbandoned,
+              historyStats: this.viewModel.historyStats,
+              completionTimeStats: this.viewModel.completionTimeStats,
+              overdueItems: this.viewModel.overdueItems,
+              cardOrder: this.viewModel.overviewCardOrder,
+              isMediumLayout: this.usesMediumLayout()
+            })
+          } else if (this.selectedIndexes[0] === 1) {
+            TrendAnalysisSection({
+              dailyStats: this.viewModel.dailyStats,
+              monthlyStats: this.viewModel.monthlyStats,
+              weeklyStats: this.viewModel.weeklyStats,
+              contributionStats: this.viewModel.contributionStats,
+              cardOrder: this.viewModel.trendCardOrder,
+              isMediumLayout: this.usesMediumLayout()
+            })
+          } else if (this.selectedIndexes[0] === 2) {
+            DashboardSection({
+              metrics: this.viewModel.metrics,
+              dailyStats: this.viewModel.lastMonthDailyStats,
+              lastMonthName: this.viewModel.lastMonthName,
+              analysis: this.viewModel.monthlyAnalysis,
+              isAnalyzing: this.viewModel.isAnalyzing,
+              isMediumLayout: this.usesMediumLayout()
+            })
+          }
+        }
+      } else {
+        Column() {
+          LoadingProgress()
+            .width(64)
+            .height(64)
+            .color($r('sys.color.ohos_id_color_text_primary'))
+          Text("正在加载数据...")
+            .fontSize(14)
+            .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+            .margin({ top: 10 })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor($r('sys.color.ohos_id_color_background'))
+      }
+    }
+  }
+
   build() {
     if (this.usesWideSplitLayout()) {
-      HdsNavigation() {
+      if (this.isNavDestination) {
+        HdsNavDestination() {
         this.wideContentBuilder()
-      }
-      .id(`overview_navigation_${this.currentThemeKey}`)
-      .titleBar({
-        style: getImmersiveTitleBarStyle(true),
-        content: {
-          title: { mainTitle: '概览' },
-          menu: {
-            value: this.buildWideTitleMenus()
+        }
+        .id(`overview_navigation_${this.currentThemeKey}`)
+        .titleBar({
+          style: getImmersiveTitleBarStyle(true),
+          content: {
+            title: { mainTitle: '概览' },
+            menu: {
+              value: this.buildWideTitleMenus()
+            }
           }
+        })
+        .titleMode(HdsNavDestinationTitleMode.MINI)
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+        .bindToScrollable([this.dummyScroller])
+        .padding({ top: this.statusBarHeight })
+        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
+          detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
+          height: SheetSize.FIT_CONTENT,
+          dragBar: true,
+          backgroundColor: Color.Transparent,
+          blurStyle: BlurStyle.Regular,
+          onDisappear: () => { this.isSortSheetShow = false },
+          title: { title: '调整卡片顺序', subtitle: '长按以拖动卡片标题' }
+        })
+      } else {
+        HdsNavigation() {
+          this.wideContentBuilder()
         }
-      })
-      .titleMode(HdsNavigationTitleMode.MINI)
-      .hideBackButton(true)
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-      .mode(NavigationMode.Stack)
-      .navBarWidth('100%')
-      .bindToScrollable([this.dummyScroller])
-      .padding({ top: this.statusBarHeight })
-      .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
-        detents: [
-          SheetSize.FIT_CONTENT,
-          SheetSize.MEDIUM,
-          SheetSize.LARGE
-        ],
-        height: SheetSize.FIT_CONTENT,
-        dragBar: true,
-        backgroundColor: Color.Transparent,
-        blurStyle: BlurStyle.Regular,
-        onDisappear: () => { this.isSortSheetShow = false },
-        title: {
-          title: '调整卡片顺序',
-          subtitle: '长按以拖动卡片标题'
-        }
-      })
+        .id(`overview_navigation_${this.currentThemeKey}`)
+        .titleBar({
+          style: getImmersiveTitleBarStyle(true),
+          content: {
+            title: { mainTitle: '概览' },
+            menu: { value: this.buildWideTitleMenus() }
+          }
+        })
+        .titleMode(HdsNavigationTitleMode.MINI)
+        .hideBackButton(true)
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+        .mode(NavigationMode.Stack)
+        .navBarWidth('100%')
+        .bindToScrollable([this.dummyScroller])
+        .padding({ top: this.statusBarHeight })
+        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
+          detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
+          height: SheetSize.FIT_CONTENT,
+          dragBar: true,
+          backgroundColor: Color.Transparent,
+          blurStyle: BlurStyle.Regular,
+          onDisappear: () => { this.isSortSheetShow = false },
+          title: { title: '调整卡片顺序', subtitle: '长按以拖动卡片标题' }
+        })
+      }
     } else {
-      HdsNavigation() {
-        Stack() {
-          if (!this.isLoading) {
-            TopSafeContainer({
-              topAvoidHeight: this.usesMediumLayout() ? this.getMiniTopAvoidHeight() : this.getBottomSegmentTopAvoidHeight(),
-              needBgTransparent: true
-            }) {
-              if (this.selectedIndexes[0] === 0) {
-                OverviewStatsSection({
-                  todayCompleted: this.viewModel.todayCompleted,
-                  todayTodo: this.viewModel.todayTodo,
-                  todayOverdue: this.viewModel.todayOverdue,
-                  activeAbandoned: this.viewModel.activeAbandoned,
-                  historyStats: this.viewModel.historyStats,
-                  completionTimeStats: this.viewModel.completionTimeStats,
-                  overdueItems: this.viewModel.overdueItems,
-                  cardOrder: this.viewModel.overviewCardOrder,
-                  isMediumLayout: this.usesMediumLayout()
-                })
-              } else if (this.selectedIndexes[0] === 1) {
-                TrendAnalysisSection({
-                  dailyStats: this.viewModel.dailyStats,
-                  monthlyStats: this.viewModel.monthlyStats,
-                  weeklyStats: this.viewModel.weeklyStats,
-                  contributionStats: this.viewModel.contributionStats,
-                  cardOrder: this.viewModel.trendCardOrder,
-                  isMediumLayout: this.usesMediumLayout()
-                })
-              } else if (this.selectedIndexes[0] === 2) {
-                DashboardSection({
-                  metrics: this.viewModel.metrics,
-                  dailyStats: this.viewModel.lastMonthDailyStats,
-                  lastMonthName: this.viewModel.lastMonthName,
-                  analysis: this.viewModel.monthlyAnalysis,
-                  isAnalyzing: this.viewModel.isAnalyzing,
-                  isMediumLayout: this.usesMediumLayout()
-                })
-              }
-            }
-          } else {
-            Column() {
-              LoadingProgress()
-                .width(64)
-                .height(64)
-                .color($r('sys.color.ohos_id_color_text_primary'))
-              Text("正在加载数据...")
-                .fontSize(14)
-                .fontColor($r('sys.color.ohos_id_color_text_secondary'))
-                .margin({ top: 10 })
-            }
-            .width('100%')
-            .height('100%')
-            .justifyContent(FlexAlign.Center)
-            .backgroundColor($r('sys.color.ohos_id_color_background'))
-          }
+      if (this.isNavDestination) {
+        HdsNavDestination() {
+          this.compactContentBuilder()
         }
-      }
       .id(`overview_navigation_${this.currentThemeKey}`)
       .titleBar({
         style: getImmersiveTitleBarStyle(this.usesMediumLayout()),
@@ -778,12 +807,9 @@ export struct OverviewPage {
           },
         }
       })
-      .titleMode(HdsNavigationTitleMode.MINI)
-      .hideBackButton(true)
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-      .mode(NavigationMode.Stack)
-      .navBarWidth('100%')
-      .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
+        .titleMode(HdsNavDestinationTitleMode.MINI)
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
         detents: [
           SheetSize.FIT_CONTENT,
           SheetSize.MEDIUM,
@@ -798,7 +824,50 @@ export struct OverviewPage {
           title: '调整卡片顺序',
           subtitle: '长按以拖动卡片标题'
         }
-      })
+        })
+      } else {
+        HdsNavigation() {
+          this.compactContentBuilder()
+        }
+        .id(`overview_navigation_${this.currentThemeKey}`)
+        .titleBar({
+          style: getImmersiveTitleBarStyle(this.usesMediumLayout()),
+          content: {
+            title: { mainTitle: '概览' },
+            stackBuilder: this.usesMediumLayout() ? () => {
+              this.mediumStackBuilder();
+            } : () => {
+              this.titleMenuBuilder();
+            },
+            bottomBuilder: this.usesMediumLayout() ? undefined : {
+              builder: () => {
+                this.tabSegment();
+              },
+              height: this.SEGMENT_HEIGHT,
+              showType: BottomBuilderShowType.DIRECTLY_SHOW
+            },
+          }
+        })
+        .titleMode(HdsNavigationTitleMode.MINI)
+        .hideBackButton(true)
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+        .mode(NavigationMode.Stack)
+        .navBarWidth('100%')
+        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
+          detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
+          height: SheetSize.FIT_CONTENT,
+          dragBar: true,
+          backgroundColor: Color.Transparent,
+          blurStyle: BlurStyle.Regular,
+          onDisappear: () => { this.isSortSheetShow = false },
+          title: { title: '调整卡片顺序', subtitle: '长按以拖动卡片标题' }
+        })
+      }
     }
   }
+}
+
+@Builder
+export function HdsOverviewDestinationBuilder() {
+  OverviewPage({ currentTabIndex: -1, isNavDestination: true })
 }

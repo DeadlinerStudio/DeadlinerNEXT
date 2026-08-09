@@ -1193,6 +1193,7 @@ export class DatabaseHelper {
         description: resultSet.getString(resultSet.getColumnIndex(C.HABIT_DESC)),
         color: getColor(),
         iconKey: resultSet.getString(resultSet.getColumnIndex(C.HABIT_ICON_KEY)),
+        categoryUid: null,
         // Enum conversion (String -> Enum)
         period: resultSet.getString(resultSet.getColumnIndex(C.HABIT_PERIOD)) as HabitPeriod,
         timesPerPeriod: resultSet.getLong(resultSet.getColumnIndex(C.HABIT_TIMES_PER_PERIOD)),

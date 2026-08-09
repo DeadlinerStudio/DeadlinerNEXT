@@ -15,6 +15,9 @@ import { ITheme } from "../../../common/theme/ThemeModel";
 import { DDLStatus } from "../../../model/DDLStatus"
 import { DialogCompat } from "../../../common/ui/DialogCompat";
 import { Toast } from '../../../common/ui/Toast';
+import { CategoryFilter, CategoryFilterResolver } from '../../../common/category/CategoryFilter';
+import { CategoryRepository } from '../../../common/repository/CategoryRepository';
+import { CategoryDisplayModel } from '../../../common/kmp/KmpCategoryRepositoryAdapter';
 
 interface EbbinState {
   isDue: boolean;
@@ -26,6 +29,7 @@ export struct HabitListSection {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
   @Prop topAvoidHeight: number = 0;
+  @Prop @Watch('onCategoryFilterChange') categoryFilter: CategoryFilter = CategoryFilter.all();
 
   scroller: Scroller = new Scroller();
   confetti: ConfettiController = new ConfettiController();
@@ -45,6 +49,7 @@ export struct HabitListSection {
   @State selectedDdlIds: Set<number> = new Set();
 
   private repo = HabitRepository.getInstance();
+  private categoryRepository: CategoryRepository = CategoryRepository.getInstance();
 
   @State tempHabitName: string = "";
   @State tempIsEnabled: boolean = false;
@@ -83,6 +88,10 @@ export struct HabitListSection {
   private onSyncEvent = () => {
     console.debug('HabitListSection received sync_done event');
     this.refreshAll(this.selectedDate);
+  }
+
+  onCategoryFilterChange(): void {
+    void this.refreshAll(this.selectedDate);
   }
 
   private bindController() {
@@ -156,7 +165,11 @@ export struct HabitListSection {
 
   async refreshAll(date: Date) {
     const allHabitsRaw = await this.repo.getAllHabits();
-    const allHabits = allHabitsRaw.filter(h => h.status !== HabitStatus.ARCHIVED);
+    const categories: CategoryDisplayModel[] = await this.categoryRepository.listCategories();
+    const allHabits = allHabitsRaw.filter((habit: Habit) =>
+      habit.status !== HabitStatus.ARCHIVED &&
+      CategoryFilterResolver.matches(this.categoryFilter, habit.categoryUid, categories)
+    );
 
     const statusListNullable = await Promise.all(allHabits.map(h => this.buildStatusForDate(h, date)));
     const statusList = statusListNullable.filter((item) => item !== null) as HabitWithDailyStatus[];

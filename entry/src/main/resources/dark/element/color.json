@@ -75,6 +75,11 @@
     { "name": "func_archive", "value": "#FF7CA6D6"},
     { "name": "func_ai", "value": "#B39DDB" },
     { "name": "func_manual", "value": "#80CBC4" },
+    { "name": "module_list", "value": "#FF5C9DFF" },
+    { "name": "module_overview", "value": "#FF41D1C7" },
+    { "name": "module_capture", "value": "#FF8E8BFF" },
+    { "name": "module_ai", "value": "#FFC7A4FF" },
+    { "name": "module_user", "value": "#FFFFB74D" },
     { "name": "font_primary", "value": "#FFFFFF"},
     { "name": "font_secondary", "value": "#B3B3B3"},
     { "name": "font_emphasize", "value": "#FFFFFF"},
@@ -282,7 +287,7 @@
     { "name": "widget_bg_grad_end", "value": "#FF141619" },
     { "name": "widget_item_bg", "value": "#FF282C31" },
 
-    { "name": "tab_bar_icon_unselected", "value": "#EEEEEE" },
+    { "name": "tab_bar_icon_unselected", "value": "#F0F0F0" },
     { "name": "segmented_color_selected", "value": "#22FFFFFF" }
   ]
 }

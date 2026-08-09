@@ -16,6 +16,9 @@ import { TaskState, TaskStateAction } from "../../../model/TaskStateMachine";
 import { DialogCompat } from "../../../common/ui/DialogCompat";
 import { Toast } from '../../../common/ui/Toast';
 import { MaterialPresets } from '../../../common/style/SystemMaterialCompat';
+import { CategoryRepository } from '../../../common/repository/CategoryRepository';
+import { CategoryDisplayModel } from '../../../common/kmp/KmpCategoryRepositoryAdapter';
+import { CategoryFilter, CategoryFilterResolver } from '../../../common/category/CategoryFilter';
 
 export interface TaskUIModel {
   title: string;
@@ -26,6 +29,10 @@ export interface TaskUIModel {
   status: DDLStatus;
   dbId: number;
   taskState: TaskState;
+  categoryUid: string | null;
+  categoryName: string;
+  categoryIconKey: string;
+  categoryColorHex: string;
 }
 
 @Component
@@ -41,6 +48,7 @@ export struct TaskListSection {
 
   @State isLoading: boolean = true;
   @Prop topAvoidHeight: number = 0;
+  @Prop @Watch('onCategoryFilterChange') categoryFilter: CategoryFilter = CategoryFilter.all();
   @Prop showSearchEntry: boolean = false;
   onSearchClick: () => void = () => {};
 
@@ -55,8 +63,13 @@ export struct TaskListSection {
   @State detailTask: DDLItem | null = null;
 
   private repo = TaskRepository.getInstance();
+  private categoryRepository: CategoryRepository = CategoryRepository.getInstance();
 
   @StorageLink(C.KEY_PROGRESS_DIRECTION) @Watch('loadData') progressDir: boolean = false;
+
+  onCategoryFilterChange(): void {
+    void this.loadData();
+  }
 
   aboutToAppear(): void {
     this.bindController();
@@ -105,14 +118,15 @@ export struct TaskListSection {
       this.isLoading = true;
 
       const dbItems = await this.repo.getMainListDDLsByType(DeadlineType.TASK);
+      const categories: CategoryDisplayModel[] = await this.categoryRepository.listCategories();
 
       const now = new Date().getTime();
 
       this.taskList = dbItems
-        .filter((item) => !item.deleted && item.type !== DeadlineType.HABIT)
+        .filter((item) => !item.deleted && item.type !== DeadlineType.HABIT && this.matchesCategoryFilter(item.categoryUid, categories))
         .sort((lhs, rhs) => this.compareTaskOrder(lhs, rhs))
         .map((item) => {
-        return this.mapToUI(item, now);
+        return this.mapToUI(item, now, categories);
       });
 
       console.info(`[TaskList] Loaded ${this.taskList.length} items.`);
@@ -153,13 +167,25 @@ export struct TaskListSection {
     return lhs.id - rhs.id;
   }
 
+  private matchesCategoryFilter(categoryUid: string | null | undefined, categories: CategoryDisplayModel[]): boolean {
+    return CategoryFilterResolver.matches(this.categoryFilter, categoryUid, categories);
+  }
+
+  private categoryForUid(uid: string | null | undefined, categories: CategoryDisplayModel[]): CategoryDisplayModel | null {
+    if (uid === null || uid === undefined) return null;
+    for (let index = 0; index < categories.length; index++) {
+      if (categories[index].uid === uid) return categories[index];
+    }
+    return null;
+  }
+
   private parseTaskSortTime(time: string): number {
     const parsed = new Date(time).getTime();
     return isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
   }
 
   // 核心逻辑：数据映射 (DB Model -> UI Model)
-  private mapToUI(item: DDLItem, now: number): TaskUIModel {
+  private mapToUI(item: DDLItem, now: number, categories: CategoryDisplayModel[]): TaskUIModel {
     // 简单的日期解析容错
     const parseDate = (str: string): number => {
       const d = new Date(str);
@@ -221,6 +247,7 @@ export struct TaskListSection {
     }
 
     const displayProgress = this.progressDir ? progress : 1.0 - progress
+    const category: CategoryDisplayModel | null = this.categoryForUid(item.categoryUid, categories);
 
     return {
       title: item.name,
@@ -230,7 +257,11 @@ export struct TaskListSection {
       isStarred: item.isStared,
       status: status,
       dbId: item.id,
-      taskState: item.state
+      taskState: item.state,
+      categoryUid: item.categoryUid ?? null,
+      categoryName: category === null ? '' : category.name,
+      categoryIconKey: category === null ? '' : category.iconKey,
+      categoryColorHex: category === null ? '' : category.colorHex
     };
   }
 
@@ -544,18 +575,22 @@ export struct TaskListSection {
 
               if (this.showSearchEntry) {
                 ListItem() {
-                  Search({ value: '', placeholder: '搜索任务' })
-                    .width('100%')
-                    .height(40)
-                    .focusable(false)
-                    .enableKeyboardOnFocus(false)
-                    .backgroundColor(Color.Transparent)
-                    .placeholderColor($r('sys.color.ohos_id_color_text_secondary'))
-                    .attributeModifier(MaterialPresets.buttonGlow())
-                    .onClick(() => {
-                      this.onSearchClick();
-                    })
-                    .margin({ bottom: 0, top: -8 })
+                  Column() {
+                    Search({ value: '', placeholder: '搜索任务' })
+                      .width('98%')
+                      .height(40)
+                      .focusable(false)
+                      .enableKeyboardOnFocus(false)
+                      .backgroundColor(Color.Transparent)
+                      .placeholderColor($r('sys.color.ohos_id_color_text_secondary'))
+                      .attributeModifier(MaterialPresets.buttonGlow())
+                      .onClick(() => {
+                        this.onSearchClick();
+                      })
+                      .margin({ bottom: 0, top: -8 })
+                  }
+                  .width('100%')
+                  .alignItems(HorizontalAlign.Center)
                 }
               }
               if (this.taskList.length > 0) {
@@ -568,6 +603,9 @@ export struct TaskListSection {
                         progress: item.progress,
                         isStarred: item.isStarred,
                         status: item.status,
+                        categoryName: item.categoryName,
+                        categoryIconKey: item.categoryIconKey,
+                        categoryColorHex: item.categoryColorHex,
 
                         selectionMode: this.isSelectionMode,
                         selected: this.selectedIds.includes(item.dbId),

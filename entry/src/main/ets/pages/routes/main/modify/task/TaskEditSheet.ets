@@ -4,6 +4,7 @@ import { DDLItem } from '../../../../../model/DDLModels';
 import { DateTimeUtils } from '../../../../../utils/DateTimeUtils';
 import { TaskFormView } from './TaskFormView';
 import { Toast } from '../../../../../common/ui/Toast';
+import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
 
 @Component
 export struct TaskEditSheet {
@@ -18,6 +19,7 @@ export struct TaskEditSheet {
   @State private note: string = '';
   @State private startTime: Date = new Date();
   @State private endTime: Date = new Date();
+  @State private categoryUid: string | null = null;
 
   // 占位状态，满足 TaskFormView 的 Link 约束
   @State private aiInputText: string = '';
@@ -38,6 +40,7 @@ export struct TaskEditSheet {
       this.note = this.editingTask.note;
       this.startTime = new Date(this.editingTask.startTime);
       this.endTime = new Date(this.editingTask.endTime);
+      this.categoryUid = this.editingTask.categoryUid ?? null;
     } else {
       console.error('[Edit] Invalid data')
     }
@@ -58,6 +61,7 @@ export struct TaskEditSheet {
       this.editingTask.note = this.note;
       this.editingTask.startTime = DateTimeUtils.toLocalISOString(this.startTime);
       this.editingTask.endTime = DateTimeUtils.toLocalISOString(this.endTime);
+      this.editingTask.categoryUid = this.categoryUid;
 
       // 调用父组件传入的保存回调
       await this.onSave(this.editingTask);
@@ -85,6 +89,8 @@ export struct TaskEditSheet {
           isAILoading: $isAILoading, // 传入占位变量
           showAIInput: false
         })
+
+        CategoryAssignmentField({ categoryUid: $categoryUid })
 
         Button('保存')
           .onClick(() => {

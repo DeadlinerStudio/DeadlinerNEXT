@@ -4,6 +4,7 @@ import { Habit, HabitGoalType, HabitPeriod, HabitStatus } from '../../../../../m
 import { HabitFormView } from './HabitFormView';
 import { HabitFormHelper } from './HabitFormHelper';
 import { Toast } from '../../../../../common/ui/Toast';
+import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
 
 @Component
 export struct HabitEditSheet {
@@ -19,6 +20,7 @@ export struct HabitEditSheet {
   @State private selectedGoalTypeIndex: number[] = [0];
   @State private timesPerPeriod: string = '1';
   @State private totalTarget: string = '';
+  @State private categoryUid: string | null = null;
 
   // 占位状态，用于满足 HabitFormView 的 Link 约束 (即使不显示 AI)
   @State private aiInputText: string = '';
@@ -55,6 +57,7 @@ export struct HabitEditSheet {
     // 数字转字符串
     this.timesPerPeriod = habit.timesPerPeriod.toString();
     this.totalTarget = habit.totalTarget ? habit.totalTarget.toString() : "";
+    this.categoryUid = habit.categoryUid;
   }
 
   // —— 保存逻辑 ——
@@ -109,6 +112,7 @@ export struct HabitEditSheet {
         description: this.editingHabit.description || "",
         color: this.editingHabit.color,
         iconKey: this.editingHabit.iconKey,
+        categoryUid: this.categoryUid,
         period: newPeriod,
         timesPerPeriod: times,
         goalType: newGoalType,
@@ -148,6 +152,8 @@ export struct HabitEditSheet {
           isAILoading: $isAILoading, // 传入占位变量
           showAIInput: false         // 明确隐藏 AI 区域
         })
+
+        CategoryAssignmentField({ categoryUid: $categoryUid })
 
         Button('保存')
           .onClick(() => {

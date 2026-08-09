@@ -129,6 +129,38 @@
       "buildFunction": "HabitProgressStyleSettingsBuilder"
     },
     {
+      "name": "hdsOverview",
+      "pageSourceFile": "src/main/ets/pages/routes/overview/OverviewPage.ets",
+      "buildFunction": "HdsOverviewDestinationBuilder",
+      "data": {
+        "description": "概览快捷入口"
+      }
+    },
+    {
+      "name": "hdsCapture",
+      "pageSourceFile": "src/main/ets/pages/routes/capture/CapturePage.ets",
+      "buildFunction": "HdsCaptureDestinationBuilder",
+      "data": {
+        "description": "灵感快捷入口"
+      }
+    },
+    {
+      "name": "hdsAi",
+      "pageSourceFile": "src/main/ets/pages/routes/ai/AIPage.ets",
+      "buildFunction": "HdsAiDestinationBuilder",
+      "data": {
+        "description": "AI 快捷入口"
+      }
+    },
+    {
+      "name": "settingsHdsTabsCustomization",
+      "pageSourceFile": "src/main/ets/pages/routes/user/settings/HdsTabsCustomizationSettings.ets",
+      "buildFunction": "HdsTabsCustomizationSettingsBuilder",
+      "data": {
+        "description": "HdsTabs 底栏自定义"
+      }
+    },
+    {
       "name": "letterPage",
       "pageSourceFile": "src/main/ets/pages/routes/user/settings/LetterPage.ets",
       "buildFunction": "LetterPageBuilder"

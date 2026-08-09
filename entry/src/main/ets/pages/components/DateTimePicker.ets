@@ -78,7 +78,6 @@ struct DateTimeContent {
               })
           }
           .width('100%')
-          .padding({ left: 16, right: 16 })
 
           Row() {
             Button("取消")
@@ -106,7 +105,11 @@ struct DateTimeContent {
         .width('100%')
       }
     }
-    .width('95%')
+    // ComponentContent 的根节点宽度相对于 Dialog 容器计算。占满可用空间后再限制最大宽度，
+    // 避免二次百分比约束导致内容被裁剪。
+    .width('100%')
+    .constraintSize({ maxWidth: 360 })
+    .alignItems(HorizontalAlign.Center)
   }
 }
 

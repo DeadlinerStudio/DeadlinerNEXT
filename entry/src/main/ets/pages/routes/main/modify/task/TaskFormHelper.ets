@@ -18,7 +18,8 @@ export class TaskFormHelper {
     name: string,
     note: string,
     startTime: Date,
-    endTime: Date
+    endTime: Date,
+    categoryUid: string | null = null
   ): Promise<boolean> {
     if (!name.trim()) {
       Toast.show({ message: '请输入任务名称' });
@@ -36,7 +37,8 @@ export class TaskFormHelper {
         isArchived: false,
         isStared: false,
         type: DeadlineType.TASK,
-        calendarEventId: null
+        calendarEventId: null,
+        categoryUid: categoryUid
       });
 
       Toast.show({ message: '创建成功' });

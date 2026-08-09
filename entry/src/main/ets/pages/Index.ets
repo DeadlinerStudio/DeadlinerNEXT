@@ -10,8 +10,16 @@ import { HuaweiAccountUtils } from '../utils/account/HuaweiAccountUtils';
 import { SettingsConstants as C } from '../common/local/SettingsConstants';
 import { ITheme } from '../common/theme/ThemeModel';
 import { TaskRepository } from '../common/repository/TaskRepository';
-import { hdsMaterial, HdsNavigation, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
+import {
+  DividerShowType,
+  hdsMaterial,
+  HdsNavigation,
+  HdsNavigationTitleMode,
+  HdsTabs,
+  HdsTabsController
+} from '@kit.UIDesignKit';
 import { AdaptedHdsTabs } from './components/AdaptedHdsTabs';
+import { CategoryFilterSideBar } from './components/CategoryFilterSideBar';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { CapturePage } from './routes/capture/CapturePage';
 import { LottieOnboardingSheet } from './common/LottieOnboardingSheet';
@@ -26,12 +34,10 @@ import {
 } from '../common/layout/AppBreakpoints';
 import { Toast } from '../common/ui/Toast';
 import { API23_UI_DEFAULT } from '../common/local/ExperimentalComponentsPolicy';
-
-interface TabData {
-  title: string,
-  icon: Resource,
-  index: number
-}
+import { getImmersiveTitleBarStyle } from '../common/style/NavStyles';
+import { HdsTabDescriptor, HdsTabId, HdsTabsCustomization } from '../model/HdsTabsCustomization';
+import { CategoryFilter } from '../common/category/CategoryFilter';
+import { SheetCompat } from '../common/ui/SheetCompat';
 
 const TAB_VERTICAL_PADDING = 86;
 
@@ -39,6 +45,7 @@ const TAB_VERTICAL_PADDING = 86;
 @Component
 struct Index {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
   @StorageProp('customBackgroundImage') customBg: string = '';
   @StorageProp('customBackgroundBlur') isBgBlurred: boolean = false;
 
@@ -416,55 +423,73 @@ struct Index {
   }
 
   @State currentIndex: number = 0;
+  @State categoryFilter: CategoryFilter = CategoryFilter.all();
+  @State isCategorySideBarShown: boolean = false;
+  @StorageLink(C.KEY_HDS_TABS_ORDER) @Watch('repairCurrentTabIndex')
+  tabOrder: string[] = HdsTabsCustomization.defaultOrder();
+  @StorageLink(C.KEY_HDS_TABS_HIDDEN) @Watch('repairCurrentTabIndex')
+  hiddenTabs: string[] = HdsTabsCustomization.defaultHiddenTabs();
+  @StorageLink(C.KEY_HDS_TAB_SYMBOL_RENDERING)
+  tabSymbolRendering: string = HdsTabsCustomization.defaultSymbolRendering();
   private tabsController: HdsTabsController = new HdsTabsController();
 
-  // 用于控制三个 Tab 的动画触发状态 (0: 初始, 每次点击增加以触发动画)
-  @State tabAnimationTriggers: number[] = [0, 0, 0, 0];
+  private getVisibleTabs(): HdsTabDescriptor[] {
+    return HdsTabsCustomization.getVisibleTabs(this.tabOrder, this.hiddenTabs);
+  }
 
-  // 定义 Tab 数据
-  private tabs: Array<TabData> = [
-    { title: '清单', icon: $r('sys.symbol.house_fill'), index: 0 },
-    { title: '概览', icon: $r('sys.symbol.data_proportion_fill'), index: 1 },
-    { title: '灵感', icon: $r('app.media.capture'), index: 2 },
-    { title: 'AI', icon: $r('app.media.lifi'), index: 3 },
-    { title: '我的', icon: $r('sys.symbol.person_crop_circle_fill_1'), index: 4 },
-  ]
-
-  private getTabBarStyle(item: TabData, isImage?: boolean): BottomTabBarStyle {
-    let symbol: boolean = true;
-    if (isImage === true) {
-      symbol = false;
+  private getVisibleTabIndex(tabId: string): number {
+    const visibleTabs = this.getVisibleTabs();
+    for (let index = 0; index < visibleTabs.length; index += 1) {
+      if (visibleTabs[index].id === tabId) {
+        return index;
+      }
     }
+    return 0;
+  }
+
+  private repairCurrentTabIndex(): void {
+    if (this.currentIndex >= this.getVisibleTabs().length || this.currentIndex < 0) {
+      this.currentIndex = 0;
+    }
+  }
+
+  private getTabBarStyle(item: HdsTabDescriptor): BottomTabBarStyle {
+    const symbol: boolean = !item.isImage;
+    const displayIcon: Resource = HdsTabsCustomization.getDisplayIcon(item.id, this.tabSymbolRendering);
+    const selectedColor: ResourceColor = this.currentThemeKey === 'colorful' ? item.color : this.theme.tabIcon;
 
     let style = BottomTabBarStyle.of(
-      symbol ? this.getTabBarSymbol(item.icon) : item.icon,
+      symbol ? this.getTabBarSymbol(displayIcon, selectedColor) : displayIcon,
       item.title
     );
 
     style.iconStyle({
-      selectedColor: this.theme.tabIcon,
+      selectedColor: selectedColor,
       unselectedColor: $r('app.color.tab_bar_icon_unselected')
     });
 
     style.labelStyle({
-      selectedColor: this.theme.tabIcon,
+      selectedColor: selectedColor,
       unselectedColor: $r('app.color.tab_bar_icon_unselected')
     })
 
     return style;
   }
 
-  private getTabBarSymbol(icon: Resource): TabBarSymbol {
+  private getTabBarSymbol(icon: Resource, selectedColor: ResourceColor): TabBarSymbol {
+    const renderingStrategy: SymbolRenderingStrategy = HdsTabsCustomization.isSingleSymbolRendering(
+      this.tabSymbolRendering
+    ) ? SymbolRenderingStrategy.SINGLE : SymbolRenderingStrategy.MULTIPLE_OPACITY;
     return {
       normal: new SymbolGlyphModifier(icon)
         .fontSize(24)
         .fontColor([$r('app.color.tab_bar_icon_unselected')])
-        .renderingStrategy(SymbolRenderingStrategy.MULTIPLE_OPACITY),
+        .renderingStrategy(renderingStrategy),
 
       selected: new SymbolGlyphModifier(icon)
         .fontSize(24)
-        .fontColor([this.theme.tabIcon])
-        .renderingStrategy(SymbolRenderingStrategy.MULTIPLE_OPACITY)
+        .fontColor([selectedColor])
+        .renderingStrategy(renderingStrategy)
         .symbolEffect(
           new BounceSymbolEffect(EffectScope.WHOLE, EffectDirection.DOWN)
         )
@@ -472,6 +497,144 @@ struct Index {
   }
 
   @State aiSheetController: AISheetController = new AISheetController();
+
+  private closeCategorySideBar(): void {
+    this.getUIContext().animateTo({
+      duration: 260,
+      curve: Curve.EaseInOut
+    }, () => {
+      this.isCategorySideBarShown = false;
+    });
+  }
+
+  @Builder
+  private categorySideBarNavigationBuilder() {
+    HdsNavigation() {
+      CategoryFilterSideBar({ categoryFilter: $categoryFilter })
+    }
+    .titleBar({
+      style: getImmersiveTitleBarStyle(false),
+      content: {
+        title: { mainTitle: '分类' },
+        subIcon: {
+          content: {
+            icon: $r('sys.symbol.open_sidebar'),
+            action: (): void => {
+              this.closeCategorySideBar();
+            }
+          }
+        },
+        divider: { showType: DividerShowType.OFF }
+      }
+    })
+    .titleMode(HdsNavigationTitleMode.MINI)
+    .mode(NavigationMode.Stack)
+    .hideBackButton(true)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .backgroundColor(Color.Transparent)
+    .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+  }
+
+  @Builder
+  private mainTabContent(tab: HdsTabDescriptor) {
+    if (tab.id === HdsTabId.LIST) {
+      TabContent() {
+        MainHomePage({
+          currentTabIndex: this.currentIndex,
+          aiSheetController: this.aiSheetController,
+          categoryFilter: $categoryFilter,
+          isCategorySideBarShown: $isCategorySideBarShown
+        })
+          .width('100%')
+          .height('100%')
+          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+          .animation({ duration: 300, curve: Curve.EaseInOut })
+          .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+      }
+      .tabBar(this.getTabBarStyle(tab))
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    } else if (tab.id === HdsTabId.OVERVIEW) {
+      TabContent() {
+        OverviewPage({ currentTabIndex: this.currentIndex })
+          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+          .animation({ duration: 300, curve: Curve.EaseInOut })
+          .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+      }
+      .tabBar(this.getTabBarStyle(tab))
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    } else if (tab.id === HdsTabId.CAPTURE) {
+      TabContent() {
+        CapturePage({ currentTabIndex: this.currentIndex })
+          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+          .animation({ duration: 300, curve: Curve.EaseInOut })
+          .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+      }
+      .tabBar(this.getTabBarStyle(tab))
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    } else if (tab.id === HdsTabId.AI) {
+      TabContent() {
+        AIPage({
+          isHdsTabActive: this.currentIndex === this.getVisibleTabIndex(tab.id)
+        })
+          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+          .animation({ duration: 300, curve: Curve.EaseInOut })
+          .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+      }
+      .tabBar(this.getTabBarStyle(tab))
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    } else {
+      TabContent() {
+        UserPage()
+          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+          .animation({ duration: 300, curve: Curve.EaseInOut })
+          .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+      }
+      .tabBar(this.getTabBarStyle(tab))
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    }
+  }
+
+  @Builder
+  private mainTabsBuilder() {
+    AdaptedHdsTabs({
+      currentIndex: $currentIndex,
+      isWideScreen: this.isWideScreen,
+      tabletUi: this.tabletUi,
+      theme: this.theme,
+      controller: this.tabsController,
+      onTabClick: (index: number) => {
+        if (index === this.currentIndex) {
+          console.debug('[MainPage] 重复点击了第 ' + index.toString() + ' 页，触发回到顶部');
+          AppStorage.setOrCreate('Event_ScrollToTop_' + index.toString(), Date.now());
+        }
+      },
+      onMiniBarClick: () => {
+        this.aiSheetController.showAI();
+      }
+    }) {
+      ForEach(this.getVisibleTabs(), (tab: HdsTabDescriptor) => {
+        this.mainTabContent(tab);
+      }, (tab: HdsTabDescriptor) => tab.id)
+    }
+  }
+
+  @Builder
+  private mainTabsWithSideBarScrimBuilder() {
+    Stack() {
+      this.mainTabsBuilder()
+
+      if (this.isCategorySideBarShown) {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor('#44000000')
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+  }
 
   build() {
     Stack() {
@@ -497,96 +660,15 @@ struct Index {
 
       if (this.isShowUI) {
         HdsNavigation(this.appPathStack) {
-          AdaptedHdsTabs({
-            currentIndex: $currentIndex,
-            isWideScreen: this.isWideScreen,
-            tabletUi: this.tabletUi,
-            theme: this.theme,
-            controller: this.tabsController,
-            onTabClick: (index: number) => {
-              this.tabAnimationTriggers[index] += 1;
-              if (index === this.currentIndex) {
-                console.debug(`[MainPage] 重复点击了第 ${index} 页，触发回到顶部`);
-                AppStorage.setOrCreate(`Event_ScrollToTop_${index}`, Date.now());
-              }
-            },
-            onMiniBarClick: () => {
-              this.aiSheetController.showAI();
-            }
-          }) {
-            // --- Tab 1: 主页 ---
-            TabContent() {
-              MainHomePage({
-                currentTabIndex: this.currentIndex,
-                aiSheetController: this.aiSheetController
-              })
-                .width("100%")
-                .height("100%")
-                .attributeModifier(new TabAnimModifier(0, this.currentIndex))
-                .animation({
-                  duration: 300, // 保持与 Tabs 动画时长一致
-                  curve: Curve.EaseInOut
-                })
-                .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-            }
-            .tabBar(this.getTabBarStyle(this.tabs[0]))
-            .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-            // .backgroundColor(this.theme.bgPrimary)
+          SideBarContainer(SideBarContainerType.Overlay) {
+            this.categorySideBarNavigationBuilder()
 
-            // --- Tab 2: 概览 ---
-            TabContent() {
-              OverviewPage({ currentTabIndex: this.currentIndex })
-                .attributeModifier(new TabAnimModifier(1, this.currentIndex))
-                .animation({
-                  duration: 300, // 保持与 Tabs 动画时长一致
-                  curve: Curve.EaseInOut
-                })
-                .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-            }
-            .tabBar(this.getTabBarStyle(this.tabs[1]))
-            .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-            // .backgroundColor(this.theme.bgPrimary)
-
-            // --- Tab 3: 灵感 ---
-            TabContent() {
-              CapturePage({ currentTabIndex: this.currentIndex })
-                .attributeModifier(new TabAnimModifier(2, this.currentIndex))
-                .animation({
-                  duration: 300,
-                  curve: Curve.EaseInOut
-                })
-                .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-            }
-            .tabBar(this.getTabBarStyle(this.tabs[2], true))
-            .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-
-            // --- Tab 4: Lifi ---
-            TabContent() {
-              AIPage({ currentTabIndex: this.currentIndex })
-                .attributeModifier(new TabAnimModifier(3, this.currentIndex))
-                .animation({
-                  duration: 300, // 保持与 Tabs 动画时长一致
-                  curve: Curve.EaseInOut
-                })
-                .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-            }
-            .tabBar(this.getTabBarStyle(this.tabs[3], true))
-            .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-
-            // --- Tab 5: 我的 ---
-            TabContent() {
-              UserPage()
-                .attributeModifier(new TabAnimModifier(4, this.currentIndex))
-                .animation({
-                  duration: 300, // 保持与 Tabs 动画时长一致
-                  curve: Curve.EaseInOut
-                })
-                .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-            }
-            .tabBar(this.getTabBarStyle(this.tabs[4]))
-            .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-            // .backgroundColor(this.theme.bgPrimary)
+            this.mainTabsWithSideBarScrimBuilder()
           }
+          .showSideBar($$this.isCategorySideBarShown)
+          .showControlButton(false)
+          .sideBarWidth(290)
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         }
         .mode(NavigationMode.Stack)
         .customNavContentTransition((from: NavContentInfo, to: NavContentInfo, _operation: NavigationOperation) => {
@@ -613,15 +695,13 @@ struct Index {
     .width('100%')
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .backgroundColor(this.theme.bgPrimary)
-    .bindSheet($$this.isGuideSheetShow, this.onboardingSheet(), {
+    .bindSheet($$this.isGuideSheetShow, this.onboardingSheet(), SheetCompat.immersive({
       height: SheetSize.LARGE,
       dragBar: false,
       showClose: false,
       enableOutsideInteractive: false,
       shouldDismiss: (_sheetDismiss: SheetDismiss) => {
       },
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       onDisappear: () => {
         this.logGuideState('bindSheet:onDisappear:before');
         if (!this.privacyAgreed) {
@@ -635,6 +715,6 @@ struct Index {
       },
       onWillDismiss: () => {
       }
-    })
+    }))
   }
 }

@@ -25,6 +25,8 @@ export struct HdsTitleBarSegment {
   @Prop experimentalHeight: number = 52;
   onItemClicked?: (index: number) => void;
 
+  maxWidth?: number;
+
   @State measuredWidth: number = 0;
 
   @StorageLink(C.KEY_EXPERIMENTAL_COMPONENTS) experimentalComponents: boolean = EXPERIMENTAL_COMPONENTS_DEFAULT;
@@ -121,6 +123,7 @@ export struct HdsTitleBarSegment {
       }
       .width(this.normalWidth)
       .height(this.segmentHeight)
+      .constraintSize({ maxWidth: this.maxWidth })
     }
   }
 }

@@ -36,6 +36,8 @@ import {
   APP_BREAKPOINT_DEFAULT,
   APP_BREAKPOINT_STORAGE_KEY
 } from '../../../common/layout/AppBreakpoints'
+import { CategoryFilter } from '../../../common/category/CategoryFilter';
+import { SheetCompat } from '../../../common/ui/SheetCompat';
 
 enum MainTabIndex {
   TASKS = 0,
@@ -55,6 +57,8 @@ export struct MainHomePage {
 
   @State currentIndex: number = MainTabIndex.TASKS
   @State @Watch('onSegmentChange') selectedIndexes: number[] = [MainTabIndex.TASKS]
+  @Link categoryFilter: CategoryFilter;
+  @Link isCategorySideBarShown: boolean;
 
   @State @Watch('onTaskSelectionChange') isTaskSelectionMode: boolean = false;
   private taskController: TaskListController = new TaskListController();
@@ -325,22 +329,31 @@ export struct MainHomePage {
   private phoneTopSegment() {
     Stack({ alignContent: Alignment.Center }) {
       if (this.titleMode === HdsNavigationTitleMode.FULL) {
-        Row() {
-          HdsTitleBarMenuButton({
-            icon: $r('sys.symbol.square_grid_2x2'),
-            onButtonClick: () => {}
-          })
+        if (!this.isCategorySideBarShown) {
+          Row() {
+            HdsTitleBarMenuButton({
+              icon: $r('sys.symbol.close_sidebar'),
+              onButtonClick: () => {
+                this.getUIContext().animateTo({
+                  duration: 260,
+                  curve: Curve.EaseInOut
+                }, () => {
+                  this.isCategorySideBarShown = true;
+                });
+              }
+            })
+          }
+          .width('100%')
+          .height('100%')
+          .justifyContent(FlexAlign.Start)
+          .padding({ left: 16 })
+          .hitTestBehavior(HitTestMode.Transparent)
+          .opacity(Math.max(0, 1 - this.scrollY / 40))
+          .transition(TransitionEffect.asymmetric(
+            TransitionEffect.OPACITY.combine(TransitionEffect.translate({ x: -20 })),
+            TransitionEffect.OPACITY.combine(TransitionEffect.translate({ x: -20 }))
+          ))
         }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Start)
-        .padding({ left: 16 })
-        .hitTestBehavior(HitTestMode.Transparent)
-        .opacity(Math.max(0, 1 - this.scrollY / 40))
-        .transition(TransitionEffect.asymmetric(
-          TransitionEffect.OPACITY.combine(TransitionEffect.translate({ x: -20 })),
-          TransitionEffect.OPACITY.combine(TransitionEffect.translate({ x: -20 }))
-        ))
 
         Column() {
           HdsTitleBarSegment({
@@ -350,7 +363,8 @@ export struct MainHomePage {
             segmentHeight: this.SEGMENT_HEIGHT,
             normalWidth: '50%',
             experimentalWidth: '50%',
-            experimentalHeight: 52
+            experimentalHeight: 52,
+            maxWidth: 200
           })
             .align(Alignment.Center)
             .margin({ top: 8 })
@@ -421,6 +435,7 @@ export struct MainHomePage {
       TaskListSection({
         scroller: this.scroller,
         topAvoidHeight: topAvoidHeight,
+        categoryFilter: this.categoryFilter,
         isSelectionMode: $isTaskSelectionMode,
         controller: this.taskController,
         confetti: this.confettiController
@@ -432,6 +447,7 @@ export struct MainHomePage {
       HabitListSection({
         scroller: this.dummyScroller,
         topAvoidHeight: topAvoidHeight,
+        categoryFilter: this.categoryFilter,
         isSelectionMode: $isHabitSelectionMode,
         controller: this.habitController,
         confetti: this.confettiController
@@ -448,6 +464,7 @@ export struct MainHomePage {
       TaskListSection({
         scroller: this.scroller,
         topAvoidHeight: this.getFreeTopAvoidHeight(),
+        categoryFilter: this.categoryFilter,
         showSearchEntry: true,
         onSearchClick: () => {
           this.appPathStack.pushPath({ name: 'search' });
@@ -467,6 +484,7 @@ export struct MainHomePage {
       HabitListSection({
         scroller: this.dummyScroller,
         topAvoidHeight: this.getFreeTopAvoidHeight(),
+        categoryFilter: this.categoryFilter,
         isSelectionMode: $isHabitSelectionMode,
         controller: this.habitController,
         confetti: this.confettiController
@@ -705,6 +723,7 @@ export struct MainHomePage {
           TaskListSection({
             scroller: this.scroller,
             topAvoidHeight: this.getMiniTopAvoidHeight() + this.statusBarHeight,
+            categoryFilter: this.categoryFilter,
             isSelectionMode: $isTaskSelectionMode,
             controller: this.taskController,
             confetti: this.confettiController
@@ -719,14 +738,12 @@ export struct MainHomePage {
         }
         .layoutWeight(1)
         .height('100%')
-        .bindSheet($$this.isAddTaskShow, this.addTaskSheetBuilder(), {
+        .bindSheet($$this.isAddTaskShow, this.addTaskSheetBuilder(), SheetCompat.immersive({
           height: SheetSize.FIT_CONTENT,
           enableOutsideInteractive: false,
           onDisappear: () => { this.isAddTaskShow = false; },
-          blurStyle: BlurStyle.Regular,
-          backgroundColor: Color.Transparent,
           showClose: false
-        })
+        }))
 
         Divider()
           .vertical(true)
@@ -739,6 +756,7 @@ export struct MainHomePage {
           HabitListSection({
             scroller: this.dummyScroller,
             topAvoidHeight: this.getMiniTopAvoidHeight() + this.statusBarHeight,
+            categoryFilter: this.categoryFilter,
             isSelectionMode: $isHabitSelectionMode,
             controller: this.habitController,
             confetti: this.confettiController
@@ -753,14 +771,12 @@ export struct MainHomePage {
         }
         .layoutWeight(1)
         .height('100%')
-        .bindSheet($$this.isAddHabitShow, this.addHabitSheetBuilder(), {
+        .bindSheet($$this.isAddHabitShow, this.addHabitSheetBuilder(), SheetCompat.immersive({
           height: SheetSize.FIT_CONTENT,
           enableOutsideInteractive: false,
           onDisappear: () => { this.isAddHabitShow = false; },
-          blurStyle: BlurStyle.Regular,
-          backgroundColor: Color.Transparent,
           showClose: false
-        })
+        }))
 
         if (this.sdEnabled) {
           Divider()
@@ -779,13 +795,12 @@ export struct MainHomePage {
       .width('100%')
       .height('100%')
       .backgroundColor(this.pageBackground)
-      .bindSheet($$this.isSearchShow, this.searchSheet(), {
+      .bindSheet($$this.isSearchShow, this.searchSheet(), SheetCompat.immersive({
         height: SheetSize.FIT_CONTENT,
         enableOutsideInteractive: false,
         onDisappear: () => { this.isSearchShow = false; },
-        blurStyle: BlurStyle.Regular,
         showClose: false
-      })
+      }))
 
       ConfettiView({
         controller: this.confettiController,
@@ -824,15 +839,53 @@ export struct MainHomePage {
         .margin({ bottom: 32 })
         .hitTestBehavior(HitTestMode.Transparent)
     }
-    .bindSheet($$this.isArchiveSheetShow, this.archiveSheet(), {
+    .bindSheet($$this.isArchiveSheetShow, this.archiveSheet(), SheetCompat.immersive({
       height: SheetSize.FIT_CONTENT,
       enableOutsideInteractive: false,
       dragBar: true,
       onDisappear: () => { this.isArchiveSheetShow = false; },
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       title: { title: '归档', subtitle: '可以在此处管理你已完成的任务' }
+    }))
+  }
+
+  @Builder
+  private phoneNavigationContentBuilder() {
+    HdsNavigation() {
+      this.mainContentBuilder()
+    }
+    .id(`main_navigation_${this.currentThemeKey}`)
+    .titleBar({
+      style: getImmersiveTitleBarStyle(false),
+      content: {
+        title: {
+          mainTitle: 'Deadliner'
+        },
+        stackBuilder: () => {
+          this.phoneTopSegment();
+        },
+        divider: { showType: DividerShowType.OFF }
+      }
     })
+    .bindSheet($$this.isAISheetShow, this.aiSheet(), SheetCompat.immersive({
+      height: SheetSize.LARGE,
+      dragBar: true,
+      onDisappear: () => {
+        this.closeAiPanel();
+      },
+      title: {
+        title: 'Lifi AI',
+      }
+    }))
+    .titleMode(HdsNavigationTitleMode.FREE)
+    .bindToScrollable([this.scroller])
+    .onTitleModeChange((titleMode) => {
+      animateTo({ duration: 400, curve: Curve.Friction }, () => {
+        this.titleMode = titleMode;
+      })
+    })
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .mode(NavigationMode.Stack)
+    .navBarWidth('100%')
   }
 
   @Builder
@@ -861,40 +914,35 @@ export struct MainHomePage {
       this.currentPhoneFabBuilder()
 
       Column()
-        .bindSheet($$this.isAddShow, this.addSheet(), {
+        .bindSheet($$this.isAddShow, this.addSheet(), SheetCompat.immersive({
           height: SheetSize.LARGE,
           onDisappear: () => {
             this.isAddShow = false;
           },
-          blurStyle: BlurStyle.Regular,
-          backgroundColor: Color.Transparent,
           showClose: false
-        })
+        }))
 
       Column()
-        .bindSheet($$this.isSearchShow, this.searchSheet(), {
+        .bindSheet($$this.isSearchShow, this.searchSheet(), SheetCompat.immersive({
           height: SheetSize.FIT_CONTENT,
           enableOutsideInteractive: false,
           onDisappear: () => { this.isSearchShow = false; },
-          blurStyle: BlurStyle.Regular,
           showClose: false
-        })
+        }))
     }
     .height('100%')
     .width('100%')
-    .bindSheet($$this.isArchiveSheetShow, this.archiveSheet(), {
+    .bindSheet($$this.isArchiveSheetShow, this.archiveSheet(), SheetCompat.immersive({
       height: SheetSize.FIT_CONTENT,
       dragBar: true,
       onDisappear: () => {
         this.isArchiveSheetShow = false;
       },
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       title: {
         title: '归档',
         subtitle: '可以在此处管理你已完成的任务'
       },
-    })
+    }))
   }
 
   @State titleMode: HdsNavigationTitleMode = HdsNavigationTitleMode.FULL;
@@ -921,14 +969,12 @@ export struct MainHomePage {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .mode(NavigationMode.Stack)
       .navBarWidth('100%')
-      .bindSheet($$this.isProfileSheetShow, this.profileSheet(), {
+      .bindSheet($$this.isProfileSheetShow, this.profileSheet(), SheetCompat.immersive({
         height: SheetSize.FIT_CONTENT,
         dragBar: true,
-        blurStyle: BlurStyle.Regular,
-        backgroundColor: Color.Transparent,
         onDisappear: () => { this.closeProfileSheet(); },
         title: { title: '主页工作台' }
-      })
+      }))
       .hideBackButton(true)
     } else if (this.usesMediumLayout()) {
       HdsNavigation() {
@@ -956,44 +1002,7 @@ export struct MainHomePage {
       .navBarWidth('100%')
       .hideBackButton(true)
     } else {
-      HdsNavigation() {
-        this.mainContentBuilder()
-      }
-      .id(`main_navigation_${this.currentThemeKey}`)
-      .titleBar({
-        style: getImmersiveTitleBarStyle(false),
-        content: {
-          title: {
-            mainTitle: 'Deadliner'
-          },
-          stackBuilder: () => {
-            this.phoneTopSegment();
-          },
-          divider: { showType: DividerShowType.OFF }
-        }
-      })
-      .bindSheet($$this.isAISheetShow, this.aiSheet(), {
-        height: SheetSize.LARGE,
-        dragBar: true,
-        onDisappear: () => {
-          this.closeAiPanel();
-        },
-        blurStyle: BlurStyle.Regular,
-        backgroundColor: Color.Transparent,
-        title: {
-          title: 'Lifi AI',
-        }
-      })
-      .titleMode(HdsNavigationTitleMode.FREE)
-      .bindToScrollable([this.scroller])
-      .onTitleModeChange((titleMode) => {
-        animateTo({ duration: 400, curve: Curve.Friction }, () => {
-          this.titleMode = titleMode;
-        })
-      })
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-      .mode(NavigationMode.Stack)
-      .navBarWidth('100%')
+      this.phoneNavigationContentBuilder()
     }
   }
 }

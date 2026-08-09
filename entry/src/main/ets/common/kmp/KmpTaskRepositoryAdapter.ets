@@ -45,6 +45,7 @@ export interface TaskCreateParams {
   isStared: boolean;
   type: DeadlineType;
   calendarEventId: number | null;
+  categoryUid?: string | null;
 }
 
 export interface LegacyTaskIdentifier {
@@ -121,7 +122,7 @@ export class KmpTaskRepositoryAdapter {
       dueAt: this.blankToNull(params.endTime),
       state: state,
       completedAt: this.blankToNull(params.completeTime),
-      categoryUid: null,
+      categoryUid: params.categoryUid ?? null,
       isStarred: params.isStared,
       calendarEventId: params.calendarEventId,
       createdAt: now,
@@ -158,7 +159,7 @@ export class KmpTaskRepositoryAdapter {
       dueAt: this.blankToNull(item.endTime),
       state: item.state,
       completedAt: this.blankToNull(item.completeTime),
-      categoryUid: current.categoryUid,
+      categoryUid: item.categoryUid === undefined ? current.categoryUid : item.categoryUid,
       isStarred: item.isStared,
       calendarEventId: item.calendarEventId,
       createdAt: current.createdAt,
@@ -272,6 +273,7 @@ export class KmpTaskRepositoryAdapter {
       habitCount: 0,
       habitTotalCount: 0,
       calendarEventId: task.calendarEventId,
+      categoryUid: task.categoryUid,
       timeStamp: task.updatedAt,
       uid: task.uid,
       deleted: task.isDeleted,

@@ -1,4 +1,6 @@
 export declare function initialize(databaseDirectory: string, installationId: string): number
+export declare function lastInitializationError(): string
+export declare function bridgeLoadError(): string
 export declare function importLegacyV2(taskPayload: string, habitPayload: string): number
 export declare function importCapturesJson(capturePayload: string): number
 export declare function diagnosticsJson(): string
@@ -6,6 +8,11 @@ export declare function mergeLegacyV2PayloadsJson(taskPayload: string, habitPayl
 export declare function syncWebDavChangeLogJson(baseUrl: string, username: string, password: string): string
 export declare function syncWebDavChangeLogJsonAsync(baseUrl: string, username: string, password: string): Promise<string>
 export declare function taskListViewModelJson(): string
+export declare function categoryCatalogJson(): string
+export declare function categoryCreateJson(payload: string): string
+export declare function categoryUpdateJson(payload: string): string
+export declare function categoryDeleteJson(uid: string, updatedAt: string): string
+export declare function categoryRestorePresetsJson(): string
 export declare function overviewViewModelJson(): string
 export declare function overviewViewModelJsonAsync(): Promise<string>
 export declare function taskCreateJson(taskPayload: string): string
@@ -15,6 +22,7 @@ export declare function taskDeleteJson(uid: string, updatedAt: string): string
 export declare function habitStateJson(): string
 export declare function habitCreateJson(habitPayload: string): string
 export declare function habitUpdateJson(habitPayload: string): string
+export declare function habitCategoryUpdateJson(payload: string): string
 export declare function habitStatusActionJson(uid: string, actionPayload: string): string
 export declare function habitToggleRecordJson(uid: string, recordPayload: string): string
 export declare function habitSaveRecordJson(recordPayload: string): string

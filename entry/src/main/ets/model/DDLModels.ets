@@ -50,6 +50,7 @@ export interface DDLItem {
   habitCount: number;
   habitTotalCount: number;
   calendarEventId: number | null;
+  categoryUid?: string | null;
   timeStamp: string;
 
   // Sync fields
@@ -68,6 +69,7 @@ export interface Habit {
   description: string | null;
   color: number | null;
   iconKey: string | null;
+  categoryUid: string | null;
   period: HabitPeriod;
   timesPerPeriod: number;
   goalType: HabitGoalType;
@@ -159,6 +161,7 @@ export function transitionDDLItem(item: DDLItem, action: TaskStateAction, action
     habitCount: item.habitCount,
     habitTotalCount: item.habitTotalCount,
     calendarEventId: item.calendarEventId,
+    categoryUid: item.categoryUid,
     timeStamp: item.timeStamp,
     uid: item.uid,
     deleted: item.deleted,

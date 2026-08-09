@@ -308,6 +308,15 @@ export const ThemeMap: Record<string, UIThemePalette> = {
     $r('app.color.widget_bg_grad_end_vibrant'),
     $r('app.color.widget_decor_vibrant')
   ),
+  'colorful': createUITheme(
+    $r('app.color.brand_vibrant'),
+    $r('app.color.brand_vibrant_50'),
+    $r('app.color.accent_vibrant'),
+    $r('app.color.background_primary'),
+    $r('app.color.widget_bg_grad_start_vibrant'),
+    $r('app.color.widget_bg_grad_end_vibrant'),
+    $r('app.color.widget_decor_vibrant')
+  ),
   'nature': createUITheme(
     $r('app.color.brand_nature'),
     $r('app.color.brand_nature_50'),
@@ -383,6 +392,7 @@ export const THEME_DEFAULT_INDICATOR_MAP: Record<string, string> = {
   'classic': 'morandi',
   'time': 'morandi',
   'vibrant': 'vibrant',
+  'colorful': 'vibrant',
   'nature': 'nature',
   'sunset': 'retro',
   'lavender': 'morandi',

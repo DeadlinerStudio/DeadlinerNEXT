@@ -3,6 +3,7 @@ import { ColorUtils } from "../../utils/ColorUtils";
 import { common } from "@kit.AbilityKit";
 import { ITheme } from "../../common/theme/ThemeModel";
 import { ImmersivePopupSurface } from "../../common/ui/ImmersivePopupSurface";
+import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
 
 @Component
 export struct ArchivedDDLItemCard {
@@ -185,6 +186,9 @@ export struct DDLItemCardSimplified {
   @Prop progress: number;
   @Prop isStarred: boolean;
   @Prop status: DDLStatus = DDLStatus.UNDERGO;
+  @Prop categoryName: string = '';
+  @Prop categoryIconKey: string = '';
+  @Prop categoryColorHex: string = '';
 
   // 1. 状态定义：增加专门用于不同透明度的状态变量
   // 仍然保留 indicatorColor 用于星标 Icon (纯色)
@@ -290,14 +294,32 @@ export struct DDLItemCardSimplified {
         .width('100%')
         .alignItems(VerticalAlign.Center)
 
-        if (this.note && this.note.length > 0) {
-          Text(this.note)
-            .fontSize(12)
-            .fontColor(this.noteColor)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width('100%')
-            .margin({ top: 8 })
+        if (this.categoryName.length > 0 || this.note.length > 0) {
+          Row({ space: 8 }) {
+            if (this.categoryName.length > 0) {
+              Row({ space: 4 }) {
+                SymbolGlyph(CategoryIconResolver.resolve(this.categoryIconKey))
+                  .fontSize(12)
+                  .fontColor([this.categoryColorHex])
+
+                Text(this.categoryName)
+                  .fontSize(11)
+                  .fontColor(this.categoryColorHex)
+                  .maxLines(1)
+              }
+            }
+
+            if (this.note.length > 0) {
+              Text(this.note)
+                .fontSize(12)
+                .fontColor(this.noteColor)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
+            }
+          }
+          .width('100%')
+          .margin({ top: 6 })
         }
       }
       .width('100%')
@@ -377,6 +399,9 @@ export struct DDLItemCardSwipeable {
   @Prop progress: number;
   @Prop isStarred: boolean;
   @Prop status: DDLStatus;
+  @Prop categoryName: string = '';
+  @Prop categoryIconKey: string = '';
+  @Prop categoryColorHex: string = '';
 
   // 交互 Props
   @Prop selectionMode: boolean = false;
@@ -468,7 +493,10 @@ export struct DDLItemCardSwipeable {
           note: this.note,
           progress: this.progress,
           isStarred: this.isStarred,
-          status: this.status
+          status: this.status,
+          categoryName: this.categoryName,
+          categoryIconKey: this.categoryIconKey,
+          categoryColorHex: this.categoryColorHex
         })
 
         // 选择态覆盖层

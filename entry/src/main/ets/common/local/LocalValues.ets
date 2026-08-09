@@ -7,6 +7,7 @@ import {
   canShowExperimentalComponentsSetting,
   defaultExperimentalComponentsEnabled
 } from './ExperimentalComponentsPolicy';
+import { HdsTabsCustomization } from '../../model/HdsTabsCustomization';
 
 interface WebDavAuthInterface {
   user: string;
@@ -165,6 +166,42 @@ export class LocalValues {
 
       const minibar = await this.pref.get(C.KEY_SHOW_MINIBAR, (deviceInfo.distributionOSApiVersion >= 60100));
       AppStorage.setOrCreate(C.KEY_SHOW_MINIBAR, minibar);
+
+      const hdsTabsOrderValue = await this.pref.get(
+        C.KEY_HDS_TABS_ORDER,
+        HdsTabsCustomization.encodeTabIds(HdsTabsCustomization.defaultOrder())
+      );
+      const hdsTabsOrderRaw = typeof hdsTabsOrderValue === 'string'
+        ? hdsTabsOrderValue
+        : HdsTabsCustomization.encodeTabIds(HdsTabsCustomization.defaultOrder());
+      AppStorage.setOrCreate(
+        C.KEY_HDS_TABS_ORDER,
+        HdsTabsCustomization.normalizeOrder(HdsTabsCustomization.decodeTabIds(hdsTabsOrderRaw))
+      );
+
+      const hdsTabsHiddenValue = await this.pref.get(
+        C.KEY_HDS_TABS_HIDDEN,
+        HdsTabsCustomization.encodeTabIds(HdsTabsCustomization.defaultHiddenTabs())
+      );
+      const hdsTabsHiddenRaw = typeof hdsTabsHiddenValue === 'string'
+        ? hdsTabsHiddenValue
+        : HdsTabsCustomization.encodeTabIds(HdsTabsCustomization.defaultHiddenTabs());
+      AppStorage.setOrCreate(
+        C.KEY_HDS_TABS_HIDDEN,
+        HdsTabsCustomization.normalizeHiddenTabs(HdsTabsCustomization.decodeTabIds(hdsTabsHiddenRaw))
+      );
+
+      const hdsTabSymbolRendering = await this.pref.get(
+        C.KEY_HDS_TAB_SYMBOL_RENDERING,
+        HdsTabsCustomization.defaultSymbolRendering()
+      );
+      const hdsTabSymbolRenderingRaw = typeof hdsTabSymbolRendering === 'string'
+        ? hdsTabSymbolRendering
+        : HdsTabsCustomization.defaultSymbolRendering();
+      AppStorage.setOrCreate(
+        C.KEY_HDS_TAB_SYMBOL_RENDERING,
+        HdsTabsCustomization.normalizeSymbolRendering(hdsTabSymbolRenderingRaw)
+      );
 
       const experimentalComponents = canShowExperimentalComponentsSetting()
         ? await this.pref.get(C.KEY_EXPERIMENTAL_COMPONENTS, defaultExperimentalComponentsEnabled())
@@ -732,5 +769,52 @@ export class LocalValues {
       return;
     }
     await this.setValue(C.KEY_SHOW_MINIBAR, false);
+  }
+
+  getHdsTabsOrder(): string[] {
+    const storedOrder = AppStorage.get<string[]>(C.KEY_HDS_TABS_ORDER) ?? HdsTabsCustomization.defaultOrder();
+    return HdsTabsCustomization.normalizeOrder(storedOrder);
+  }
+
+  async setHdsTabsOrder(order: string[]): Promise<void> {
+    const normalizedOrder = HdsTabsCustomization.normalizeOrder(order);
+    await this.setSerializedTabIds(C.KEY_HDS_TABS_ORDER, normalizedOrder);
+  }
+
+  getHdsTabsHidden(): string[] {
+    const storedHidden = AppStorage.get<string[]>(C.KEY_HDS_TABS_HIDDEN) ?? HdsTabsCustomization.defaultHiddenTabs();
+    return HdsTabsCustomization.normalizeHiddenTabs(storedHidden);
+  }
+
+  async setHdsTabsHidden(hiddenTabs: string[]): Promise<void> {
+    const normalizedHiddenTabs = HdsTabsCustomization.normalizeHiddenTabs(hiddenTabs);
+    await this.setSerializedTabIds(C.KEY_HDS_TABS_HIDDEN, normalizedHiddenTabs);
+  }
+
+  getHdsTabSymbolRendering(): string {
+    const storedRendering = AppStorage.get<string>(C.KEY_HDS_TAB_SYMBOL_RENDERING) ??
+      HdsTabsCustomization.defaultSymbolRendering();
+    return HdsTabsCustomization.normalizeSymbolRendering(storedRendering);
+  }
+
+  async setHdsTabSymbolRendering(rendering: string): Promise<void> {
+    await this.setValue(
+      C.KEY_HDS_TAB_SYMBOL_RENDERING,
+      HdsTabsCustomization.normalizeSymbolRendering(rendering)
+    );
+  }
+
+  private async setSerializedTabIds(key: string, tabIds: string[]): Promise<void> {
+    AppStorage.set(key, tabIds);
+    if (!this.pref) {
+      return;
+    }
+
+    try {
+      await this.pref.put(key, HdsTabsCustomization.encodeTabIds(tabIds));
+      await this.pref.flush();
+    } catch (err) {
+      console.error('Failed to save ' + key + ': ' + JSON.stringify(err));
+    }
   }
 }

@@ -3,6 +3,9 @@ import { ITheme } from '../../common/theme/ThemeModel';
 import { Habit, HabitGoalType, HabitPeriod, HabitRecordStatus } from '../../model/DDLModels';
 import { DDLStatus } from '../../model/DDLStatus';
 import { ColorUtils } from '../../utils/ColorUtils';
+import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
+import { CategoryDisplayModel } from '../../common/kmp/KmpCategoryRepositoryAdapter';
+import { CategoryRepository } from '../../common/repository/CategoryRepository';
 
 // 接口定义保持不变
 export interface DayOverview {
@@ -433,6 +436,35 @@ export struct HabitRow {
 
   @State private titleColor: ResourceColor = $r('app.color.font_primary');
   @State private noteColor: ResourceColor = $r('app.color.font_secondary');
+  @State private categoryName: string = '';
+  @State private categoryIconKey: string = '';
+  @State private categoryColorHex: string = '';
+  private readonly categoryRepository: CategoryRepository = CategoryRepository.getInstance();
+
+  aboutToAppear(): void {
+    void this.loadCategoryBadge();
+  }
+
+  private async loadCategoryBadge(): Promise<void> {
+    this.categoryName = '';
+    this.categoryIconKey = '';
+    this.categoryColorHex = '';
+    if (this.data.habit.categoryUid === null) return;
+    try {
+      const categories: CategoryDisplayModel[] = await this.categoryRepository.listCategories();
+      for (let index = 0; index < categories.length; index += 1) {
+        const category: CategoryDisplayModel = categories[index];
+        if (category.uid === this.data.habit.categoryUid) {
+          this.categoryName = category.name;
+          this.categoryIconKey = category.iconKey;
+          this.categoryColorHex = category.colorHex;
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('[HabitRow] Load category badge failed: ' + String(error));
+    }
+  }
 
   // --- 1. 获取纯色 (用于 Checkbox 选中色) ---
   private getIndicatorColor(): ResourceColor {
@@ -568,9 +600,23 @@ export struct HabitRow {
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
 
-          Text(this.getRightLabel())
-            .fontSize(10)
-            .fontColor(this.noteColor)
+          if (this.categoryName.length > 0) {
+            Row({ space: 4 }) {
+              SymbolGlyph(CategoryIconResolver.resolve(this.categoryIconKey))
+                .fontSize(12)
+                .fontColor([this.categoryColorHex])
+              Text(this.categoryName)
+                .fontSize(10)
+                .fontColor(this.categoryColorHex)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+            }
+            .constraintSize({ maxWidth: 88 })
+          } else {
+            Text(this.getRightLabel())
+              .fontSize(10)
+              .fontColor(this.noteColor)
+          }
         }
         .padding({ left: 12, right: 12, top: 12, bottom: 12 })
         .width('100%')

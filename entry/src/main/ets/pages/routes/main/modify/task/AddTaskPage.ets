@@ -2,6 +2,7 @@ import { ITheme } from '../../../../../common/theme/ThemeModel';
 import { DateTimeUtils } from '../../../../../utils/DateTimeUtils';
 import { TaskFormView } from './TaskFormView';
 import { TaskFormHelper } from './TaskFormHelper';
+import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
 
 export interface AddTaskParams {
   name: string;
@@ -24,6 +25,7 @@ export struct AddTaskPage {
   @State note: string = '';
   @State startTime: Date = new Date();
   @State endTime: Date = new Date(new Date().getTime() + 60 * 60 * 1000);
+  @State categoryUid: string | null = null;
 
   @State aiInputText: string = '';
   @State isAILoading: boolean = false;
@@ -39,7 +41,7 @@ export struct AddTaskPage {
   // —— 委托给 Helper 的保存逻辑 ——
   private async saveTask() {
     const isSuccess = await TaskFormHelper.saveNewTask(
-      this.name, this.note, this.startTime, this.endTime
+      this.name, this.note, this.startTime, this.endTime, this.categoryUid
     );
 
     if (isSuccess) {
@@ -90,6 +92,9 @@ export struct AddTaskPage {
           onAITriggered: (): Promise<void> => this.onAITriggered(),
           showAIInput: true // 开启 AI 输入框
         })
+
+        CategoryAssignmentField({ categoryUid: $categoryUid })
+          .margin({ top: 12 })
       }
       .width('100%')
       .height('100%')

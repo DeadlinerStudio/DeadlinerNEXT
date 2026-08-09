@@ -3,6 +3,7 @@ import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { HabitFormView } from './HabitFormView';
 import { ITheme } from '../../../../../common/theme/ThemeModel';
 import { HabitFormHelper } from './HabitFormHelper'; // 引入 Helper
+import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
 
 @Component
 export struct AddHabitSheet {
@@ -19,6 +20,7 @@ export struct AddHabitSheet {
   @State totalTarget: string = '';
   @State aiInputText: string = '';
   @State isAILoading: boolean = false;
+  @State categoryUid: string | null = null;
 
   aboutToAppear(): void {
     if (this.initialName) {
@@ -38,7 +40,7 @@ export struct AddHabitSheet {
     const gIndex = this.selectedGoalTypeIndex.length > 0 ? this.selectedGoalTypeIndex[0] : 0;
 
     const isSuccess = await HabitFormHelper.saveNewHabit(
-      this.name, pIndex, gIndex, this.timesPerPeriod, this.totalTarget
+      this.name, pIndex, gIndex, this.timesPerPeriod, this.totalTarget, this.categoryUid
     );
 
     if (isSuccess) {
@@ -82,6 +84,9 @@ export struct AddHabitSheet {
           onAITriggered: (): Promise<void> => this.onAITriggered(),
           showAIInput: true
         }).padding({ left: 16, right: 16 })
+
+        CategoryAssignmentField({ categoryUid: $categoryUid })
+          .margin({ left: 16, right: 16, top: 12 })
       }
       .width('100%')
       .height('100%')

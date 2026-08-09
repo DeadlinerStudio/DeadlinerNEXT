@@ -120,7 +120,8 @@ export class KmpHabitRepositoryAdapter {
     iconKey: string | null,
     sortOrder: number,
     alarmTime: string | null,
-    existingUid: string | null = null
+    existingUid: string | null = null,
+    categoryUid: string | null = null
   ): Promise<number> {
     const now: string = new Date().toISOString();
     const uid: string = existingUid === null ? util.generateRandomUUID(true) : existingUid;
@@ -130,7 +131,7 @@ export class KmpHabitRepositoryAdapter {
       description: description.length > 0 ? description : null,
       color: color,
       iconKey: iconKey,
-      categoryUid: null,
+      categoryUid: categoryUid,
       period: period,
       timesPerPeriod: timesPerPeriod,
       goalType: goalType,
@@ -151,6 +152,7 @@ export class KmpHabitRepositoryAdapter {
   public async update(habit: Habit): Promise<boolean> {
     const current: KmpHabitPayload | null = await this.rawHabitForId(habit.id);
     if (current === null) return false;
+    const categoryChanged: boolean = habit.categoryUid !== current.categoryUid;
     const updated: KmpHabitPayload = {
       uid: current.uid,
       name: habit.name,
@@ -170,6 +172,17 @@ export class KmpHabitRepositoryAdapter {
       isDeleted: false
     };
     this.persistence.habitUpdateJson(JSON.stringify(updated));
+    if (categoryChanged) {
+      this.persistence.habitCategoryUpdateJson(JSON.stringify({ uid: current.uid, categoryUid: habit.categoryUid }));
+    }
+    this.invalidateState();
+    return true;
+  }
+
+  public async updateCategory(habitId: number, categoryUid: string | null): Promise<boolean> {
+    const habit: KmpHabitPayload | null = await this.rawHabitForId(habitId);
+    if (habit === null) return false;
+    this.persistence.habitCategoryUpdateJson(JSON.stringify({ uid: habit.uid, categoryUid: categoryUid }));
     this.invalidateState();
     return true;
   }
@@ -271,6 +284,7 @@ export class KmpHabitRepositoryAdapter {
       description: habit.description,
       color: habit.color,
       iconKey: habit.iconKey,
+      categoryUid: habit.categoryUid,
       period: habit.period,
       timesPerPeriod: habit.timesPerPeriod,
       goalType: habit.goalType,

@@ -10,6 +10,7 @@ struct TaskWidgetCardCapsule {
       case 'classic':
       case 'time':
       case 'vibrant':
+      case 'colorful':
       case 'nature':
       case 'sunset':
       case 'lavender':
@@ -25,7 +26,8 @@ struct TaskWidgetCardCapsule {
 
   getBrandColor(): ResourceColor {
     switch (this.getThemeKey()) {
-      case 'vibrant': return $r('app.color.brand_vibrant');
+      case 'vibrant':
+      case 'colorful': return $r('app.color.brand_vibrant');
       case 'nature': return $r('app.color.brand_nature');
       case 'sunset': return $r('app.color.brand_sunset');
       case 'lavender': return $r('app.color.brand_lavender');
@@ -40,7 +42,8 @@ struct TaskWidgetCardCapsule {
 
   getAccentColor(): ResourceColor {
     switch (this.getThemeKey()) {
-      case 'vibrant': return $r('app.color.accent_vibrant');
+      case 'vibrant':
+      case 'colorful': return $r('app.color.accent_vibrant');
       case 'nature': return $r('app.color.accent_nature');
       case 'sunset': return $r('app.color.accent_sunset');
       case 'lavender': return $r('app.color.accent_lavender');
@@ -52,7 +55,8 @@ struct TaskWidgetCardCapsule {
 
   getBrandSoftColor(): ResourceColor {
     switch (this.getThemeKey()) {
-      case 'vibrant': return $r('app.color.brand_vibrant_50');
+      case 'vibrant':
+      case 'colorful': return $r('app.color.brand_vibrant_50');
       case 'nature': return $r('app.color.brand_nature_50');
       case 'sunset': return $r('app.color.brand_sunset_50');
       case 'lavender': return $r('app.color.brand_lavender_50');
@@ -65,7 +69,8 @@ struct TaskWidgetCardCapsule {
   getWidgetBgStartColor(): ResourceColor {
     switch (this.getThemeKey()) {
       case 'time': return $r('app.color.widget_bg_grad_start_time');
-      case 'vibrant': return $r('app.color.widget_bg_grad_start_vibrant');
+      case 'vibrant':
+      case 'colorful': return $r('app.color.widget_bg_grad_start_vibrant');
       case 'nature': return $r('app.color.widget_bg_grad_start_nature');
       case 'sunset': return $r('app.color.widget_bg_grad_start_sunset');
       case 'lavender': return $r('app.color.widget_bg_grad_start_lavender');
@@ -80,7 +85,8 @@ struct TaskWidgetCardCapsule {
   getWidgetBgEndColor(): ResourceColor {
     switch (this.getThemeKey()) {
       case 'time': return $r('app.color.widget_bg_grad_end_time');
-      case 'vibrant': return $r('app.color.widget_bg_grad_end_vibrant');
+      case 'vibrant':
+      case 'colorful': return $r('app.color.widget_bg_grad_end_vibrant');
       case 'nature': return $r('app.color.widget_bg_grad_end_nature');
       case 'sunset': return $r('app.color.widget_bg_grad_end_sunset');
       case 'lavender': return $r('app.color.widget_bg_grad_end_lavender');
@@ -95,7 +101,8 @@ struct TaskWidgetCardCapsule {
   getWidgetDecorColor(): ResourceColor {
     switch (this.getThemeKey()) {
       case 'time': return $r('app.color.widget_decor_time');
-      case 'vibrant': return $r('app.color.widget_decor_vibrant');
+      case 'vibrant':
+      case 'colorful': return $r('app.color.widget_decor_vibrant');
       case 'nature': return $r('app.color.widget_decor_nature');
       case 'sunset': return $r('app.color.widget_decor_sunset');
       case 'lavender': return $r('app.color.widget_decor_lavender');

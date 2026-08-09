@@ -76,6 +76,11 @@
     { "name": "func_archive", "value": "#FF507EC2" },
     { "name": "func_ai", "value": "#9D7AD2" },
     { "name": "func_manual", "value": "#4DB6AC" },
+    { "name": "module_list", "value": "#FF0A59F7" },
+    { "name": "module_overview", "value": "#FF0FA6A6" },
+    { "name": "module_capture", "value": "#FF5856D6" },
+    { "name": "module_ai", "value": "#FF8B5CF6" },
+    { "name": "module_user", "value": "#FFFF9500" },
     { "name": "font_primary", "value": "#1A1A1A" },
     { "name": "font_secondary", "value": "#666666" },
     { "name": "font_emphasize", "value": "#000000" },
@@ -299,7 +304,7 @@
     { "name": "widget_item_bg", "value": "#FFFFFFFF" },
 
     { "name": "item_title_font", "value": "#E6000000" },
-    { "name": "tab_bar_icon_unselected", "value": "#222222" },
+    { "name": "tab_bar_icon_unselected", "value": "#111111" },
     { "name": "segmented_color_selected", "value": "#22666666" }
   ]
 }

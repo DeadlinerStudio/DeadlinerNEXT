@@ -215,6 +215,17 @@ struct AppearanceSettings {
                 this.isBackgroundSheetShow = true;
               }
             })
+
+            SettingsDivider()
+
+            SettingsItem({
+              title: '底栏自定义',
+              subtitle: '排序、显示入口与系统图标渲染',
+              icon: $r('sys.symbol.slider_horizontal_2'),
+              onItemClick: () => {
+                this.navigateTo('settingsHdsTabsCustomization');
+              }
+            })
           }
 
           SettingsSection() {

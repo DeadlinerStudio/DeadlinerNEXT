@@ -1,7 +1,9 @@
 import {
   DividerShowType,
+  HdsNavDestination,
   HdsNavigation,
   HdsListItem,
+  HdsNavDestinationTitleMode,
   HdsNavigationTitleMode,
   TextStyleMode
 } from '@kit.UIDesignKit';
@@ -52,6 +54,7 @@ export struct CapturePage {
   private repo: InspirationRepository = InspirationRepository.getInstance();
 
   @Prop @Watch('onTabSwitch') currentTabIndex: number = 0;
+  @Prop isNavDestination: boolean = false;
   readonly TARGET_INDEX: number = 2;
 
   aboutToAppear(): void {
@@ -825,77 +828,147 @@ export struct CapturePage {
     })
   }
 
-  build() {
-    HdsNavigation() {
-      TopSafeContainer({
-        topAvoidHeight: this.usesWideLayout() ? 0 : this.pageTopAvoidHeight(),
-        needBgTransparent: true,
-        scrollable: !this.usesWideLayout()
-      }) {
-        if (this.usesWideLayout()) {
-          this.wideContentBuilder()
-        } else if (this.usesMediumLayout()) {
-          this.mediumContentBuilder()
-        } else {
-          this.portraitContentBuilder()
-        }
+  @Builder
+  private pageContentBuilder() {
+    TopSafeContainer({
+      topAvoidHeight: this.usesWideLayout() ? 0 : this.pageTopAvoidHeight(),
+      needBgTransparent: true,
+      scrollable: !this.usesWideLayout()
+    }) {
+      if (this.usesWideLayout()) {
+        this.wideContentBuilder()
+      } else if (this.usesMediumLayout()) {
+        this.mediumContentBuilder()
+      } else {
+        this.portraitContentBuilder()
       }
     }
-    .titleBar({
-      style: getImmersiveTitleBarStyle(false, false),
-      avoidLayoutSafeArea: this.usesWideLayout(),
-      content: {
-        title: {
-          mainTitle: this.selectionMode ? `已选 ${this.selectedIds.length} 项` : '灵感'
-        },
-        subIcon: this.selectionMode ? {
-          content: {
-            icon: $r('sys.symbol.xmark'),
-            action: (): void => {
-              this.exitSelectionMode();
-            }
-          }
-        } : undefined,
-        menu: {
-          value: this.selectionMode ? [
-            {
-              content: {
-                icon: $r('sys.symbol.trash'),
-                action: (): void => {
-                  void this.deleteSelectedItems();
-                }
+  }
+
+  build() {
+    if (this.isNavDestination) {
+      HdsNavDestination() {
+        this.pageContentBuilder()
+      }
+      .titleBar({
+        style: getImmersiveTitleBarStyle(false, false),
+        avoidLayoutSafeArea: this.usesWideLayout(),
+        content: {
+          title: {
+            mainTitle: this.selectionMode ? `已选 ${this.selectedIds.length} 项` : '灵感'
+          },
+          subIcon: this.selectionMode ? {
+            content: {
+              icon: $r('sys.symbol.xmark'),
+              action: (): void => {
+                this.exitSelectionMode();
               }
-            },
-            {
-              content: {
-                label: `合并`,
-                type: TextStyleMode.NORMAL,
-                action: (): void => {
-                  if (this.selectedIds.length >= 2) {
-                    void this.mergeSelectedItems();
-                  } else {
-                    Toast.show({ message: '至少选择两条灵感再合并' });
+            }
+          } : undefined,
+          menu: {
+            value: this.selectionMode ? [
+              {
+                content: {
+                  icon: $r('sys.symbol.trash'),
+                  action: (): void => {
+                    void this.deleteSelectedItems();
+                  }
+                }
+              },
+              {
+                content: {
+                  label: `合并`,
+                  type: TextStyleMode.NORMAL,
+                  action: (): void => {
+                    if (this.selectedIds.length >= 2) {
+                      void this.mergeSelectedItems();
+                    } else {
+                      Toast.show({ message: '至少选择两条灵感再合并' });
+                    }
                   }
                 }
               }
-            }
-          ] : [
-            {
-              content: {
-                icon: $r('sys.symbol.checkmark_circle'),
-                action: (): void => {
-                  this.selectionMode = true
+            ] : [
+              {
+                content: {
+                  icon: $r('sys.symbol.checkmark_circle'),
+                  action: (): void => {
+                    this.selectionMode = true
+                  }
                 }
               }
-            }
-          ]
-        },
-        divider: { showType: DividerShowType.OFF }
+            ]
+          },
+          divider: { showType: DividerShowType.OFF }
+        }
+      })
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    } else {
+      HdsNavigation() {
+        this.pageContentBuilder()
       }
-    })
-    .titleMode(HdsNavigationTitleMode.MINI)
-    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-    .mode(NavigationMode.Stack)
-    .hideBackButton(true)
+      .titleBar({
+        style: getImmersiveTitleBarStyle(false, false),
+        avoidLayoutSafeArea: this.usesWideLayout(),
+        content: {
+          title: {
+            mainTitle: this.selectionMode ? `已选 ${this.selectedIds.length} 项` : '灵感'
+          },
+          subIcon: this.selectionMode ? {
+            content: {
+              icon: $r('sys.symbol.xmark'),
+              action: (): void => {
+                this.exitSelectionMode();
+              }
+            }
+          } : undefined,
+          menu: {
+            value: this.selectionMode ? [
+              {
+                content: {
+                  icon: $r('sys.symbol.trash'),
+                  action: (): void => {
+                    void this.deleteSelectedItems();
+                  }
+                }
+              },
+              {
+                content: {
+                  label: `合并`,
+                  type: TextStyleMode.NORMAL,
+                  action: (): void => {
+                    if (this.selectedIds.length >= 2) {
+                      void this.mergeSelectedItems();
+                    } else {
+                      Toast.show({ message: '至少选择两条灵感再合并' });
+                    }
+                  }
+                }
+              }
+            ] : [
+              {
+                content: {
+                  icon: $r('sys.symbol.checkmark_circle'),
+                  action: (): void => {
+                    this.selectionMode = true
+                  }
+                }
+              }
+            ]
+          },
+          divider: { showType: DividerShowType.OFF }
+        }
+      })
+      .titleMode(HdsNavigationTitleMode.MINI)
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      .mode(NavigationMode.Stack)
+      .hideBackButton(true)
+    }
   }
+}
+
+@Builder
+export function HdsCaptureDestinationBuilder() {
+  CapturePage({ currentTabIndex: -1, isNavDestination: true })
 }

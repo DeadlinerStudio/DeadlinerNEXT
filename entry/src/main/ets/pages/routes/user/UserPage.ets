@@ -25,6 +25,8 @@ import {
   APP_BREAKPOINT_STORAGE_KEY,
   AppBreakpointUtils
 } from "../../../common/layout/AppBreakpoints";
+import { HdsTabDescriptor, HdsTabId, HdsTabsCustomization } from '../../../model/HdsTabsCustomization';
+import { CategoryRepository } from '../../../common/repository/CategoryRepository';
 
 const USER_ROUTE_WHITELIST: string[] = [
   'settingsAppearance',
@@ -37,6 +39,10 @@ const USER_ROUTE_WHITELIST: string[] = [
   'settingsWidgetBackground',
   'settingsMainPageButtons',
   'settingsHabitProgressStyle',
+  'settingsHdsTabsCustomization',
+  'hdsOverview',
+  'hdsCapture',
+  'hdsAi',
   'helpDetail',
   'letterPage',
   'codeText',
@@ -44,6 +50,57 @@ const USER_ROUTE_WHITELIST: string[] = [
 ];
 
 const PLACEHOLDER_ROUTE_NAME = 'placeholder';
+
+@Component
+struct UserQuickEntry {
+  title: string = '';
+  icon: Resource = $r('sys.symbol.square');
+  iconColor: ResourceColor = $r('app.color.font_primary');
+  isImage: boolean = false;
+  onItemClick?: () => void;
+
+  @State isPressed: boolean = false;
+
+  build() {
+    Column({ space: 8 }) {
+      if (this.isImage) {
+        Image(this.icon)
+          .size({ width: 26, height: 26 })
+          .fillColor(this.iconColor)
+      } else {
+        SymbolGlyph(this.icon)
+          .fontSize(26)
+          .fontColor([this.iconColor])
+      }
+
+      Text(this.title)
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.font_primary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width(96)
+    .height(76)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .borderRadius(20)
+    .backgroundColor(this.isPressed ? $r('sys.color.ohos_id_color_click_effect') : Color.Transparent)
+    .animation({ duration: 200 })
+    .onTouch((event) => {
+      if (event.type === TouchType.Down) {
+        this.isPressed = true;
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.isPressed = false;
+      }
+    })
+    .onClick(() => {
+      if (this.onItemClick) {
+        this.onItemClick();
+      }
+    })
+  }
+}
 
 @Component
 export struct UserPage {
@@ -62,6 +119,11 @@ export struct UserPage {
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @StorageLink(C.KEY_BASIC_MODE) isBasicMode: boolean = false;
+  @StorageLink(C.KEY_HDS_TABS_ORDER) tabOrder: string[] = HdsTabsCustomization.defaultOrder();
+  @StorageLink(C.KEY_HDS_TABS_HIDDEN) hiddenTabs: string[] = HdsTabsCustomization.defaultHiddenTabs();
+  @StorageLink(C.KEY_HDS_TAB_SYMBOL_RENDERING)
+  tabSymbolRendering: string = HdsTabsCustomization.defaultSymbolRendering();
+  private readonly categoryRepository: CategoryRepository = CategoryRepository.getInstance();
 
   onScreenModeChange() {
     console.info(`[UserPage] Screen Mode Change Detected. Wide: ${this.isWideScreen}, breakpoint: ${this.currentBreakpoint}`);
@@ -178,6 +240,38 @@ export struct UserPage {
     }, BlurStyle.Regular));
   }
 
+  private showRestorePresetCategoriesDialog(): void {
+    AlertDialog.show(DialogCompat.withAlertBlurStyle({
+      title: '恢复预设分类',
+      message: '将补回缺失或已删除的默认分类，不会覆盖现有分类的名称、图标或颜色。',
+      autoCancel: true,
+      alignment: DialogAlignment.Bottom,
+      offset: { dx: 0, dy: -20 },
+      primaryButton: {
+        value: '取消',
+        fontColor: this.theme.brand,
+        action: () => {}
+      },
+      secondaryButton: {
+        value: '恢复',
+        fontColor: this.theme.brand,
+        action: () => {
+          void this.restorePresetCategories();
+        }
+      }
+    }, BlurStyle.Regular));
+  }
+
+  private async restorePresetCategories(): Promise<void> {
+    try {
+      await this.categoryRepository.restorePresets();
+      promptAction.showToast({ message: '预设分类已恢复' });
+    } catch (error) {
+      console.error('[UserPage] Restore preset categories failed:', JSON.stringify(error));
+      promptAction.showToast({ message: '恢复预设分类失败' });
+    }
+  }
+
   @State isArchiveSheetShow: boolean = false;
   @Builder
   archiveSheet() {
@@ -244,6 +338,87 @@ export struct UserPage {
     }
   }
 
+  private getHiddenTabs(): HdsTabDescriptor[] {
+    return HdsTabsCustomization.getHiddenTabs(this.tabOrder, this.hiddenTabs);
+  }
+
+  private shouldScrollQuickEntries(): boolean {
+    return this.getHiddenTabs().length + 2 > 3;
+  }
+
+  private hiddenTabRoute(tabId: string): string {
+    if (tabId === HdsTabId.OVERVIEW) {
+      return 'hdsOverview';
+    }
+    if (tabId === HdsTabId.CAPTURE) {
+      return 'hdsCapture';
+    }
+    return 'hdsAi';
+  }
+
+  private openHiddenTab(tabId: string): void {
+    this.navigateTo(this.hiddenTabRoute(tabId));
+  }
+
+  @Builder
+  private quickEntryChildren() {
+    UserQuickEntry({
+      title: '归档管理',
+      icon: $r('sys.symbol.archivebox_fill'),
+      iconColor: $r('app.color.func_archive'),
+      onItemClick: () => {
+        this.isArchiveSheetShow = true;
+      }
+    })
+
+    SettingsVerticalDivider()
+
+    UserQuickEntry({
+      title: '使用手册',
+      icon: $r('sys.symbol.book_open_fill'),
+      iconColor: $r('app.color.func_manual'),
+      onItemClick: () => {
+        this.navigateTo('settingsHelpCenter');
+      }
+    })
+
+    ForEach(this.getHiddenTabs(), (tab: HdsTabDescriptor) => {
+      SettingsVerticalDivider()
+
+      UserQuickEntry({
+        title: tab.title,
+        icon: HdsTabsCustomization.getDisplayIcon(tab.id, this.tabSymbolRendering),
+        iconColor: tab.color,
+        isImage: tab.isImage,
+        onItemClick: () => {
+          this.openHiddenTab(tab.id);
+        }
+      })
+    }, (tab: HdsTabDescriptor) => tab.id)
+  }
+
+  @Builder
+  private standardQuickEntries() {
+    Row() {
+      this.quickEntryChildren()
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.SpaceEvenly)
+  }
+
+  @Builder
+  private scrollableQuickEntries() {
+    Scroll() {
+      Row() {
+        this.quickEntryChildren()
+      }
+      .padding({ left: 4, right: 4 })
+    }
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+    .width('100%')
+  }
+
   @State isFriendsSheetShow: boolean = false;
   @Builder
   friendsSheet() {
@@ -264,40 +439,11 @@ export struct UserPage {
           }
 
           SettingsSection({ mainUserPage: true }) {
-            Row() {
-              SettingsGridItem({
-                title: "归档管理",
-                icon: $r('sys.symbol.archivebox_fill'),
-                iconColor: $r('app.color.func_archive'),
-                onItemClick: () => {
-                  this.isArchiveSheetShow = true;
-                }
-              })
-
-              // SettingsVerticalDivider()
-              //
-              // SettingsGridItem({
-              //   title: "Lifi AI",
-              //   icon: $r('app.media.lifi'),
-              //   iconColor: $r('app.color.func_ai'),
-              //   isImage: true,
-              //   onItemClick: () => {
-              //     this.isAISheetShow = true;
-              //   }
-              // })
-
-              SettingsVerticalDivider()
-
-              SettingsGridItem({
-                title: "使用手册",
-                icon: $r('sys.symbol.book_open_fill'),
-                iconColor: $r('app.color.func_manual'),
-                onItemClick: () => {
-                  this.navigateTo('settingsHelpCenter')
-                }
-              })
+            if (this.shouldScrollQuickEntries()) {
+              this.scrollableQuickEntries()
+            } else {
+              this.standardQuickEntries()
             }
-            .width('100%')
           }
 
           SettingsSection({ title: '偏好设置', mainUserPage: true }) {
@@ -341,6 +487,17 @@ export struct UserPage {
                 icon: $r('sys.symbol.cloud'),
                 onItemClick: () => {
                   this.navigateTo('settingsWebDav');
+                }
+              })
+
+              SettingsDivider()
+
+              SettingsItem({
+                title: '恢复预设分类',
+                subtitle: '补回缺失分类，不覆盖现有修改',
+                icon: $r('sys.symbol.folder'),
+                onItemClick: () => {
+                  this.showRestorePresetCategoriesDialog();
                 }
               })
 

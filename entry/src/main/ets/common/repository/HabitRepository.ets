@@ -50,12 +50,13 @@ export class HabitRepository {
     color: number | null = null,
     iconKey: string | null = null,
     sortOrder: number = 0,
-    alarmTime: string | null = null
+    alarmTime: string | null = null,
+    categoryUid: string | null = null
   ): Promise<number> {
     await this.initializeKmp();
     const uid: string | null = await this.kmpTaskAdapter.taskUidForLegacyId(ddlId);
     const id: number = await this.kmpHabits.create(
-      name, period, timesPerPeriod, goalType, totalTarget, description, color, iconKey, sortOrder, alarmTime, uid
+      name, period, timesPerPeriod, goalType, totalTarget, description, color, iconKey, sortOrder, alarmTime, uid, categoryUid
     );
     this.scheduleReminderRefresh();
     this.triggerDataSync();
@@ -86,6 +87,14 @@ export class HabitRepository {
     await this.initializeKmp();
     if (!await this.kmpHabits.update(habit)) throw new Error('KMP habit not found for update');
     this.scheduleReminderRefresh();
+    this.triggerDataSync();
+  }
+
+  public async updateHabitCategory(habitId: number, categoryUid: string | null): Promise<void> {
+    await this.initializeKmp();
+    if (!await this.kmpHabits.updateCategory(habitId, categoryUid)) {
+      throw new Error('KMP habit not found for category update');
+    }
     this.triggerDataSync();
   }
 

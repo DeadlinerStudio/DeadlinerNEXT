@@ -37,7 +37,8 @@ export class HabitFormHelper {
     pIndex: number,
     gIndex: number,
     timesPerPeriod: string,
-    totalTarget: string
+    totalTarget: string,
+    categoryUid: string | null = null
   ): Promise<boolean> { // 返回 true 代表保存成功
     if (!name.trim()) {
       Toast.show({ message: '请输入习惯名称' });
@@ -79,13 +80,14 @@ export class HabitFormHelper {
         isArchived: false,
         isStared: false,
         type: DeadlineType.HABIT,
-        calendarEventId: null
+        calendarEventId: null,
+        categoryUid: categoryUid
       });
 
       if (ddlId <= 0) throw new Error("Insert DDL failed");
 
       await HabitRepository.getInstance().createHabitForDdl(
-        ddlId, name, currentPeriod, times, currentGoalType, total, ""
+        ddlId, name, currentPeriod, times, currentGoalType, total, '', null, null, 0, null, categoryUid
       );
 
       Toast.show({ message: '创建成功' });

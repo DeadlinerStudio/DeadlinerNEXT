@@ -1,7 +1,9 @@
 import {
   DividerShowType,
   HdsListItem,
+  HdsNavDestination,
   HdsNavigation,
+  HdsNavDestinationTitleMode,
   HdsNavigationTitleMode
 } from '@kit.UIDesignKit';
 import { getImmersiveTitleBarStyle } from '../../../common/style/NavStyles';
@@ -28,7 +30,8 @@ export struct AIPage {
   @StorageLink(APP_BREAKPOINT_STORAGE_KEY) currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
 
-  @Prop @Watch('onTabSwitch') currentTabIndex: number = 0;
+  @Prop @Watch('onHdsTabActive') isHdsTabActive: boolean = false;
+  @Prop isNavDestination: boolean = false;
   @State newChatSignal: number = 0;
   @State currentSessionSnapshot: AIWorkspaceSessionSnapshot | null = null;
   @State archivedHistory: AIConversationHistoryRecord[] = [];
@@ -36,13 +39,13 @@ export struct AIPage {
   @State workspaceSessionVersion: number = 0;
   @State historyPreviewVersion: number = 0;
   @State deletingHistoryId: string = '';
-  readonly TARGET_INDEX: number = 3;
-
   private flowTimerId: number = -1;
 
   aboutToAppear(): void {
-    if (this.currentTabIndex === this.TARGET_INDEX) {
+    if (this.shouldPlayAiFlow()) {
       this.playAiFlow();
+    } else {
+      this.stopAiFlow();
     }
     this.loadConversationState();
   }
@@ -51,10 +54,16 @@ export struct AIPage {
     this.stopAiFlow();
   }
 
-  onTabSwitch(): void {
-    if (this.currentTabIndex === this.TARGET_INDEX) {
+  onHdsTabActive(): void {
+    if (this.shouldPlayAiFlow()) {
       this.playAiFlow();
+    } else {
+      this.stopAiFlow();
     }
+  }
+
+  private shouldPlayAiFlow(): boolean {
+    return !this.isNavDestination && this.isHdsTabActive;
   }
 
   private async loadConversationState(): Promise<void> {
@@ -542,46 +551,86 @@ export struct AIPage {
     .padding({ left: this.pagePadding(), right: this.pagePadding() })
   }
 
-  build() {
-    HdsNavigation() {
-      if (this.usesWideLayout()) {
-        this.wideLayoutBuilder()
-      } else if (this.usesMediumLayout()) {
-        this.mediumLayoutBuilder()
-      } else {
-        Column() {
-          this.workspaceBuilder()
-        }
-          .layoutWeight(1)
-          .width('100%')
-          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+  @Builder
+  private pageContentBuilder() {
+    if (this.usesWideLayout()) {
+      this.wideLayoutBuilder()
+    } else if (this.usesMediumLayout()) {
+      this.mediumLayoutBuilder()
+    } else {
+      Column() {
+        this.workspaceBuilder()
       }
+        .layoutWeight(1)
+        .width('100%')
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     }
-    .titleBar({
-      style: getImmersiveTitleBarStyle(false, false),
-      avoidLayoutSafeArea: this.usesWideLayout(),
-      content: {
-        title: {
-          mainTitle: 'Lifi AI'
-        },
-        menu: {
-          value: [
-            {
-              content: {
-                icon: $r('sys.symbol.message_badge_plus'),
-                action: (): void => {
-                  this.startNewConversation();
+  }
+
+  build() {
+    if (this.isNavDestination) {
+      HdsNavDestination() {
+        this.pageContentBuilder()
+      }
+      .titleBar({
+        style: getImmersiveTitleBarStyle(false, false),
+        avoidLayoutSafeArea: this.usesWideLayout(),
+        content: {
+          title: {
+            mainTitle: 'Lifi AI'
+          },
+          menu: {
+            value: [
+              {
+                content: {
+                  icon: $r('sys.symbol.message_badge_plus'),
+                  action: (): void => {
+                    this.startNewConversation();
+                  }
                 }
               }
-            }
-          ]
-        },
-        divider: { showType: DividerShowType.OFF }
+            ]
+          },
+          divider: { showType: DividerShowType.OFF }
+        }
+      })
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    } else {
+      HdsNavigation() {
+        this.pageContentBuilder()
       }
-    })
-    .titleMode(HdsNavigationTitleMode.MINI)
-    .mode(NavigationMode.Stack)
-    .hideBackButton(true)
-    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      .titleBar({
+        style: getImmersiveTitleBarStyle(false, false),
+        avoidLayoutSafeArea: this.usesWideLayout(),
+        content: {
+          title: {
+            mainTitle: 'Lifi AI'
+          },
+          menu: {
+            value: [
+              {
+                content: {
+                  icon: $r('sys.symbol.message_badge_plus'),
+                  action: (): void => {
+                    this.startNewConversation();
+                  }
+                }
+              }
+            ]
+          },
+          divider: { showType: DividerShowType.OFF }
+        }
+      })
+      .titleMode(HdsNavigationTitleMode.MINI)
+      .mode(NavigationMode.Stack)
+      .hideBackButton(true)
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    }
   }
+}
+
+@Builder
+export function HdsAiDestinationBuilder() {
+  AIPage({ isNavDestination: true })
 }

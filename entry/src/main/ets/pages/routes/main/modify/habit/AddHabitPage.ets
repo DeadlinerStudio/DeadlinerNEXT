@@ -1,6 +1,7 @@
 import { HabitFormView } from './HabitFormView';
 import { HabitFormHelper } from './HabitFormHelper';
 import { ITheme } from '../../../../../common/theme/ThemeModel';
+import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
 
 @Builder
 export function AddHabitBuilder(name: string, param: Object) {
@@ -19,6 +20,7 @@ export struct AddHabitPage {
   @State totalTarget: string = '';
   @State aiInputText: string = '';
   @State isAILoading: boolean = false;
+  @State categoryUid: string | null = null;
 
   saveMenuItem: NavigationMenuItem = {
     value: "Save",
@@ -31,7 +33,7 @@ export struct AddHabitPage {
     const gIndex = this.selectedGoalTypeIndex.length > 0 ? this.selectedGoalTypeIndex[0] : 0;
 
     const isSuccess = await HabitFormHelper.saveNewHabit(
-      this.name, pIndex, gIndex, this.timesPerPeriod, this.totalTarget
+      this.name, pIndex, gIndex, this.timesPerPeriod, this.totalTarget, this.categoryUid
     );
 
     if (isSuccess) {
@@ -72,6 +74,9 @@ export struct AddHabitPage {
           onAITriggered: (): Promise<void> => this.onAITriggered(),
           showAIInput: true
         })
+
+        CategoryAssignmentField({ categoryUid: $categoryUid })
+          .margin({ top: 12 })
       }
       .width('100%').height('100%').padding(16)
     }

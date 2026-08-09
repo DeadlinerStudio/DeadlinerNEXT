@@ -63,4 +63,8 @@ export class SettingsConstants {
   static readonly KEY_LAST_ANALYZED_MONTH = 'last_analyzed_month';
 
   static readonly KEY_SHOW_MINIBAR = 'show_minibar';
+
+  static readonly KEY_HDS_TABS_ORDER = 'hds_tabs_order';
+  static readonly KEY_HDS_TABS_HIDDEN = 'hds_tabs_hidden';
+  static readonly KEY_HDS_TAB_SYMBOL_RENDERING = 'hds_tab_symbol_rendering';
 }

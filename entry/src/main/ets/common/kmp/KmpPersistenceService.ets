@@ -4,16 +4,23 @@ import { util } from '@kit.ArkTS';
 import { fileIo } from '@kit.CoreFileKit';
 import {
   bridgeVersion,
+  bridgeLoadError,
   close,
   diagnosticsJson,
   health,
   initialize,
+  lastInitializationError,
   importLegacyV2,
   importCapturesJson,
   mergeLegacyV2PayloadsJson,
   syncWebDavChangeLogJson,
   syncWebDavChangeLogJsonAsync,
   taskListViewModelJson,
+  categoryCatalogJson,
+  categoryCreateJson,
+  categoryUpdateJson,
+  categoryDeleteJson,
+  categoryRestorePresetsJson,
   overviewViewModelJsonAsync,
   taskCreateJson,
   taskUpdateJson,
@@ -22,6 +29,7 @@ import {
   habitStateJson,
   habitCreateJson,
   habitUpdateJson,
+  habitCategoryUpdateJson,
   habitStatusActionJson,
   habitToggleRecordJson,
   habitSaveRecordJson,
@@ -70,7 +78,11 @@ export class KmpPersistenceService {
     await this.ensureDatabaseDirectory(databaseDirectory);
     const result: number = initialize(databaseDirectory, installationId);
     if (result !== 1) {
-      throw new Error('KMP persistence initialization failed');
+      const initializationDetail: string = lastInitializationError();
+      const bridgeDetail: string = bridgeLoadError();
+      const detail: string = initializationDetail.length > 0 ? initializationDetail : bridgeDetail;
+      throw new Error('KMP persistence initialization failed' +
+        (detail.length > 0 ? ': ' + detail : ''));
     }
     this.initialized = true;
   }
@@ -194,6 +206,35 @@ export class KmpPersistenceService {
     return statePayload;
   }
 
+  public categoryCatalogJson(): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const statePayload: string = categoryCatalogJson();
+    if (statePayload.length === 0) throw new Error('KMP category catalog did not return state');
+    return statePayload;
+  }
+
+  public categoryCreateJson(payload: string): string {
+    return this.categoryMutationJson(payload, true);
+  }
+
+  public categoryUpdateJson(payload: string): string {
+    return this.categoryMutationJson(payload, false);
+  }
+
+  public categoryDeleteJson(uid: string, updatedAt: string): string {
+    this.requireCategoryWriteSupport();
+    const statePayload: string = categoryDeleteJson(uid, updatedAt);
+    if (statePayload.length === 0) throw new Error('KMP category deletion failed');
+    return statePayload;
+  }
+
+  public categoryRestorePresetsJson(): string {
+    this.requirePresetRestoreSupport();
+    const statePayload: string = categoryRestorePresetsJson();
+    if (statePayload.length === 0) throw new Error('KMP category preset restore failed');
+    return statePayload;
+  }
+
   public async overviewViewModelJson(): Promise<string> {
     if (!this.isReady()) throw new Error('KMP persistence is not initialized');
     const statePayload: string = await overviewViewModelJsonAsync();
@@ -275,6 +316,13 @@ export class KmpPersistenceService {
   public habitCreateJson(habitPayload: string): string { return this.habitMutationJson(habitPayload, true); }
   public habitUpdateJson(habitPayload: string): string { return this.habitMutationJson(habitPayload, false); }
 
+  public habitCategoryUpdateJson(payload: string): string {
+    this.requireCategoryWriteSupport();
+    const statePayload: string = habitCategoryUpdateJson(payload);
+    if (statePayload.length === 0) throw new Error('KMP habit category update failed');
+    return statePayload;
+  }
+
   public habitStatusActionJson(uid: string, actionPayload: string): string {
     return this.habitKeyMutationJson(uid, actionPayload, true);
   }
@@ -306,6 +354,27 @@ export class KmpPersistenceService {
     const statePayload: string = isCreate ? taskCreateJson(taskPayload) : taskUpdateJson(taskPayload);
     if (statePayload.length === 0) throw new Error('KMP task mutation failed');
     return statePayload;
+  }
+
+  private categoryMutationJson(payload: string, isCreate: boolean): string {
+    this.requireCategoryWriteSupport();
+    const statePayload: string = isCreate ? categoryCreateJson(payload) : categoryUpdateJson(payload);
+    if (statePayload.length === 0) throw new Error('KMP category mutation failed');
+    return statePayload;
+  }
+
+  private requireCategoryWriteSupport(): void {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    if (bridgeVersion() < 10) {
+      throw new Error('Installed KMP persistence does not support category management');
+    }
+  }
+
+  private requirePresetRestoreSupport(): void {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    if (bridgeVersion() < 11) {
+      throw new Error('Installed KMP persistence does not support category preset restore');
+    }
   }
 
   private captureMutation(payload: string, create: boolean): string {
