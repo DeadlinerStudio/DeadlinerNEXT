@@ -24,6 +24,7 @@ import {
   AppBreakpointUtils
 } from '../../../common/layout/AppBreakpoints';
 import { Toast } from '../../../common/ui/Toast';
+import { SheetCompat } from '../../../common/ui/SheetCompat';
 
 @Component
 export struct CapturePage {
@@ -512,6 +513,10 @@ export struct CapturePage {
       .cachedCount(this.portraitListCachedCount(), true)
       .clip(false)
       .scrollBar(BarState.Off)
+      .nestedScroll({
+        scrollForward: NestedScrollMode.PARENT_FIRST,
+        scrollBackward: NestedScrollMode.PARENT_FIRST
+      })
     }
   }
 
@@ -663,43 +668,37 @@ export struct CapturePage {
     Blank()
       .width(0)
       .height(0)
-      .bindSheet($$this.isDetailSheetShow, this.detailSheetBuilder(), {
+      .bindSheet($$this.isDetailSheetShow, this.detailSheetBuilder(), SheetCompat.immersive({
         height: SheetSize.LARGE,
         dragBar: true,
-        blurStyle: BlurStyle.Regular,
-        backgroundColor: Color.Transparent,
         showClose: false,
         onDisappear: () => {
           this.isDetailSheetShow = false;
           this.editingItem = null;
         },
-      })
+      }))
 
     Blank()
       .width(0)
       .height(0)
-      .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), {
+      .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), SheetCompat.immersive({
         height: SheetSize.LARGE,
-        blurStyle: BlurStyle.Regular,
-        backgroundColor: Color.Transparent,
         showClose: false,
         onDisappear: () => {
           this.isAddTaskSheetShow = false;
         }
-      })
+      }))
 
     Blank()
       .width(0)
       .height(0)
-      .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), {
+      .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), SheetCompat.immersive({
         height: SheetSize.LARGE,
-        blurStyle: BlurStyle.Regular,
-        backgroundColor: Color.Transparent,
         showClose: false,
         onDisappear: () => {
           this.isAddHabitSheetShow = false;
         }
-      })
+      }))
   }
 
   @Builder

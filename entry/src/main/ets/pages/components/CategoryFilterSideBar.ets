@@ -11,6 +11,7 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { TopSafeContainer } from './TopSafeContainer';
 import { MaterialPresets } from '../../common/style/SystemMaterialCompat';
 import { DialogCompat } from '../../common/ui/DialogCompat';
+import { SheetCompat } from '../../common/ui/SheetCompat';
 
 @Component
 export struct CategoryFilterSideBar {
@@ -317,16 +318,14 @@ export struct CategoryFilterSideBar {
     }
     .width('100%')
     .height('100%')
-    .bindSheet($$this.isEditorShown, this.categoryEditorBuilder(), {
+    .bindSheet($$this.isEditorShown, this.categoryEditorBuilder(), SheetCompat.immersive({
       detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
       height: SheetSize.MEDIUM,
       dragBar: true,
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       showClose: true,
       onDisappear: (): void => { this.isEditorShown = false; },
       title: { title: this.editingCategory === null ? '新建分类' : '编辑分类' }
-    })
+    }))
   }
 
   @Builder

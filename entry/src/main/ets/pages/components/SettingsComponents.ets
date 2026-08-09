@@ -8,6 +8,7 @@ import { BlurBackgroundModifier } from "../../utils/animation/BlurBackgroundModi
 import { Symbol } from "./infra/Symbol";
 import { DialogCompat } from "../../common/ui/DialogCompat";
 import { Toast } from '../../common/ui/Toast';
+import { SheetCompat } from '../../common/ui/SheetCompat';
 
 /**
  * SettingsSection: 类似 Android 的 Surface 容器
@@ -461,13 +462,11 @@ export struct SettingsUserProfile {
     .onClick(() => {
       this.handleCardClick();
     })
-    .bindSheet($$this.isLoginSheetShow, this.loginSheetBuilder(), {
+    .bindSheet($$this.isLoginSheetShow, this.loginSheetBuilder(), SheetCompat.immersive({
       height: SheetSize.FIT_CONTENT,
       dragBar: true,
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       title: { title: '登录' }
-    })
+    }))
   }
 }
 

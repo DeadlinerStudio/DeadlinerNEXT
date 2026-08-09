@@ -2,6 +2,7 @@ import { CategoryPickerSheet } from './CategoryPickerSheet';
 import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
 import { CategoryDisplayModel } from '../../common/kmp/KmpCategoryRepositoryAdapter';
 import { CategoryRepository } from '../../common/repository/CategoryRepository';
+import { SheetCompat } from '../../common/ui/SheetCompat';
 
 @Component
 export struct CategoryAssignmentField {
@@ -58,16 +59,14 @@ export struct CategoryAssignmentField {
     .borderRadius(16)
     .backgroundColor($r('sys.color.comp_background_tertiary'))
     .onClick((): void => { this.isPickerShown = true; })
-    .bindSheet($$this.isPickerShown, this.categoryPickerBuilder(), {
+    .bindSheet($$this.isPickerShown, this.categoryPickerBuilder(), SheetCompat.immersive({
       detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
       height: SheetSize.MEDIUM,
       dragBar: true,
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       showClose: true,
       onDisappear: (): void => { this.isPickerShown = false; },
       title: { title: '选择分类' }
-    })
+    }))
   }
 
   @Builder

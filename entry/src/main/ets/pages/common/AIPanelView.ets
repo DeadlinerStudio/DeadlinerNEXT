@@ -46,6 +46,7 @@ import { MemoryManageSheet } from './MemoryManageSheet';
 import { HabitFormHelper } from '../routes/main/modify/habit/HabitFormHelper';
 import { MaterialPresets, canUseSystemMaterial } from '../../common/style/SystemMaterialCompat';
 import { DialogCompat } from '../../common/ui/DialogCompat';
+import { SheetCompat } from '../../common/ui/SheetCompat';
 import { Symbol } from '../components/infra/Symbol';
 
 // ==========================================
@@ -1036,7 +1037,7 @@ export struct AIWorkspaceView {
       }
     }
     .width('100%').height('100%')
-    .bindSheet($$this.showMemorySheet, this.memoryManageSheet(), {
+    .bindSheet($$this.showMemorySheet, this.memoryManageSheet(), SheetCompat.immersive({
       detents: [ 550, 900 ],
       height: 550,
       dragBar: true,
@@ -1047,10 +1048,8 @@ export struct AIWorkspaceView {
         this.showMemorySheet = false;
         this.refreshMemoryState();
       },
-      // blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       showClose: false
-    })
+    }))
   }
 }
 

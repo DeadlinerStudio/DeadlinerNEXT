@@ -18,6 +18,7 @@ import { Toast } from '../../../common/ui/Toast';
 import { CategoryFilter, CategoryFilterResolver } from '../../../common/category/CategoryFilter';
 import { CategoryRepository } from '../../../common/repository/CategoryRepository';
 import { CategoryDisplayModel } from '../../../common/kmp/KmpCategoryRepositoryAdapter';
+import { SheetCompat } from '../../../common/ui/SheetCompat';
 
 interface EbbinState {
   isDue: boolean;
@@ -667,20 +668,18 @@ export struct HabitListSection {
     }
     .width('100%')
     .height('100%')
-    .bindSheet($$this.isEditSheetShow, this.habitEditSheet(), {
+    .bindSheet($$this.isEditSheetShow, this.habitEditSheet(), SheetCompat.immersive({
       height: SheetSize.FIT_CONTENT,
       dragBar: true,
       onDisappear: () => {
         this.isEditSheetShow = false;
         this.currentEditingHabit = undefined;
       },
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       title: {
         title: '编辑待办',
         subtitle: '修改待办信息。'
       }
-    })
+    }))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
   }
 }

@@ -35,6 +35,7 @@ import { ImmersiveMaterialModifier } from '../../../../common/style/SystemMateri
 import { DialogCompat } from '../../../../common/ui/DialogCompat';
 import { Toast } from '../../../../common/ui/Toast';
 import { API23_UI_DEFAULT, EXPERIMENTAL_COMPONENTS_DEFAULT } from '../../../../common/local/ExperimentalComponentsPolicy';
+import { SheetCompat } from '../../../../common/ui/SheetCompat';
 
 @Builder
 export function SearchPageBuilder() {
@@ -1173,42 +1174,36 @@ export struct SearchPage {
         Blank()
           .width(0)
           .height(0)
-          .bindSheet($$this.isInspirationSheetShow, this.inspirationSheetBuilder(), {
+          .bindSheet($$this.isInspirationSheetShow, this.inspirationSheetBuilder(), SheetCompat.immersive({
             height: SheetSize.LARGE,
-            blurStyle: BlurStyle.Regular,
-            backgroundColor: Color.Transparent,
             showClose: false,
             onDisappear: () => {
               this.isInspirationSheetShow = false;
               this.editingInspiration = null;
             },
-          })
+          }))
 
         Blank()
           .width(0)
           .height(0)
-          .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), {
+          .bindSheet($$this.isAddTaskSheetShow, this.addTaskSheetBuilder(), SheetCompat.immersive({
             height: SheetSize.LARGE,
-            blurStyle: BlurStyle.Regular,
-            backgroundColor: Color.Transparent,
             showClose: false,
             onDisappear: () => {
               this.isAddTaskSheetShow = false;
             }
-          })
+          }))
 
         Blank()
           .width(0)
           .height(0)
-          .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), {
+          .bindSheet($$this.isAddHabitSheetShow, this.addHabitSheetBuilder(), SheetCompat.immersive({
             height: SheetSize.LARGE,
-            blurStyle: BlurStyle.Regular,
-            backgroundColor: Color.Transparent,
             showClose: false,
             onDisappear: () => {
               this.isAddHabitSheetShow = false;
             }
-          })
+          }))
       }
     }
     .backgroundColor(this.bgColor)

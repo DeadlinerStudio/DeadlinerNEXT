@@ -1,5 +1,6 @@
 import { ITheme } from "../../common/theme/ThemeModel";
 import { ImmersivePopupSurface } from "../../common/ui/ImmersivePopupSurface";
+import { DefaultCustomDialogMaterial } from "../../common/style/SystemMaterialCompat";
 
 @CustomDialog
 export struct HabitReminderDialog {
@@ -15,7 +16,12 @@ export struct HabitReminderDialog {
 
   build() {
     Column() {
-      ImmersivePopupSurface({ paddingValue: 16, radius: 36, fallbackBlurStyle: BlurStyle.Thick }) {
+      ImmersivePopupSurface({
+        paddingValue: 16,
+        radius: 36,
+        fallbackBlurStyle: BlurStyle.Regular,
+        materialPreset: DefaultCustomDialogMaterial
+      }) {
         Column() {
           Text(`提醒设置: ${this.habitName}`)
             .fontSize(20)

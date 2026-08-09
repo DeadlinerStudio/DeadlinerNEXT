@@ -10,6 +10,7 @@ import { ConfettiController } from "../../components/confetti/ConfettiController
 import { SettingsConstants as C } from "../../../common/local/SettingsConstants"
 import { FloatUpModifier } from "../../../utils/animation/FloatUpModifier";
 import { TaskDetailSheet } from "./modify/task/TaskDetailSheet";
+import { TaskEditSheet } from "./modify/task/TaskEditSheet";
 import { PressEffectModifier } from "../../../utils/animation/PressModifier";
 import { ITheme } from "../../../common/theme/ThemeModel";
 import { TaskState, TaskStateAction } from "../../../model/TaskStateMachine";
@@ -19,6 +20,7 @@ import { MaterialPresets } from '../../../common/style/SystemMaterialCompat';
 import { CategoryRepository } from '../../../common/repository/CategoryRepository';
 import { CategoryDisplayModel } from '../../../common/kmp/KmpCategoryRepositoryAdapter';
 import { CategoryFilter, CategoryFilterResolver } from '../../../common/category/CategoryFilter';
+import { SheetCompat } from '../../../common/ui/SheetCompat';
 
 export interface TaskUIModel {
   title: string;
@@ -61,6 +63,8 @@ export struct TaskListSection {
 
   @State isDetailSheetShow: boolean = false;
   @State detailTask: DDLItem | null = null;
+  @State isEditSheetShow: boolean = false;
+  @State editingTask: DDLItem | null = null;
 
   private repo = TaskRepository.getInstance();
   private categoryRepository: CategoryRepository = CategoryRepository.getInstance();
@@ -506,14 +510,27 @@ export struct TaskListSection {
     }
   }
 
-  private async handleBatchEdit() {
-    if (this.selectedIds.length === 0) {
-      Toast.show({ message: '未选中任何任务' });
+  private async handleBatchEdit(): Promise<void> {
+    if (this.selectedIds.length !== 1) {
+      Toast.show({ message: '请选择一个任务进行编辑' });
       return;
     }
-    const targetId = this.selectedIds[0];
-    await this.openTaskDetail(targetId);
-    this.exitSelectionMode();
+
+    try {
+      const targetId = this.selectedIds[0];
+      const task = await this.repo.getDDLById(targetId);
+      if (!task) {
+        Toast.show({ message: '找不到该任务' });
+        return;
+      }
+
+      this.editingTask = task;
+      this.exitSelectionMode();
+      this.isEditSheetShow = true;
+    } catch (e) {
+      console.error('Open task edit failed:', e);
+      Toast.show({ message: '无法打开任务编辑' });
+    }
   }
 
   @Builder
@@ -522,6 +539,18 @@ export struct TaskListSection {
       isShow: $isDetailSheetShow,
       task: this.detailTask,
       onTaskChanged: async (): Promise<void> => {
+        await this.loadData();
+      }
+    })
+  }
+
+  @Builder
+  taskEditSheet() {
+    TaskEditSheet({
+      isShow: $isEditSheetShow,
+      editingTask: this.editingTask,
+      onSave: async (task: DDLItem): Promise<void> => {
+        await this.repo.updateDDL(task);
         await this.loadData();
       }
     })
@@ -687,20 +716,34 @@ export struct TaskListSection {
             .clip(false)
           }
       }
+
+      Blank()
+        .width(0)
+        .height(0)
+        .bindSheet($$this.isEditSheetShow, this.taskEditSheet(), SheetCompat.immersive({
+          height: SheetSize.FIT_CONTENT,
+          dragBar: true,
+          onDisappear: (): void => {
+            this.isEditSheetShow = false;
+            this.editingTask = null;
+          },
+          title: {
+            title: '编辑任务',
+            subtitle: '修改任务信息。'
+          }
+        }))
     }
     .width("100%")
     .height("100%")
-    .bindSheet($$this.isDetailSheetShow, this.taskDetailSheet(), {
+    .bindSheet($$this.isDetailSheetShow, this.taskDetailSheet(), SheetCompat.immersive({
       height: SheetSize.FIT_CONTENT,
       dragBar: true,
       onDisappear: () => {
         this.isDetailSheetShow = false;
         this.detailTask = null;
       },
-      showClose: false,
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent
-    })
+      showClose: false
+    }))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
   }
 }

@@ -1,6 +1,7 @@
 import { ComponentContent, promptAction } from '@kit.ArkUI';
 import { ITheme } from '../../common/theme/ThemeModel';
 import { ImmersivePopupSurface } from '../../common/ui/ImmersivePopupSurface';
+import { DefaultCustomDialogMaterial } from '../../common/style/SystemMaterialCompat';
 
 class DateTimeDialogParams {
   selectedDate: Date = new Date();
@@ -31,7 +32,13 @@ struct DateTimeContent {
 
   build() {
     Column() {
-      ImmersivePopupSurface({ paddingValue: 8, radius: 36, maxWidthValue: 360, fallbackBlurStyle: BlurStyle.Regular }) {
+      ImmersivePopupSurface({
+        paddingValue: 8,
+        radius: 36,
+        maxWidthValue: 360,
+        fallbackBlurStyle: BlurStyle.Regular,
+        materialPreset: DefaultCustomDialogMaterial
+      }) {
         Column() {
           Row() {
             Text(this.getTitle(this.currentDate))

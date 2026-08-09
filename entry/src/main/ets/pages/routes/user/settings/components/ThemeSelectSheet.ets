@@ -8,6 +8,8 @@ import { SettingsItem, SettingsSection, SettingsDivider, SubSettingsSwitch } fro
 import { IndicatorThemeSheet } from './IndicatorThemeSelect';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { WidgetUpdater } from '../../../../../utils/WidgetUpdater';
+import { getImmersiveTitleBarStyle } from '../../../../../common/style/NavStyles';
+import { MaterialPresets } from '../../../../../common/style/SystemMaterialCompat';
 
 interface ThemeOption {
   key: string;
@@ -56,9 +58,10 @@ export struct ThemeSelectSheet {
               .padding({ left: 16, right: 16, bottom: 20 })
           }
         }
-        .backgroundBlurStyle(BlurStyle.Regular)
+        .attributeModifier(MaterialPresets.backgroundImmersive())
       }
       .titleBar({
+        style: getImmersiveTitleBarStyle(false),
         content: {
           title: { mainTitle: "自定义颜色" },
           menu: {
@@ -88,9 +91,10 @@ export struct ThemeSelectSheet {
             IndicatorThemeSheet()
           }
         }
-        .backgroundBlurStyle(BlurStyle.Regular)
+        .attributeModifier(MaterialPresets.backgroundImmersive())
       }
       .titleBar({
+        style: getImmersiveTitleBarStyle(false),
         content: {
           title: { mainTitle: "图表颜色" },
           menu: {
@@ -156,6 +160,7 @@ export struct ThemeSelectSheet {
       .padding({ left: 20, right: 20 })
     }
     .titleBar({
+      style: getImmersiveTitleBarStyle(false),
       content: {
         title: { mainTitle: "选择主题" },
         menu: {
@@ -176,7 +181,6 @@ export struct ThemeSelectSheet {
     .hideBackButton(true)
     .backgroundColor(Color.Transparent)
     .mode(NavigationMode.Stack)
-    .backgroundBlurStyle(BlurStyle.Regular)
   }
 
   // === 首页：预设列表内容 ===

@@ -5,6 +5,7 @@ import { CategoryRepository } from '../../common/repository/CategoryRepository';
 import { ITheme } from '../../common/theme/ThemeModel';
 import { Toast } from '../../common/ui/Toast';
 import { MaterialPresets } from '../../common/style/SystemMaterialCompat';
+import { SheetCompat } from '../../common/ui/SheetCompat';
 
 @Component
 export struct CategoryPickerSheet {
@@ -121,16 +122,14 @@ export struct CategoryPickerSheet {
     .width('100%')
     .height('100%')
     .padding(20)
-    .bindSheet($$this.isEditorShown, this.categoryEditorBuilder(), {
+    .bindSheet($$this.isEditorShown, this.categoryEditorBuilder(), SheetCompat.immersive({
       detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
       height: SheetSize.MEDIUM,
       dragBar: true,
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       showClose: true,
       onDisappear: (): void => { this.isEditorShown = false; },
       title: { title: '新建分类' }
-    })
+    }))
   }
 
   @Builder

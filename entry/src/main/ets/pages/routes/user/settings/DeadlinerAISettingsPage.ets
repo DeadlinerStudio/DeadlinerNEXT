@@ -10,6 +10,7 @@ import { HdsNavDestination, HdsNavDestinationAttribute } from "@kit.UIDesignKit"
 import { getImmersiveTitleBarStyle } from "../../../../common/style/NavStyles";
 import { DialogCompat } from "../../../../common/ui/DialogCompat";
 import { Toast } from '../../../../common/ui/Toast';
+import { SheetCompat } from '../../../../common/ui/SheetCompat';
 
 @Builder
 export function SettingsAIBuilder(name: string, param: Object) {
@@ -260,7 +261,7 @@ export struct LifiAISettingsPage {
       this.pageStack = context.pathStack;
     })
     .backgroundColor(this.theme.bgPrimary)
-    .bindSheet($$this.isHelpSheetShow, this.helpSheet(), {
+    .bindSheet($$this.isHelpSheetShow, this.helpSheet(), SheetCompat.immersive({
       title: { title: '如何配置大模型 API？' },
       detents: [
         SheetSize.FIT_CONTENT,
@@ -270,10 +271,8 @@ export struct LifiAISettingsPage {
       height: SheetSize.FIT_CONTENT,
       enableOutsideInteractive: false,
       dragBar: true,
-      backgroundColor: Color.Transparent,
-      blurStyle: BlurStyle.Regular,
       onDisappear: () => { this.isHelpSheetShow = false },
-    })
+    }))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
   }
 }

@@ -4,6 +4,7 @@ import { ImmersivePopupSurface } from '../../../common/ui/ImmersivePopupSurface'
 import { InspirationItem } from '../../../model/InspirationModels';
 import { BlurBackgroundModifier } from '../../../utils/animation/BlurBackgroundModifier';
 import { PressEffectModifier } from '../../../utils/animation/PressModifier';
+import { getImmersiveTitleBarStyle } from '../../../common/style/NavStyles';
 
 @Component
 struct SelectionOverlay {
@@ -491,6 +492,7 @@ export struct InspirationEditSheet {
       .height('100%')
     }
     .titleBar({
+      style: getImmersiveTitleBarStyle(false),
       content: {
         title: { mainTitle: "编辑灵感" },
         menu: {

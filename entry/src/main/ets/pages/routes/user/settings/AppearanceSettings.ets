@@ -21,8 +21,11 @@ import { APP_BREAKPOINT_DEFAULT, APP_BREAKPOINT_STORAGE_KEY, AppBreakpointUtils 
 import { Toast } from '../../../../common/ui/Toast';
 import {
   canShowExperimentalComponentsSetting,
-  EXPERIMENTAL_COMPONENTS_DEFAULT
+  canShowImmersiveFloatingToolbarSetting,
+  EXPERIMENTAL_COMPONENTS_DEFAULT,
+  IMMERSIVE_FLOATING_TOOLBAR_DEFAULT
 } from '../../../../common/local/ExperimentalComponentsPolicy';
+import { SheetCompat } from '../../../../common/ui/SheetCompat';
 
 @Builder
 export function AppearanceSettingsBuilder() {
@@ -60,6 +63,8 @@ struct AppearanceSettings {
   @StorageLink(C.KEY_ADD_SYMBOL_WEIGHT) weight: number = 600;
   @StorageLink(C.KEY_ENABLE_API23) api23: boolean = true;
   @StorageLink(C.KEY_EXPERIMENTAL_COMPONENTS) experimentalComponents: boolean = EXPERIMENTAL_COMPONENTS_DEFAULT;
+  @StorageLink(C.KEY_ENABLE_IMMERSIVE_FLOATING_TOOLBAR) immersiveFloatingToolbar: boolean =
+    IMMERSIVE_FLOATING_TOOLBAR_DEFAULT;
 
   @StorageLink(C.KEY_ENABLE_TABLET_UI) tabletUi: boolean = true;
   @StorageLink(C.KEY_TABLET_SIDE_DASHBOARD) tabletSd: boolean = true;
@@ -274,6 +279,18 @@ struct AppearanceSettings {
                 })
               }
             }
+
+            if (canShowImmersiveFloatingToolbarSetting()) {
+              SubSettingsDivider()
+
+              SubSettingsSwitch({
+                title: '沉浸浮动工具栏',
+                subtitle: '使用自绘的沉浸光感工具栏；关闭时使用系统工具栏。',
+                isOn: this.immersiveFloatingToolbar,
+                onChange: (isOn): Promise<void> =>
+                  LocalValues.getInstance().setImmersiveFloatingToolbarEnabled(isOn)
+              })
+            }
           }
 
           // if (this.api23 && deviceInfo.distributionOSApiVersion >= 60100) {
@@ -386,20 +403,18 @@ struct AppearanceSettings {
           }
 
           Blank().height(50)
-            .bindSheet($$this.isIconSelectShow, this.iconSelectSheet(), {
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
+            .bindSheet($$this.isIconSelectShow, this.iconSelectSheet(), SheetCompat.immersive({
               detents: [SheetSize.MEDIUM],
               title: { title: '自定义图标' }
-            })
+            }))
         }
         .width('100%')
         .padding(16)
         .justifyContent(FlexAlign.Start)
         .constraintSize({ minHeight: '100%' })
-        .bindSheet($$this.isBackgroundSheetShow, this.cropSheetBuilder(), {
+        .bindSheet($$this.isBackgroundSheetShow, this.cropSheetBuilder(), SheetCompat.defaultBackground({
           showClose: false
-        })
+        }))
       }
     }
     .titleBar({
@@ -407,7 +422,7 @@ struct AppearanceSettings {
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "显示与个性化" } }
     })
-    .bindSheet($$this.isThemeSelectSheetShow, this.themeSheet(), {
+    .bindSheet($$this.isThemeSelectSheetShow, this.themeSheet(), SheetCompat.immersive({
       detents: [ 550, 900 ],
       height: 550,
       dragBar: true,
@@ -417,9 +432,7 @@ struct AppearanceSettings {
       onDisappear: () => {
         this.isThemeSelectSheetShow = false;
       },
-      // blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       showClose: false
-    })
+    }))
   }
 }

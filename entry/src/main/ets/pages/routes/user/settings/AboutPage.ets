@@ -13,6 +13,7 @@ import { LETTER_CONTENT } from "./LetterPage";
 import { ITheme } from "../../../../common/theme/ThemeModel";
 import { DialogCompat } from "../../../../common/ui/DialogCompat";
 import { APP_BREAKPOINT_DEFAULT, APP_BREAKPOINT_STORAGE_KEY, AppBreakpointUtils } from "../../../../common/layout/AppBreakpoints";
+import { SheetCompat } from '../../../../common/ui/SheetCompat';
 
 @Builder
 export function AboutPageBuilder() {
@@ -233,11 +234,9 @@ export struct AboutPage {
       style: getImmersiveTitleBarStyle(this.isWideScreen),
       content: { title: { mainTitle: "关于与协议" } }
     })
-    .bindSheet($$this.isLetterSheetShow, this.letterSheet(), {
+    .bindSheet($$this.isLetterSheetShow, this.letterSheet(), SheetCompat.immersive({
       title: { title: '开发者说' },
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       height: SheetSize.LARGE
-    })
+    }))
   }
 }

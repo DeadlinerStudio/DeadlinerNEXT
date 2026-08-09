@@ -4,6 +4,7 @@ import { HabitFormView } from './HabitFormView';
 import { ITheme } from '../../../../../common/theme/ThemeModel';
 import { HabitFormHelper } from './HabitFormHelper'; // 引入 Helper
 import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
+import { getImmersiveTitleBarStyle } from '../../../../../common/style/NavStyles';
 
 @Component
 export struct AddHabitSheet {
@@ -92,6 +93,7 @@ export struct AddHabitSheet {
       .height('100%')
     }
     .titleBar({
+      style: getImmersiveTitleBarStyle(false),
       content: {
         title: { mainTitle: "创建新习惯" },
         menu: { value: [{ content: { icon: $r('sys.symbol.checkmark'), action: async () => this.saveHabit() } }] },

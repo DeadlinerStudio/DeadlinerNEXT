@@ -1,5 +1,5 @@
 import { Available } from '@kit.BasicServicesKit';
-import { buildImmersiveMaterial, canUseSystemMaterial } from '../style/SystemMaterialCompat';
+import { buildImmersiveMaterial, canUseSystemMaterial, DefaultSheetMaterial } from '../style/SystemMaterialCompat';
 
 /**
  * Keeps the native Sheet appearance consistent across API levels.
@@ -30,7 +30,7 @@ export class SheetCompat {
 
   @Available({ minApiVersion: '26.0.0' })
   private static applyImmersiveMaterial(options: SheetOptions): SheetOptions {
-    options.systemMaterial = buildImmersiveMaterial();
+    options.systemMaterial = buildImmersiveMaterial({ preset: DefaultSheetMaterial });
     return options;
   }
 }

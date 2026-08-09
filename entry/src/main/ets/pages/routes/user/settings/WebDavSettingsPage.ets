@@ -12,6 +12,7 @@ import { HdsNavDestination, HdsNavDestinationAttribute } from "@kit.UIDesignKit"
 import { getImmersiveTitleBarStyle } from "../../../../common/style/NavStyles";
 import { TopSafeContainer } from "../../../components/TopSafeContainer";
 import { Toast } from '../../../../common/ui/Toast';
+import { SheetCompat } from '../../../../common/ui/SheetCompat';
 
 // 选项接口定义
 interface SyncOption {
@@ -241,7 +242,7 @@ export struct SettingsWebDavPage {
     .onReady((context: NavDestinationContext) => {
       this.pageStack = context.pathStack;
     })
-    .bindSheet($$this.isHelpSheetShow, this.helpSheet(), {
+    .bindSheet($$this.isHelpSheetShow, this.helpSheet(), SheetCompat.immersive({
       title: { title: '同步配置指南' },
       detents: [
         SheetSize.FIT_CONTENT,
@@ -251,9 +252,7 @@ export struct SettingsWebDavPage {
       height: SheetSize.FIT_CONTENT,
       enableOutsideInteractive: false,
       dragBar: true,
-      backgroundColor: Color.Transparent,
-      blurStyle: BlurStyle.Regular,
       onDisappear: () => { this.isHelpSheetShow = false },
-    })
+    }))
   }
 }

@@ -38,6 +38,7 @@ import { getImmersiveTitleBarStyle } from '../common/style/NavStyles';
 import { HdsTabDescriptor, HdsTabId, HdsTabsCustomization } from '../model/HdsTabsCustomization';
 import { CategoryFilter } from '../common/category/CategoryFilter';
 import { SheetCompat } from '../common/ui/SheetCompat';
+import { MaterialPresets } from '../common/style/SystemMaterialCompat';
 
 const TAB_VERTICAL_PADDING = 86;
 
@@ -532,7 +533,9 @@ struct Index {
     .hideBackButton(true)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .backgroundColor(Color.Transparent)
-    .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+    .attributeModifier(MaterialPresets.backgroundImmersive(BlurStyle.COMPONENT_REGULAR))
+    .offset({ left: -1 })
+    .padding({ left: 1 })
   }
 
   @Builder

@@ -7,6 +7,8 @@ import { TaskStateMachine } from '../../../../../model/TaskStateMachine';
 import { TaskEditSheet } from './TaskEditSheet';
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { Toast } from '../../../../../common/ui/Toast';
+import { SheetCompat } from '../../../../../common/ui/SheetCompat';
+import { getImmersiveTitleBarStyle } from '../../../../../common/style/NavStyles';
 
 @Component
 struct TaskDetailSubTaskRow {
@@ -751,6 +753,7 @@ export struct TaskDetailSheet {
       }
     }
     .titleBar({
+      style: getImmersiveTitleBarStyle(false),
       content: {
         title: {
           mainTitle: '任务详情'
@@ -782,19 +785,17 @@ export struct TaskDetailSheet {
     .backgroundColor(Color.Transparent)
     .width('100%')
     .height('100%')
-    .bindSheet($$this.isEditSheetShow, this.taskEditSheet(), {
+    .bindSheet($$this.isEditSheetShow, this.taskEditSheet(), SheetCompat.immersive({
       height: SheetSize.FIT_CONTENT,
       dragBar: true,
       onDisappear: () => {
         this.isEditSheetShow = false;
         this.editingTask = null;
       },
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       title: {
         title: '编辑任务',
         subtitle: '修改任务信息。'
       }
-    })
+    }))
   }
 }

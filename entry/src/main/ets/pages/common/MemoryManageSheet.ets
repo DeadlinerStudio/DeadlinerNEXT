@@ -8,6 +8,7 @@ import { SettingsSection } from '../components/SettingsComponents';
 import { TopSafeContainer } from '../components/TopSafeContainer';
 import { DialogCompat } from '../../common/ui/DialogCompat';
 import { ImmersivePopupSurface } from '../../common/ui/ImmersivePopupSurface';
+import { getImmersiveTitleBarStyle } from '../../common/style/NavStyles';
 
 // ==========================================
 // MARK: - 自定义画像编辑弹窗
@@ -414,6 +415,7 @@ export struct MemoryManageSheet {
       .padding({ left: 20, right: 20 })
     }
     .titleBar({
+      style: getImmersiveTitleBarStyle(false),
       content: {
         title: { mainTitle: "记忆管理" },
         menu: {

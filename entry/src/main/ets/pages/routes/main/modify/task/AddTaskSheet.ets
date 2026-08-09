@@ -2,6 +2,7 @@ import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { TaskFormView } from './TaskFormView';
 import { TaskFormHelper } from './TaskFormHelper';
 import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
+import { getImmersiveTitleBarStyle } from '../../../../../common/style/NavStyles';
 
 export interface AddTaskParams {
   name: string;
@@ -96,6 +97,7 @@ export struct AddTaskSheet {
       .height('100%')
     }
     .titleBar({
+      style: getImmersiveTitleBarStyle(false),
       content: {
         title: { mainTitle: "创建新任务" },
         menu: { value: [{ content: { icon: $r('sys.symbol.checkmark'), action: async () => this.saveTask() } }] },

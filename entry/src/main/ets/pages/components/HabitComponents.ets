@@ -577,9 +577,6 @@ export struct HabitRow {
           Checkbox({ name: 'done', group: 'habit' })
             .select(this.data.isCompleted)
             .selectedColor(this.getIndicatorColor()) // 选中色保持使用纯色
-            .onChange(() => {
-              if (this.canToggle) this.onToggle();
-            })
             .enabled(this.canToggle)
             .margin({ right: 12 })
 

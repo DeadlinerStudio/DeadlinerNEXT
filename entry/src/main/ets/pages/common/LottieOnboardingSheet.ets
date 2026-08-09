@@ -11,6 +11,7 @@ import { AiPage, HuaweiLoginPage, ImmersiveEffectPage, NotificationPage, Persona
 import { GuidePageId, LottieSceneMeta, PANEL_BG, RawFileResourceManager } from './onboarding/OnboardingTypes';
 import { HelpDetailSheet } from '../routes/user/manual/HelpDetailSheet';
 import { Toast } from '../../common/ui/Toast';
+import { SheetCompat } from '../../common/ui/SheetCompat';
 
 @Component
 export struct LottieOnboardingSheet {
@@ -278,7 +279,7 @@ export struct LottieOnboardingSheet {
         Blank()
           .width(0)
           .height(0)
-          .bindSheet($$this.isHelpSheetShow, this.helpSheetBuilder(), {
+          .bindSheet($$this.isHelpSheetShow, this.helpSheetBuilder(), SheetCompat.immersive({
             title: {
               title: this.currentPageId() === 'sync' ? '同步配置指南' : '如何配置 DeepSeek API？'
             },
@@ -286,12 +287,10 @@ export struct LottieOnboardingSheet {
             height: SheetSize.FIT_CONTENT,
             enableOutsideInteractive: false,
             dragBar: true,
-            backgroundColor: Color.Transparent,
-            blurStyle: BlurStyle.Regular,
             onDisappear: () => {
               this.isHelpSheetShow = false;
             }
-          })
+          }))
       }
       .width('100%')
       .height('100%')
@@ -299,6 +298,7 @@ export struct LottieOnboardingSheet {
       .backgroundColor(Color.Transparent)
     }
     .titleBar({
+      style: getImmersiveTitleBarStyle(false),
       content: {
         title: {
           mainTitle: ''

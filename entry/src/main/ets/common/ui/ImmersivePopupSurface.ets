@@ -1,4 +1,8 @@
-import { MaterialPresets, canUseSystemMaterial } from '../style/SystemMaterialCompat';
+import {
+  ImmersiveMaterialPreset,
+  MaterialPresets,
+  canUseSystemMaterial
+} from '../style/SystemMaterialCompat';
 
 @Component
 export struct ImmersivePopupSurface {
@@ -10,6 +14,8 @@ export struct ImmersivePopupSurface {
   @Prop maxWidthValue: number = 0;
   @Prop alignStart: boolean = true;
   @Prop fallbackBlurStyle: BlurStyle = BlurStyle.Regular;
+  @Prop materialPreset: ImmersiveMaterialPreset = ImmersiveMaterialPreset.REGULAR;
+  @Prop enableLightEffect: boolean = false;
 
   build() {
     if (canUseSystemMaterial()) {
@@ -24,7 +30,9 @@ export struct ImmersivePopupSurface {
         .padding(this.paddingValue)
         .borderRadius(this.radius)
         .backgroundColor(Color.Transparent)
-        .attributeModifier(MaterialPresets.surface())
+        .attributeModifier(this.enableLightEffect
+          ? MaterialPresets.surfaceGlowPreset(this.materialPreset)
+          : MaterialPresets.surfacePreset(this.materialPreset))
         .clip(true)
         .alignItems(this.alignStart ? HorizontalAlign.Start : HorizontalAlign.Center)
       } else if (this.widthValue > 0) {
@@ -37,7 +45,9 @@ export struct ImmersivePopupSurface {
         .padding(this.paddingValue)
         .borderRadius(this.radius)
         .backgroundColor(Color.Transparent)
-        .attributeModifier(MaterialPresets.surface())
+        .attributeModifier(this.enableLightEffect
+          ? MaterialPresets.surfaceGlowPreset(this.materialPreset)
+          : MaterialPresets.surfacePreset(this.materialPreset))
         .clip(true)
         .alignItems(this.alignStart ? HorizontalAlign.Start : HorizontalAlign.Center)
       } else if (this.maxWidthValue > 0) {
@@ -50,7 +60,9 @@ export struct ImmersivePopupSurface {
         .padding(this.paddingValue)
         .borderRadius(this.radius)
         .backgroundColor(Color.Transparent)
-        .attributeModifier(MaterialPresets.surface())
+        .attributeModifier(this.enableLightEffect
+          ? MaterialPresets.surfaceGlowPreset(this.materialPreset)
+          : MaterialPresets.surfacePreset(this.materialPreset))
         .clip(true)
         .alignItems(this.alignStart ? HorizontalAlign.Start : HorizontalAlign.Center)
       } else {
@@ -62,7 +74,9 @@ export struct ImmersivePopupSurface {
         .padding(this.paddingValue)
         .borderRadius(this.radius)
         .backgroundColor(Color.Transparent)
-        .attributeModifier(MaterialPresets.surface())
+        .attributeModifier(this.enableLightEffect
+          ? MaterialPresets.surfaceGlowPreset(this.materialPreset)
+          : MaterialPresets.surfacePreset(this.materialPreset))
         .clip(true)
         .alignItems(this.alignStart ? HorizontalAlign.Start : HorizontalAlign.Center)
       }

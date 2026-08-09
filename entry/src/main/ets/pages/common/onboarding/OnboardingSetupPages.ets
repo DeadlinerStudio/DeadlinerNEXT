@@ -25,6 +25,7 @@ import { MaterialOption, SyncOption } from './OnboardingTypes';
 import { GuideContainer } from './OnboardingCorePages';
 import { DialogCompat } from '../../../common/ui/DialogCompat';
 import { Toast } from '../../../common/ui/Toast';
+import { SheetCompat } from '../../../common/ui/SheetCompat';
 
 @Component
 struct OnboardingHeader {
@@ -829,7 +830,7 @@ export struct PersonalizationPage {
         Blank()
           .width(0)
           .height(0)
-          .bindSheet($$this.isThemeSelectSheetShow, this.themeSheet(), {
+          .bindSheet($$this.isThemeSelectSheetShow, this.themeSheet(), SheetCompat.immersive({
             detents: [550, 900],
             height: 550,
             dragBar: true,
@@ -841,17 +842,17 @@ export struct PersonalizationPage {
             },
             backgroundColor: Color.Transparent,
             showClose: false
-          })
+          }))
 
         Blank()
           .width(0)
           .height(0)
-          .bindSheet($$this.isBackgroundSheetShow, this.cropSheetBuilder(), {
+          .bindSheet($$this.isBackgroundSheetShow, this.cropSheetBuilder(), SheetCompat.defaultBackground({
             showClose: false,
             onDisappear: () => {
               this.isBackgroundSheetShow = false;
             }
-          })
+          }))
       }
     }
   }

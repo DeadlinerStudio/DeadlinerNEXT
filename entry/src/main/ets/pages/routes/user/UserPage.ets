@@ -27,6 +27,7 @@ import {
 } from "../../../common/layout/AppBreakpoints";
 import { HdsTabDescriptor, HdsTabId, HdsTabsCustomization } from '../../../model/HdsTabsCustomization';
 import { CategoryRepository } from '../../../common/repository/CategoryRepository';
+import { SheetCompat } from '../../../common/ui/SheetCompat';
 
 const USER_ROUTE_WHITELIST: string[] = [
   'settingsAppearance',
@@ -583,49 +584,43 @@ export struct UserPage {
           // 底部留白
 
           Blank().height(30)
-            .bindSheet($$this.isFriendsSheetShow, this.friendsSheet(), {
+            .bindSheet($$this.isFriendsSheetShow, this.friendsSheet(), SheetCompat.immersive({
               height: SheetSize.FIT_CONTENT,
               enableOutsideInteractive: false,
               dragBar: true,
               onDisappear: () => {
                 this.isFriendsSheetShow = false;
               },
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
               title: { title: "友链" }
-            })
+            }))
 
           Blank().height(30)
-            .bindSheet($$this.isSupportSheetShow, this.supportSheet(), {
+            .bindSheet($$this.isSupportSheetShow, this.supportSheet(), SheetCompat.immersive({
               height: SheetSize.FIT_CONTENT,
               enableOutsideInteractive: false,
               dragBar: true,
               onDisappear: () => {
                 this.isSupportSheetShow = false;
               },
-              blurStyle: BlurStyle.Regular,
-              backgroundColor: Color.Transparent,
               title: { title: "支持与反馈" }
-            })
+            }))
         }
         .width('100%')
         .padding({ left: 12, right: 12 })
         .justifyContent(FlexAlign.Start)
         .constraintSize({ minHeight: '100%' })
-        .bindSheet($$this.isArchiveSheetShow, this.archiveSheet(), {
+        .bindSheet($$this.isArchiveSheetShow, this.archiveSheet(), SheetCompat.immersive({
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
           enableOutsideInteractive: false,
           onDisappear: () => {
             this.isArchiveSheetShow = false;
           },
-          blurStyle: BlurStyle.Regular,
-          backgroundColor: Color.Transparent,
           title: {
             title: '归档',
             subtitle: '可以在此处管理你已完成的任务'
           },
-        })
+        }))
       }
     }
     .titleBar({
@@ -640,19 +635,17 @@ export struct UserPage {
     })
     .titleMode(HdsNavigationTitleMode.MINI)
     .hideBackButton(true)
-    .bindSheet($$this.isAISheetShow, this.aiSheet(), {
+    .bindSheet($$this.isAISheetShow, this.aiSheet(), SheetCompat.immersive({
       height: SheetSize.LARGE,
       dragBar: true,
       enableOutsideInteractive: false,
       onDisappear: () => {
         this.closeAiPanel();
       },
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: Color.Transparent,
       title: {
         title: 'Lifi AI',
       }
-    })
+    }))
     .mode(this.usesSplitLayout() ? NavigationMode.Split : NavigationMode.Stack)
     .navBarWidth(this.usesSplitLayout() ? '40%' : '100%')
   }

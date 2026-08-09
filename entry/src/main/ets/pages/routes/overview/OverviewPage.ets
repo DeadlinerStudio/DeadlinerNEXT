@@ -28,6 +28,7 @@ import {
 } from "../../../common/layout/AppBreakpoints";
 import { ImmersivePopupSurface } from '../../../common/ui/ImmersivePopupSurface';
 import { Toast } from '../../../common/ui/Toast';
+import { SheetCompat } from '../../../common/ui/SheetCompat';
 
 @Component
 export struct OverviewPage {
@@ -745,15 +746,13 @@ export struct OverviewPage {
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .bindToScrollable([this.dummyScroller])
         .padding({ top: this.statusBarHeight })
-        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
+        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), SheetCompat.immersive({
           detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
-          backgroundColor: Color.Transparent,
-          blurStyle: BlurStyle.Regular,
           onDisappear: () => { this.isSortSheetShow = false },
           title: { title: '调整卡片顺序', subtitle: '长按以拖动卡片标题' }
-        })
+        }))
       } else {
         HdsNavigation() {
           this.wideContentBuilder()
@@ -773,15 +772,13 @@ export struct OverviewPage {
         .navBarWidth('100%')
         .bindToScrollable([this.dummyScroller])
         .padding({ top: this.statusBarHeight })
-        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
+        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), SheetCompat.immersive({
           detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
-          backgroundColor: Color.Transparent,
-          blurStyle: BlurStyle.Regular,
           onDisappear: () => { this.isSortSheetShow = false },
           title: { title: '调整卡片顺序', subtitle: '长按以拖动卡片标题' }
-        })
+        }))
       }
     } else {
       if (this.isNavDestination) {
@@ -809,7 +806,7 @@ export struct OverviewPage {
       })
         .titleMode(HdsNavDestinationTitleMode.MINI)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
+        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), SheetCompat.immersive({
         detents: [
           SheetSize.FIT_CONTENT,
           SheetSize.MEDIUM,
@@ -817,14 +814,12 @@ export struct OverviewPage {
         ],
         height: SheetSize.FIT_CONTENT,
         dragBar: true,
-        backgroundColor: Color.Transparent,
-        blurStyle: BlurStyle.Regular,
         onDisappear: () => { this.isSortSheetShow = false },
         title: {
           title: '调整卡片顺序',
           subtitle: '长按以拖动卡片标题'
         }
-        })
+        }))
       } else {
         HdsNavigation() {
           this.compactContentBuilder()
@@ -853,15 +848,13 @@ export struct OverviewPage {
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .mode(NavigationMode.Stack)
         .navBarWidth('100%')
-        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), {
+        .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), SheetCompat.immersive({
           detents: [SheetSize.FIT_CONTENT, SheetSize.MEDIUM, SheetSize.LARGE],
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
-          backgroundColor: Color.Transparent,
-          blurStyle: BlurStyle.Regular,
           onDisappear: () => { this.isSortSheetShow = false },
           title: { title: '调整卡片顺序', subtitle: '长按以拖动卡片标题' }
-        })
+        }))
       }
     }
   }

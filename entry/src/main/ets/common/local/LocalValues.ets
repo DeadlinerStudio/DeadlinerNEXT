@@ -5,7 +5,8 @@ import { MainButtonType } from './LocalModels';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import {
   canShowExperimentalComponentsSetting,
-  defaultExperimentalComponentsEnabled
+  defaultExperimentalComponentsEnabled,
+  IMMERSIVE_FLOATING_TOOLBAR_DEFAULT
 } from './ExperimentalComponentsPolicy';
 import { HdsTabsCustomization } from '../../model/HdsTabsCustomization';
 
@@ -207,6 +208,12 @@ export class LocalValues {
         ? await this.pref.get(C.KEY_EXPERIMENTAL_COMPONENTS, defaultExperimentalComponentsEnabled())
         : false;
       AppStorage.setOrCreate(C.KEY_EXPERIMENTAL_COMPONENTS, experimentalComponents);
+
+      const immersiveFloatingToolbar = await this.pref.get(
+        C.KEY_ENABLE_IMMERSIVE_FLOATING_TOOLBAR,
+        IMMERSIVE_FLOATING_TOOLBAR_DEFAULT
+      );
+      AppStorage.setOrCreate(C.KEY_ENABLE_IMMERSIVE_FLOATING_TOOLBAR, immersiveFloatingToolbar);
 
       const overviewOrder = await this.pref.get(C.KEY_OVERVIEW_CARD_ORDER, []) as string[];
       AppStorage.setOrCreate(C.KEY_OVERVIEW_CARD_ORDER, overviewOrder);
@@ -739,6 +746,14 @@ export class LocalValues {
   async setExperimentalComponents(enable: boolean) {
     await this.setValue(C.KEY_EXPERIMENTAL_COMPONENTS,
       canShowExperimentalComponentsSetting() ? enable : false);
+  }
+
+  getImmersiveFloatingToolbarEnabled(): boolean {
+    return AppStorage.get(C.KEY_ENABLE_IMMERSIVE_FLOATING_TOOLBAR) ?? IMMERSIVE_FLOATING_TOOLBAR_DEFAULT;
+  }
+
+  async setImmersiveFloatingToolbarEnabled(enable: boolean): Promise<void> {
+    await this.setValue(C.KEY_ENABLE_IMMERSIVE_FLOATING_TOOLBAR, enable);
   }
 
   getSyncMode(): string {
