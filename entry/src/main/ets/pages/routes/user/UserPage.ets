@@ -634,6 +634,7 @@ export struct UserPage {
       }
     })
     .titleMode(HdsNavigationTitleMode.MINI)
+    .backgroundColor(Color.Transparent)
     .hideBackButton(true)
     .bindSheet($$this.isAISheetShow, this.aiSheet(), SheetCompat.immersive({
       height: SheetSize.LARGE,

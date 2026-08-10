@@ -19,6 +19,12 @@ import { CategoryFilter, CategoryFilterResolver } from '../../../common/category
 import { CategoryRepository } from '../../../common/repository/CategoryRepository';
 import { CategoryDisplayModel } from '../../../common/kmp/KmpCategoryRepositoryAdapter';
 import { SheetCompat } from '../../../common/ui/SheetCompat';
+import { PageToneResolver } from '../../../common/semantic/PageToneResolver';
+import {
+  HabitSemanticInput,
+  SemanticPageKind,
+  SemanticSnapshot
+} from '../../../common/semantic/SemanticContract';
 
 interface EbbinState {
   isDue: boolean;
@@ -40,6 +46,8 @@ export struct HabitListSection {
   @State searchQuery: string = "";
   @State weekOverview: DayOverview[] = [];
   @State displayHabits: HabitWithDailyStatus[] = [];
+  @State semanticSnapshot: SemanticSnapshot = SemanticSnapshot.empty(SemanticPageKind.HABITS);
+  onSemanticSnapshotChanged: (snapshot: SemanticSnapshot) => void = (_snapshot: SemanticSnapshot): void => {};
 
   // 内存缓存
   private allHabitsCache: HabitWithDailyStatus[] = [];
@@ -268,6 +276,18 @@ export struct HabitListSection {
       it.habit.name.toLowerCase().includes(lowerQ)
       );
     }
+    this.publishSemanticSnapshot();
+  }
+
+  private publishSemanticSnapshot(): void {
+    const inputs: HabitSemanticInput[] = [];
+    for (let index: number = 0; index < this.displayHabits.length; index++) {
+      const item: HabitWithDailyStatus = this.displayHabits[index];
+      inputs.push(new HabitSemanticInput(item.habit.id, item.isCompleted));
+    }
+    const snapshot: SemanticSnapshot = PageToneResolver.resolveHabits(inputs);
+    this.semanticSnapshot = snapshot;
+    this.onSemanticSnapshotChanged(snapshot);
   }
 
   private getPeriodBounds(period: HabitPeriod, date: Date): [Date, Date] {
@@ -650,6 +670,9 @@ export struct HabitListSection {
           .padding({ left: 12, right: 12 })
           .scrollBar(BarState.Off)
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+          .onScroll((_scrollOffset: number, _scrollState: ScrollState) => {
+            this.controller.onScroll(this.scroller.currentOffset().yOffset);
+          })
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
         }
         .onRefreshing(async () => {

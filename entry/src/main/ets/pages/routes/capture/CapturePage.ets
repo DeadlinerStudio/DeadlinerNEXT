@@ -459,10 +459,29 @@ export struct CapturePage {
 
   @Builder
   private portraitListBuilder() {
-    if (!this.isLoading && this.items.length === 0) {
-      this.emptyBuilder()
-    } else {
-      List({ space: 12 }) {
+    List({ space: 12 }) {
+      if (!this.selectionMode) {
+        ListItem() {
+          Column() {
+            this.inputCardBuilder()
+          }
+          .width('100%')
+          .transition(
+            TransitionEffect.OPACITY
+              .combine(TransitionEffect.translate({ y: -24 }))
+              .animation({
+                duration: 280,
+                curve: Curve.FastOutSlowIn
+              })
+          )
+        }
+      }
+
+      if (!this.isLoading && this.items.length === 0) {
+        ListItem() {
+          this.emptyBuilder()
+        }
+      } else {
         ForEach(this.items, (item: InspirationItem) => {
           if (this.selectionMode) {
             ListItem() {
@@ -508,16 +527,25 @@ export struct CapturePage {
           }
         }, (item: InspirationItem) => `${item.id}_${item.updatedAt}`)
       }
-      .width('100%')
-      .height('100%')
-      .cachedCount(this.portraitListCachedCount(), true)
-      .clip(false)
-      .scrollBar(BarState.Off)
-      .nestedScroll({
-        scrollForward: NestedScrollMode.PARENT_FIRST,
-        scrollBackward: NestedScrollMode.PARENT_FIRST
-      })
+
+      ListItem() {
+        Column() {
+          Blank().height(96)
+        }
+        .width('100%')
+      }
     }
+    .width('100%')
+    .height('100%')
+    .padding({
+      top: this.pageTopAvoidHeight(),
+      right: 16,
+      bottom: 0,
+      left: 16
+    })
+    .cachedCount(this.portraitListCachedCount(), true)
+    .clip(false)
+    .scrollBar(BarState.Off)
   }
 
   @Builder
@@ -703,31 +731,12 @@ export struct CapturePage {
 
   @Builder
   private portraitContentBuilder() {
-    Column({ space: 16 }) {
-      if (!this.selectionMode) {
-        Column() {
-          this.inputCardBuilder()
-        }
-        .transition(
-          TransitionEffect.OPACITY
-            .combine(TransitionEffect.translate({ y: -24 }))
-            .animation({
-              duration: 280,
-              curve: Curve.FastOutSlowIn
-            })
-        )
-      }
-
+    Column() {
       this.portraitListBuilder()
-
-      Blank().height(96)
-
       this.sheetAnchorsBuilder()
     }
     .width('100%')
-    .justifyContent(FlexAlign.Start)
-    .padding({ left: 16, right: 16 })
-    .constraintSize({ minHeight: '100%' })
+    .height('100%')
   }
 
   @Builder
@@ -830,9 +839,9 @@ export struct CapturePage {
   @Builder
   private pageContentBuilder() {
     TopSafeContainer({
-      topAvoidHeight: this.usesWideLayout() ? 0 : this.pageTopAvoidHeight(),
+      topAvoidHeight: this.usesMediumLayout() ? this.pageTopAvoidHeight() : 0,
       needBgTransparent: true,
-      scrollable: !this.usesWideLayout()
+      scrollable: this.usesMediumLayout()
     }) {
       if (this.usesWideLayout()) {
         this.wideContentBuilder()
@@ -902,6 +911,7 @@ export struct CapturePage {
         }
       })
       .titleMode(HdsNavDestinationTitleMode.MINI)
+      .backgroundColor(Color.Transparent)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     } else {
       HdsNavigation() {
@@ -960,6 +970,7 @@ export struct CapturePage {
         }
       })
       .titleMode(HdsNavigationTitleMode.MINI)
+      .backgroundColor(Color.Transparent)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .mode(NavigationMode.Stack)
       .hideBackButton(true)

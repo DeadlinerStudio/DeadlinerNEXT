@@ -38,6 +38,11 @@ import {
 } from '../../../common/layout/AppBreakpoints'
 import { CategoryFilter } from '../../../common/category/CategoryFilter';
 import { SheetCompat } from '../../../common/ui/SheetCompat';
+import {
+  SemanticPageKind,
+  SemanticSnapshot,
+  SemanticTone
+} from '../../../common/semantic/SemanticContract';
 
 enum MainTabIndex {
   TASKS = 0,
@@ -71,8 +76,12 @@ export struct MainHomePage {
   @StorageLink('QuickAddTaskTrigger') @Watch('onQuickAddTaskChange') quickAddTrigger: boolean = false;
 
   @ObjectLink aiSheetController: AISheetController;
+  onSemanticToneChanged: (tone: SemanticTone) => void = (_tone: SemanticTone): void => {};
+  onAtmosphereScrollProgressChanged: (progress: number) => void = (_progress: number): void => {};
 
   @State scrollY: number = 0;
+  @State taskSemanticSnapshot: SemanticSnapshot = SemanticSnapshot.empty(SemanticPageKind.TASKS);
+  @State habitSemanticSnapshot: SemanticSnapshot = SemanticSnapshot.empty(SemanticPageKind.HABITS);
   @State profileAvatarUri: string = '';
   @State hasProfileAvatar: boolean = false;
   private readonly defaultProfileAvatar: ResourceStr = $r('sys.symbol.person_crop_circle_fill_1');
@@ -83,6 +92,11 @@ export struct MainHomePage {
     }
     this.taskController.onScroll = (offset: number) => {
       this.scrollY = offset;
+      this.publishAtmosphereScrollProgress();
+    }
+    this.habitController.onScroll = (offset: number) => {
+      this.scrollY = offset;
+      this.publishAtmosphereScrollProgress();
     }
   }
 
@@ -185,6 +199,7 @@ export struct MainHomePage {
     this.onStartupSettingLoaded();
 
     this.bindController();
+    this.publishRootAtmosphere();
 
     if (this.isLoggedIn) {
       this.refreshProfileAvatar();
@@ -243,6 +258,7 @@ export struct MainHomePage {
   onSegmentChange() {
     if (this.selectedIndexes.length > 0) {
       const nextIndex = this.selectedIndexes[0];
+      this.scrollY = 0;
 
       // 如果要切到习惯页，先把任务页的 Scroller 重置回 0
       // 这样 HdsNavigation 才会因为绑定的还是同一个 scroller 且 offset 为 0 而丝滑地展开，且不触发重绘
@@ -251,6 +267,7 @@ export struct MainHomePage {
       }
 
       this.currentIndex = nextIndex;
+      this.publishRootAtmosphere();
       this.taskController.requestExitSelection();
       this.habitController.requestExitSelection();
     }
@@ -298,6 +315,35 @@ export struct MainHomePage {
 
   private isTaskTab(): boolean {
     return this.currentIndex === MainTabIndex.TASKS;
+  }
+
+  private currentSemanticSnapshot(): SemanticSnapshot {
+    return this.isTaskTab() ? this.taskSemanticSnapshot : this.habitSemanticSnapshot;
+  }
+
+  private atmosphereScrollProgress(): number {
+    return Math.max(0, Math.min(1, this.scrollY / 300));
+  }
+
+  private publishAtmosphereScrollProgress(): void {
+    this.onAtmosphereScrollProgressChanged(this.atmosphereScrollProgress());
+  }
+
+  private publishRootAtmosphere(): void {
+    const tone: SemanticTone = this.currentSemanticSnapshot().tone;
+    AppStorage.setOrCreate('rootListSemanticTone', tone);
+    this.onSemanticToneChanged(tone);
+    this.publishAtmosphereScrollProgress();
+  }
+
+  private updateTaskSemanticSnapshot(snapshot: SemanticSnapshot): void {
+    this.taskSemanticSnapshot = snapshot;
+    this.publishRootAtmosphere();
+  }
+
+  private updateHabitSemanticSnapshot(snapshot: SemanticSnapshot): void {
+    this.habitSemanticSnapshot = snapshot;
+    this.publishRootAtmosphere();
   }
 
   private getFreeTopAvoidHeight(): number {
@@ -438,7 +484,10 @@ export struct MainHomePage {
         categoryFilter: this.categoryFilter,
         isSelectionMode: $isTaskSelectionMode,
         controller: this.taskController,
-        confetti: this.confettiController
+        confetti: this.confettiController,
+        onSemanticSnapshotChanged: (snapshot: SemanticSnapshot): void => {
+          this.updateTaskSemanticSnapshot(snapshot);
+        }
       })
         .id(`main_task_content_${idSuffix}`)
         .height('100%')
@@ -450,7 +499,10 @@ export struct MainHomePage {
         categoryFilter: this.categoryFilter,
         isSelectionMode: $isHabitSelectionMode,
         controller: this.habitController,
-        confetti: this.confettiController
+        confetti: this.confettiController,
+        onSemanticSnapshotChanged: (snapshot: SemanticSnapshot): void => {
+          this.updateHabitSemanticSnapshot(snapshot);
+        }
       })
         .id(`main_habit_content_${idSuffix}`)
         .height('100%')
@@ -471,7 +523,10 @@ export struct MainHomePage {
         },
         isSelectionMode: $isTaskSelectionMode,
         controller: this.taskController,
-        confetti: this.confettiController
+        confetti: this.confettiController,
+        onSemanticSnapshotChanged: (snapshot: SemanticSnapshot): void => {
+          this.updateTaskSemanticSnapshot(snapshot);
+        }
       })
         .id('main_task_content_phone')
         .alignRules({
@@ -487,7 +542,10 @@ export struct MainHomePage {
         categoryFilter: this.categoryFilter,
         isSelectionMode: $isHabitSelectionMode,
         controller: this.habitController,
-        confetti: this.confettiController
+        confetti: this.confettiController,
+        onSemanticSnapshotChanged: (snapshot: SemanticSnapshot): void => {
+          this.updateHabitSemanticSnapshot(snapshot);
+        }
       })
         .id('main_habit_content_phone')
         .alignRules({
@@ -647,9 +705,20 @@ export struct MainHomePage {
   @State isSearchShow: boolean = false;
   onAddSheetQuit: () => void = () => {
     this.isAddShow = false
+    if (this.isTaskTab()) {
+      this.taskController.loadData();
+    } else {
+      this.habitController.loadData();
+    }
   }
-  onAddTaskQuit: () => void = () => { this.isAddTaskShow = false }
-  onAddHabitQuit: () => void = () => { this.isAddHabitShow = false }
+  onAddTaskQuit: () => void = () => {
+    this.isAddTaskShow = false;
+    this.taskController.loadData();
+  }
+  onAddHabitQuit: () => void = () => {
+    this.isAddHabitShow = false;
+    this.habitController.loadData();
+  }
 
   @Builder
   addSheet() {
@@ -726,7 +795,10 @@ export struct MainHomePage {
             categoryFilter: this.categoryFilter,
             isSelectionMode: $isTaskSelectionMode,
             controller: this.taskController,
-            confetti: this.confettiController
+            confetti: this.confettiController,
+            onSemanticSnapshotChanged: (snapshot: SemanticSnapshot): void => {
+              this.updateTaskSemanticSnapshot(snapshot);
+            }
           })
             .id('task_content')
             .alignRules({
@@ -759,7 +831,10 @@ export struct MainHomePage {
             categoryFilter: this.categoryFilter,
             isSelectionMode: $isHabitSelectionMode,
             controller: this.habitController,
-            confetti: this.confettiController
+            confetti: this.confettiController,
+            onSemanticSnapshotChanged: (snapshot: SemanticSnapshot): void => {
+              this.updateHabitSemanticSnapshot(snapshot);
+            }
           })
             .id('habit_content')
             .alignRules({
@@ -794,7 +869,8 @@ export struct MainHomePage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(this.pageBackground)
+      .backgroundColor(Color.Transparent)
+      .zIndex(1)
       .bindSheet($$this.isSearchShow, this.searchSheet(), SheetCompat.immersive({
         height: SheetSize.FIT_CONTENT,
         enableOutsideInteractive: false,
@@ -877,6 +953,7 @@ export struct MainHomePage {
       }
     }))
     .titleMode(HdsNavigationTitleMode.FREE)
+    .backgroundColor(Color.Transparent)
     .bindToScrollable([this.scroller])
     .onTitleModeChange((titleMode) => {
       animateTo({ duration: 400, curve: Curve.Friction }, () => {
@@ -966,6 +1043,7 @@ export struct MainHomePage {
         }
       })
       .titleMode(HdsNavigationTitleMode.MINI)
+      .backgroundColor(Color.Transparent)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .mode(NavigationMode.Stack)
       .navBarWidth('100%')
@@ -997,6 +1075,7 @@ export struct MainHomePage {
         }
       })
       .titleMode(HdsNavigationTitleMode.MINI)
+      .backgroundColor(Color.Transparent)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .mode(NavigationMode.Stack)
       .navBarWidth('100%')

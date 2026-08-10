@@ -222,6 +222,7 @@ export default class EntryAbility extends UIAbility {
     let isWideScreen = AppBreakpointUtils.isWide(breakpoint);
 
     let isDark = this.context.config.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+    AppStorage.setOrCreate('currentColorMode', this.context.config.colorMode);
     AppStorage.setOrCreate(APP_BREAKPOINT_STORAGE_KEY, breakpoint);
     AppStorage.setOrCreate('isWideScreen', isWideScreen);
 

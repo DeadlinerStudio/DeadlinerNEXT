@@ -8,4 +8,5 @@ export class HabitListController implements DDLListController {
   requestExitSelection: () => void = () => {};
   requestSetAlarm: () => void = () => {};
   loadData: () => void = () => {};
+  onScroll: (offset: number) => void = () => {};
 }

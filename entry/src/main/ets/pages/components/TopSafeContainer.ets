@@ -11,7 +11,6 @@ import { ITheme } from '../../common/theme/ThemeModel';
 @Component
 export struct TopSafeContainer {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
-  @StorageProp('customBackgroundImage') customBg: string = '';
 
   @BuilderParam content: () => void;
 
@@ -47,7 +46,7 @@ export struct TopSafeContainer {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor((this.needBgTransparent && this.customBg) ? Color.Transparent : this.bgColor)
+      .backgroundColor(this.needBgTransparent ? Color.Transparent : this.bgColor)
       .scrollBar(BarState.Off) // 隐藏外层滚动条，视觉更纯净
       .edgeEffect(EdgeEffect.Spring)
       .nestedScroll({
@@ -71,7 +70,7 @@ export struct TopSafeContainer {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor((this.needBgTransparent && this.customBg) ? Color.Transparent : this.bgColor)
+      .backgroundColor(this.needBgTransparent ? Color.Transparent : this.bgColor)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
     }
   }

@@ -41,6 +41,7 @@ struct AppearanceSettings {
   @StorageLink(APP_BREAKPOINT_STORAGE_KEY) currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
   @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
   @StorageProp('currentTheme') currentTheme: ITheme = {} as ITheme;
+  @StorageLink('semanticGlowEnabled') semanticGlowEnabled: boolean = true;
   @State initialThemeSnapshot: string = '';
   @State restartRequested: boolean = false;
 
@@ -245,6 +246,15 @@ struct AppearanceSettings {
           }
 
           SettingsSection({ title: '界面显示' }) {
+            SubSettingsSwitch({
+              title: '顶部浮光',
+              subtitle: '在主要页面顶部显示随主题和任务状态变化的渐变氛围。',
+              isOn: this.semanticGlowEnabled,
+              onChange: (isOn: boolean): Promise<void> => ThemeManager.setSemanticGlowEnabled(isOn)
+            })
+
+            SubSettingsDivider()
+
             SubSettingsSwitch({
               title: "沉浸光感视效",
               subtitle: "API23以上可以打开该选项获得最佳的视觉体验 (需重启生效)。",

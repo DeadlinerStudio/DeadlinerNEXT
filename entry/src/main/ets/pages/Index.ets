@@ -39,6 +39,8 @@ import { HdsTabDescriptor, HdsTabId, HdsTabsCustomization } from '../model/HdsTa
 import { CategoryFilter } from '../common/category/CategoryFilter';
 import { SheetCompat } from '../common/ui/SheetCompat';
 import { MaterialPresets } from '../common/style/SystemMaterialCompat';
+import { SemanticTone } from '../common/semantic/SemanticContract';
+import { SemanticTopAtmosphere } from './components/semantic/SemanticTopAtmosphere';
 
 const TAB_VERTICAL_PADDING = 86;
 
@@ -49,6 +51,7 @@ struct Index {
   @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
   @StorageProp('customBackgroundImage') customBg: string = '';
   @StorageProp('customBackgroundBlur') isBgBlurred: boolean = false;
+  @StorageProp('semanticGlowEnabled') semanticGlowEnabled: boolean = true;
 
   // 全局路由栈
   @Provide('appPathStack') appPathStack: NavPathStack = new NavPathStack();
@@ -214,6 +217,7 @@ struct Index {
   aboutToAppear() {
     this.registerBreakpointListeners();
     this.syncTopAvoidExtraHeight();
+    this.publishRootTabId(this.currentIndex);
     this.logGuideState('aboutToAppear');
 
     if (this.isAppDataReady) {
@@ -424,6 +428,7 @@ struct Index {
   }
 
   @State currentIndex: number = 0;
+  @State listAtmosphereScrollProgress: number = 0;
   @State categoryFilter: CategoryFilter = CategoryFilter.all();
   @State isCategorySideBarShown: boolean = false;
   @StorageLink(C.KEY_HDS_TABS_ORDER) @Watch('repairCurrentTabIndex')
@@ -452,12 +457,35 @@ struct Index {
     if (this.currentIndex >= this.getVisibleTabs().length || this.currentIndex < 0) {
       this.currentIndex = 0;
     }
+    this.publishRootTabId(this.currentIndex);
+  }
+
+  private getCurrentTab(): HdsTabDescriptor {
+    const visibleTabs: HdsTabDescriptor[] = this.getVisibleTabs();
+    if (this.currentIndex >= 0 && this.currentIndex < visibleTabs.length) {
+      return visibleTabs[this.currentIndex];
+    }
+    return visibleTabs[0];
+  }
+
+  private getEffectiveTabColor(item: HdsTabDescriptor): ResourceColor {
+    if (this.currentThemeKey === 'colorful') {
+      return item.id === HdsTabId.LIST ? this.theme.brand : item.color;
+    }
+    return this.theme.tabIcon;
+  }
+
+  private publishRootTabId(index: number): void {
+    const visibleTabs: HdsTabDescriptor[] = this.getVisibleTabs();
+    if (index >= 0 && index < visibleTabs.length) {
+      AppStorage.setOrCreate('rootSemanticTabId', visibleTabs[index].id);
+    }
   }
 
   private getTabBarStyle(item: HdsTabDescriptor): BottomTabBarStyle {
     const symbol: boolean = !item.isImage;
     const displayIcon: Resource = HdsTabsCustomization.getDisplayIcon(item.id, this.tabSymbolRendering);
-    const selectedColor: ResourceColor = this.currentThemeKey === 'colorful' ? item.color : this.theme.tabIcon;
+    const selectedColor: ResourceColor = this.getEffectiveTabColor(item);
 
     let style = BottomTabBarStyle.of(
       symbol ? this.getTabBarSymbol(displayIcon, selectedColor) : displayIcon,
@@ -546,7 +574,13 @@ struct Index {
           currentTabIndex: this.currentIndex,
           aiSheetController: this.aiSheetController,
           categoryFilter: $categoryFilter,
-          isCategorySideBarShown: $isCategorySideBarShown
+          isCategorySideBarShown: $isCategorySideBarShown,
+          onSemanticToneChanged: (tone: SemanticTone): void => {
+            AppStorage.set('rootListSemanticTone', tone);
+          },
+          onAtmosphereScrollProgressChanged: (progress: number): void => {
+            this.listAtmosphereScrollProgress = progress;
+          }
         })
           .width('100%')
           .height('100%')
@@ -613,6 +647,9 @@ struct Index {
       },
       onMiniBarClick: () => {
         this.aiSheetController.showAI();
+      },
+      onTabChange: (index: number): void => {
+        this.publishRootTabId(index);
       }
     }) {
       ForEach(this.getVisibleTabs(), (tab: HdsTabDescriptor) => {
@@ -636,11 +673,12 @@ struct Index {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(Color.Transparent)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 
   build() {
-    Stack() {
+    Stack({ alignContent: Alignment.Top }) {
       if (this.customBg) {
         Image(this.customBg)
           .width('100%')
@@ -662,6 +700,16 @@ struct Index {
       }
 
       if (this.isShowUI) {
+        SemanticTopAtmosphere({
+          visible: this.semanticGlowEnabled,
+          scrollProgress: this.getCurrentTab().id === HdsTabId.LIST ? this.listAtmosphereScrollProgress : 0
+        })
+          .width('100%')
+          .align(Alignment.Top)
+          .zIndex(0)
+          .hitTestBehavior(HitTestMode.None)
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+
         HdsNavigation(this.appPathStack) {
           SideBarContainer(SideBarContainerType.Overlay) {
             this.categorySideBarNavigationBuilder()
@@ -671,6 +719,7 @@ struct Index {
           .showSideBar($$this.isCategorySideBarShown)
           .showControlButton(false)
           .sideBarWidth(290)
+          .backgroundColor(Color.Transparent)
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         }
         .mode(NavigationMode.Stack)
@@ -682,6 +731,8 @@ struct Index {
           enableComponentSafeArea: false
         })
         .hideTitleBar(true)
+        .backgroundColor(Color.Transparent)
+        .zIndex(1)
       }
 
       if (this.isAiFlowShown) {

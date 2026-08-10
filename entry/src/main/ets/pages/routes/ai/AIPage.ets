@@ -595,6 +595,7 @@ export struct AIPage {
         }
       })
       .titleMode(HdsNavDestinationTitleMode.MINI)
+      .backgroundColor(Color.Transparent)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     } else {
       HdsNavigation() {
@@ -623,6 +624,7 @@ export struct AIPage {
         }
       })
       .titleMode(HdsNavigationTitleMode.MINI)
+      .backgroundColor(Color.Transparent)
       .mode(NavigationMode.Stack)
       .hideBackButton(true)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])

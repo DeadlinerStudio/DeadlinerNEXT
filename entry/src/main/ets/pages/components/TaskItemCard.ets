@@ -2,6 +2,7 @@ import { DDLStatus } from "../../model/DDLStatus";
 import { ColorUtils } from "../../utils/ColorUtils";
 import { common } from "@kit.AbilityKit";
 import { ITheme } from "../../common/theme/ThemeModel";
+import { ThemeManager } from '../../common/theme/ThemeManager';
 import { ImmersivePopupSurface } from "../../common/ui/ImmersivePopupSurface";
 import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
 
@@ -178,67 +179,62 @@ export struct ArchivedDDLItemCard {
 
 @Component
 export struct DDLItemCardSimplified {
-  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @StorageProp('currentTheme') @Watch('syncIndicatorColors') theme: ITheme = ThemeManager.getCurrentTheme();
 
   @Prop title: string;
   @Prop remainingTimeAlt: string;
   @Prop note: string;
   @Prop progress: number;
   @Prop isStarred: boolean;
-  @Prop status: DDLStatus = DDLStatus.UNDERGO;
+  @Prop @Watch('syncIndicatorColors') status: DDLStatus = DDLStatus.UNDERGO;
   @Prop categoryName: string = '';
   @Prop categoryIconKey: string = '';
   @Prop categoryColorHex: string = '';
 
-  // 1. 状态定义：增加专门用于不同透明度的状态变量
-  // 仍然保留 indicatorColor 用于星标 Icon (纯色)
   @State private indicatorColor: ResourceColor = this.theme.indicatorUndergo;
-
-  // 新增：直接对应 json 中的透明度资源
   @State private indicatorColor50: ResourceColor = this.theme.indicatorUndergo50;
   @State private indicatorColor70: ResourceColor = this.theme.indicatorUndergo70;
   @State private bgColor40: ResourceColor = this.theme.bgUndergo40;
-
   @State private titleColor: ResourceColor = Color.Black;
   @State private noteColor: ResourceColor = Color.Gray;
   @State private globalBgColor: ResourceColor = $r('app.color.background_secondary');
+
+  aboutToAppear(): void {
+    this.syncIndicatorColors();
+  }
 
   onWillApplyTheme(theme: Theme) {
     this.titleColor = theme.colors.fontPrimary;
     this.noteColor = theme.colors.fontSecondary;
     this.globalBgColor = theme.colors.backgroundSecondary;
+  }
 
-    // 2. 根据 Status 映射资源 ID
-    // 系统会自动根据当前深浅模式解析这些 ID
-    if (this.status === DDLStatus.UNDERGO) {
-      this.indicatorColor = this.theme.indicatorUndergo;
-      this.indicatorColor50 = this.theme.indicatorUndergo50;
-      this.indicatorColor70 = this.theme.indicatorUndergo70;
-      this.bgColor40 = this.theme.bgUndergo40;
-
-    } else if (this.status === DDLStatus.NEAR) {
+  private syncIndicatorColors(): void {
+    if (this.status === DDLStatus.NEAR) {
       this.indicatorColor = this.theme.indicatorNear;
       this.indicatorColor50 = this.theme.indicatorNear50;
       this.indicatorColor70 = this.theme.indicatorNear70;
       this.bgColor40 = this.theme.bgNear40;
-
     } else if (this.status === DDLStatus.PASSED) {
       this.indicatorColor = this.theme.indicatorPassed;
       this.indicatorColor50 = this.theme.indicatorPassed50;
       this.indicatorColor70 = this.theme.indicatorPassed70;
       this.bgColor40 = this.theme.bgPassed40;
-
     } else if (this.status === DDLStatus.ABANDONED) {
       this.indicatorColor = $r('sys.color.ohos_id_color_text_tertiary');
       this.indicatorColor50 = $r('sys.color.ohos_id_color_text_tertiary');
       this.indicatorColor70 = $r('sys.color.ohos_id_color_text_tertiary');
       this.bgColor40 = $r('app.color.background_tertiary');
-
     } else if (this.status === DDLStatus.COMPLETED) {
       this.indicatorColor = this.theme.indicatorCompleted;
       this.indicatorColor50 = this.theme.indicatorCompleted50;
       this.indicatorColor70 = this.theme.indicatorCompleted70;
       this.bgColor40 = this.theme.bgCompleted40;
+    } else {
+      this.indicatorColor = this.theme.indicatorUndergo;
+      this.indicatorColor50 = this.theme.indicatorUndergo50;
+      this.indicatorColor70 = this.theme.indicatorUndergo70;
+      this.bgColor40 = this.theme.bgUndergo40;
     }
   }
 
@@ -254,7 +250,6 @@ export struct DDLItemCardSimplified {
             .linearGradient({
               direction: GradientDirection.Right,
               colors: [
-                // 3. 直接使用资源变量，无需 addAlpha
                 [this.indicatorColor50, 0.0],
                 [this.indicatorColor70, 1.0]
               ]
@@ -263,7 +258,6 @@ export struct DDLItemCardSimplified {
       }
       .width('100%')
       .height('100%')
-      // 4. 直接使用带透明度的背景色资源
       .backgroundColor(this.bgColor40)
 
       // 2. 内容层
@@ -286,7 +280,6 @@ export struct DDLItemCardSimplified {
           if (this.isStarred) {
             SymbolGlyph($r('sys.symbol.star_fill'))
               .fontSize(20)
-              // 星标继续使用纯色
               .fontColor([this.indicatorColor])
               .margin({ left: 8 })
           }

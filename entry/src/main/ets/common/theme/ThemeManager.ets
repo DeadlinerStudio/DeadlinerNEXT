@@ -24,6 +24,7 @@ export class ThemeManager {
 
   private static readonly KEY_CUSTOM_BACKGROUND = 'key_custom_background';
   private static readonly KEY_CUSTOM_BACKGROUND_BLUR = 'key_custom_background_blur';
+  private static readonly KEY_SEMANTIC_GLOW_ENABLED = 'key_semantic_glow_enabled';
 
   // 自定义 UI 相关的 Key
   private static readonly KEY_CUSTOM_BRAND = 'key_custom_brand';
@@ -37,6 +38,9 @@ export class ThemeManager {
   private static readonly KEY_THEME_LEGACY = 'key_current_theme';
 
   static async init(context: Context) {
+    AppStorage.setOrCreate('semanticGlowEnabled', true);
+    AppStorage.setOrCreate('rootListSemanticTone', 'accent');
+    AppStorage.setOrCreate('rootSemanticTabId', 'list');
     try {
       ThemeManager.pref = await preferences.getPreferences(context, ThemeManager.STORE_NAME);
 
@@ -45,6 +49,12 @@ export class ThemeManager {
 
       let bgBlur = await ThemeManager.pref.get(ThemeManager.KEY_CUSTOM_BACKGROUND_BLUR, false) as boolean;
       AppStorage.setOrCreate('customBackgroundBlur', bgBlur);
+
+      const semanticGlowEnabled = await ThemeManager.pref.get(
+        ThemeManager.KEY_SEMANTIC_GLOW_ENABLED,
+        true
+      ) as boolean;
+      AppStorage.set('semanticGlowEnabled', semanticGlowEnabled);
 
       // 1. 读取配置
       let uiKey = await ThemeManager.pref.get(ThemeManager.KEY_THEME_UI, '') as string;
@@ -111,6 +121,14 @@ export class ThemeManager {
     AppStorage.setOrCreate('customBackgroundImage', '');
     if (ThemeManager.pref) {
       await ThemeManager.pref.put(ThemeManager.KEY_CUSTOM_BACKGROUND, '');
+      await ThemeManager.pref.flush();
+    }
+  }
+
+  static async setSemanticGlowEnabled(enable: boolean): Promise<void> {
+    AppStorage.set('semanticGlowEnabled', enable);
+    if (ThemeManager.pref) {
+      await ThemeManager.pref.put(ThemeManager.KEY_SEMANTIC_GLOW_ENABLED, enable);
       await ThemeManager.pref.flush();
     }
   }

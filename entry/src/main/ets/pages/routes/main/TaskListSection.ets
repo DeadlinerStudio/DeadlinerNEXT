@@ -21,6 +21,13 @@ import { CategoryRepository } from '../../../common/repository/CategoryRepositor
 import { CategoryDisplayModel } from '../../../common/kmp/KmpCategoryRepositoryAdapter';
 import { CategoryFilter, CategoryFilterResolver } from '../../../common/category/CategoryFilter';
 import { SheetCompat } from '../../../common/ui/SheetCompat';
+import { DeadlineStatusResolver } from '../../../common/semantic/DeadlineStatusResolver';
+import { PageToneResolver } from '../../../common/semantic/PageToneResolver';
+import {
+  DeadlineSemanticStatus,
+  SemanticPageKind,
+  SemanticSnapshot
+} from '../../../common/semantic/SemanticContract';
 
 export interface TaskUIModel {
   title: string;
@@ -46,6 +53,7 @@ export struct TaskListSection {
   scroller: Scroller = new Scroller();
 
   @State taskList: Array<TaskUIModel> = [];
+  @State semanticSnapshot: SemanticSnapshot = SemanticSnapshot.empty(SemanticPageKind.TASKS);
   @State isRefreshing: boolean = false; // 控制下拉刷新状态
 
   @State isLoading: boolean = true;
@@ -60,6 +68,7 @@ export struct TaskListSection {
   @State selectedIds: number[] = [];
 
   @Prop confetti: ConfettiController;
+  onSemanticSnapshotChanged: (snapshot: SemanticSnapshot) => void = (_snapshot: SemanticSnapshot): void => {};
 
   @State isDetailSheetShow: boolean = false;
   @State detailTask: DDLItem | null = null;
@@ -126,11 +135,15 @@ export struct TaskListSection {
 
       const now = new Date().getTime();
 
-      this.taskList = dbItems
+      const visibleItems: DDLItem[] = dbItems
         .filter((item) => !item.deleted && item.type !== DeadlineType.HABIT && this.matchesCategoryFilter(item.categoryUid, categories))
-        .sort((lhs, rhs) => this.compareTaskOrder(lhs, rhs))
-        .map((item) => {
-        return this.mapToUI(item, now, categories);
+        .sort((lhs, rhs) => this.compareTaskOrder(lhs, rhs));
+
+      const snapshot: SemanticSnapshot = PageToneResolver.resolveTasks(visibleItems, now);
+      this.semanticSnapshot = snapshot;
+      this.onSemanticSnapshotChanged(snapshot);
+      this.taskList = visibleItems.map((item: DDLItem): TaskUIModel => {
+        return this.mapToUI(item, now, categories, snapshot.statusForTask(item.id));
       });
 
       console.info(`[TaskList] Loaded ${this.taskList.length} items.`);
@@ -189,52 +202,31 @@ export struct TaskListSection {
   }
 
   // 核心逻辑：数据映射 (DB Model -> UI Model)
-  private mapToUI(item: DDLItem, now: number, categories: CategoryDisplayModel[]): TaskUIModel {
+  private mapToUI(
+    item: DDLItem,
+    now: number,
+    categories: CategoryDisplayModel[],
+    semanticStatus: DeadlineSemanticStatus
+  ): TaskUIModel {
     // 简单的日期解析容错
     const parseDate = (str: string): number => {
       const d = new Date(str);
       return isNaN(d.getTime()) ? 0 : d.getTime();
     };
 
-    const start = parseDate(item.startTime);
     const end = parseDate(item.endTime);
 
-    // 1. 计算状态
-    let status = DDLStatus.UNDERGO;
-    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) {
-      status = DDLStatus.COMPLETED;
-    } else if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) {
-      status = DDLStatus.ABANDONED;
-    } else if (now > end) {
-      status = DDLStatus.PASSED;
-    } else if ((end - now) < 24 * 60 * 60 * 1000) {
-      status = DDLStatus.NEAR;
-    } else {
-      status = DDLStatus.UNDERGO;
-    }
-
-    // 2. 计算进度
-    let progress = 0.0;
-    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) {
-      progress = 1.0;
-    } else if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) {
-      progress = 0;
-    } else {
-      const totalDuration = end - start;
-      const elapsed = now - start;
-      if (totalDuration > 0) {
-        progress = Math.max(0, Math.min(1, elapsed / totalDuration));
-      } else {
-        progress = 0;
-      }
-    }
+    const status: DDLStatus = DeadlineStatusResolver.toDDLStatus(semanticStatus);
+    const progress: number = DeadlineStatusResolver.resolveProgress(item, now);
 
     // 3. 计算剩余时间文本
     let timeText = "";
-    if (item.state === TaskState.COMPLETED || item.state === TaskState.ARCHIVED) {
+    if (semanticStatus === DeadlineSemanticStatus.COMPLETED) {
       timeText = "已完成";
-    } else if (item.state === TaskState.ABANDONED || item.state === TaskState.ABANDONED_ARCHIVED) {
+    } else if (semanticStatus === DeadlineSemanticStatus.ABANDONED) {
       timeText = "已放弃";
+    } else if (end <= 0) {
+      timeText = "进行中";
     } else {
       const diffMs = end - now;
       if (diffMs < 0) {

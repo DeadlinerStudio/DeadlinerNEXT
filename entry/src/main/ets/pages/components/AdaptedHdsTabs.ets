@@ -27,6 +27,7 @@ export struct AdaptedHdsTabs {
 
   // 点击事件回调（把业务逻辑抛给父组件）
   onTabClick?: (index: number) => void;
+  onTabChange?: (index: number) => void;
 
   onMiniBarClick?: () => void;
 
@@ -47,8 +48,12 @@ export struct AdaptedHdsTabs {
         .scrollable(false)
         .height('100%')
         .width('100%')
+        .backgroundColor(Color.Transparent)
         .onChange((index: number) => {
           this.currentIndex = index;
+          if (this.onTabChange) {
+            this.onTabChange(index);
+          }
         })
         .onTabBarClick((index: number) => {
           if (this.onTabClick) {
@@ -87,8 +92,12 @@ export struct AdaptedHdsTabs {
         .scrollable(false)
         .height('100%')
         .width('100%')
+        .backgroundColor(Color.Transparent)
         .onChange((index: number) => {
           this.currentIndex = index;
+          if (this.onTabChange) {
+            this.onTabChange(index);
+          }
         })
         .onTabBarClick((index: number) => {
           if (this.onTabClick) {
@@ -117,8 +126,12 @@ export struct AdaptedHdsTabs {
         .scrollable(false)
         .height('100%')
         .width('100%')
+        .backgroundColor(Color.Transparent)
         .onChange((index: number) => {
           this.currentIndex = index;
+          if (this.onTabChange) {
+            this.onTabChange(index);
+          }
         })
         .onTabBarClick((index: number) => {
           if (this.onTabClick) {

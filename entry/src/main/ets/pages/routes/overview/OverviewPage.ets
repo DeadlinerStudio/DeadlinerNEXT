@@ -743,6 +743,7 @@ export struct OverviewPage {
           }
         })
         .titleMode(HdsNavDestinationTitleMode.MINI)
+        .backgroundColor(Color.Transparent)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .bindToScrollable([this.dummyScroller])
         .padding({ top: this.statusBarHeight })
@@ -766,6 +767,7 @@ export struct OverviewPage {
           }
         })
         .titleMode(HdsNavigationTitleMode.MINI)
+        .backgroundColor(Color.Transparent)
         .hideBackButton(true)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .mode(NavigationMode.Stack)
@@ -805,6 +807,7 @@ export struct OverviewPage {
         }
       })
         .titleMode(HdsNavDestinationTitleMode.MINI)
+        .backgroundColor(Color.Transparent)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .bindSheet($$this.isSortSheetShow, this.SortSheetBuilder(), SheetCompat.immersive({
         detents: [
@@ -844,6 +847,7 @@ export struct OverviewPage {
           }
         })
         .titleMode(HdsNavigationTitleMode.MINI)
+        .backgroundColor(Color.Transparent)
         .hideBackButton(true)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .mode(NavigationMode.Stack)
