@@ -55,7 +55,7 @@ import { Symbol } from '../components/infra/Symbol';
 
 @Component
 export struct AIWorkspaceView {
-  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop theme: ITheme;
   @Consume('appPathStack') appPathStack: NavPathStack;
   @StorageProp(C.KEY_DIRECT_ADD_ON_AI) directAdd: boolean = true;
   @StorageProp(C.KEY_AI_SILENT_TASK_ADD) silentTaskAdd: boolean = true;
@@ -1055,6 +1055,7 @@ export struct AIWorkspaceView {
 
 @Component
 export struct AIPanelView {
+  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
   @Prop bypassHuaweiLogin: boolean = false;
   @Prop topAvoidHeight: number = 0;
   @Prop bottomPadding: number = 0;
@@ -1063,6 +1064,7 @@ export struct AIPanelView {
 
   build() {
     AIWorkspaceView({
+      theme: this.theme,
       bypassHuaweiLogin: this.bypassHuaweiLogin,
       topAvoidHeight: this.topAvoidHeight,
       bottomPadding: this.bottomPadding,

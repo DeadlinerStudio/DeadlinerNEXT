@@ -43,6 +43,7 @@ import {
   SemanticSnapshot,
   SemanticTone
 } from '../../../common/semantic/SemanticContract';
+import { ITheme } from '../../../common/theme/ThemeModel';
 
 enum MainTabIndex {
   TASKS = 0,
@@ -53,6 +54,7 @@ enum MainTabIndex {
 @Component
 export struct MainHomePage {
   @Consume('appPathStack') appPathStack: NavPathStack;
+  @Prop theme: ITheme;
 
   @StorageLink(C.KEY_ENABLE_TABLET_UI) tabletUi: boolean = true;
   @StorageLink(C.KEY_TABLET_SIDE_DASHBOARD) sdEnabled: boolean = true;
@@ -624,7 +626,7 @@ export struct MainHomePage {
         .color($r('sys.color.ohos_id_color_list_separator'))
         .opacity(0.5)
 
-      SideDashboard()
+      SideDashboard({ theme: this.theme })
         .width(132)
         .height('100%')
         .padding({ top: this.getMiniTopAvoidHeight(), left: 10, right: 10, bottom: 24 })
@@ -861,7 +863,7 @@ export struct MainHomePage {
             .color($r('sys.color.ohos_id_color_list_separator'))
             .opacity(0.5)
 
-          SideDashboard()
+          SideDashboard({ theme: this.theme })
             .width(108)
             .height('100%')
             .padding({ top: this.getMiniTopAvoidHeight() + this.statusBarHeight })

@@ -70,12 +70,12 @@
 ## 修订：根级统一浮光
 
 - 任务卡的状态 indicator 继续服从用户选择的 indicator 风格；语义 resolver 负责状态判定，但不得用固定 palette 覆盖卡片的主题 indicator 颜色。
-- 清单顶部浮光服从同一个 indicator 风格：`accent / success / warning / danger` 分别复用 `undergo / completed / near / passed` 的基础 indicator 色；与其他 Tab 统一使用低浓度整屏渐变与 `SCREEN` 混合，保留染色范围并减少灰脏感。
+- 清单顶部浮光服从同一个 indicator 风格：`accent / success / warning / danger` 分别复用 `undergo / completed / near / passed` 的基础 indicator 色；与其他 Tab 统一使用低浓度整屏线性渐变，并使用默认混合方式直接保留目标色。渐变终点必须保持目标色 RGB 不变且仅将 alpha 降为 0，不得使用透明黑或透明白参与颜色插值。
 - 用户可在“显示与个性化 → 界面显示”关闭顶部浮光；开关默认开启并持久化，切换后即时淡入淡出。
 - 根层先把当前 Tab、清单 tone 与主题解析为单一颜色，再传给浮光组件；颜色改变时旧色与新色进行约 420ms 交叉淡化。
 - 新增任务或习惯完成后必须显式刷新对应列表并重新发布语义快照，不能只依赖同步事件间接刷新。
 - 移除任务与习惯列表顶部的 `SemanticDashboardHero` 状态卡片，页面不再因浮光额外增加一张摘要卡。
-- 全应用只允许 `Index` 根级容器渲染一个顶部浮光；`MainHomePage` 只向根层发布清单语义 tone 与滚动进度，不再自行绘制浮光。
+- 全应用只允许 `Index` 根级容器渲染一个顶部浮光组件；`MainHomePage` 只向根层发布清单语义 tone 与滚动进度，不再自行绘制浮光。
 - 根级浮光必须扩展到系统顶部安全区之后，并保持不拦截点击。
 - 清单页浮光使用当前任务/习惯可见范围的语义 tone；多彩主题下清单 Tab 图标与文字使用 `theme.brand`，其他 Tab 的浮光及 Tab 选中色使用各自模块色；其余主题使用当前主题既有 Tab/brand 规则，不再被 `useWhiteGlow` 条件隐藏。
 - Tab 切换时只更换根级浮光颜色；清单列表滚动时继续按归一化进度收缩，其他 Tab 使用展开态。

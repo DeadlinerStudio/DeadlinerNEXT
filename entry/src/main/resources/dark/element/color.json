@@ -76,10 +76,15 @@
     { "name": "func_ai", "value": "#B39DDB" },
     { "name": "func_manual", "value": "#80CBC4" },
     { "name": "module_list", "value": "#FF5C9DFF" },
+    { "name": "module_list_50", "value": "#805C9DFF" },
     { "name": "module_overview", "value": "#FF41D1C7" },
+    { "name": "module_overview_50", "value": "#8041D1C7" },
     { "name": "module_capture", "value": "#FF8E8BFF" },
+    { "name": "module_capture_50", "value": "#808E8BFF" },
     { "name": "module_ai", "value": "#FFC7A4FF" },
+    { "name": "module_ai_50", "value": "#80C7A4FF" },
     { "name": "module_user", "value": "#FFFFB74D" },
+    { "name": "module_user_50", "value": "#80FFB74D" },
     { "name": "font_primary", "value": "#FFFFFF"},
     { "name": "font_secondary", "value": "#B3B3B3"},
     { "name": "font_emphasize", "value": "#FFFFFF"},
@@ -294,6 +299,7 @@
     { "name": "widget_item_bg", "value": "#FF282C31" },
 
     { "name": "tab_bar_icon_unselected", "value": "#F0F0F0" },
+    { "name": "tab_bar_icon_unselected_soft", "value": "#B0B0B0" },
     { "name": "segmented_color_selected", "value": "#22FFFFFF" }
   ]
 }

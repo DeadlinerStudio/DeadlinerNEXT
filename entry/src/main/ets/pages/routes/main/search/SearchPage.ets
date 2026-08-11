@@ -942,6 +942,7 @@ export struct SearchPage {
       progress: item.task.progress,
       isStarred: item.task.isStarred,
       status: item.task.status,
+      swipeId: item.task.dbId,
       selectionMode: false,
       selected: false,
       primaryActionSymbol: item.task.taskState === TaskState.ACTIVE

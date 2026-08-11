@@ -5,7 +5,7 @@
 - `semantic-contract`：定义 `DeadlineSemanticStatus`、`SemanticTone`、`SemanticSnapshot`、习惯可见状态输入和快照空值；不包含 ArkUI 资源。
 - `semantic-domain`：`DeadlineStatusResolver` 负责单条任务优先级、时间边界与进度；`PageToneResolver` 负责从当前可见任务/习惯生成页面快照。
 - `semantic-palette`：`SemanticPalette` 只把 tone/status 映射到当前 `IndicatorSet` 的基础状态色；浮光透明度由 presentation 层统一控制，并与品牌强调色及 `CategoryColorPalette` 保持隔离。
-- `semantic-presentation`：`SemanticTopAtmosphere` 绘制语义或 Tab 色的线性渐变与两个径向光晕；列表不再增加状态摘要卡。
+- `semantic-presentation`：`SemanticTopAtmosphere` 使用语义或 Tab 色绘制单层整屏线性渐变；列表不再增加状态摘要卡。
 - `semantic-bridge`：任务/习惯列表在完成现有筛选后生成快照，通过回调同步到 `MainHomePage`；主页根据当前分段选择快照，并只把 tone 与滚动进度传给氛围组件。
 - `deadline-card-adapter`：`TaskListSection` 使用 `DeadlineStatusResolver` 生成 `TaskUIModel`；现有 `TaskItemCard` 继续消费兼容 `DDLStatus`，但映射来源收口到 resolver，分类徽标不参与状态 palette。
 - `semantic-tests`：纯 ArkTS 单元测试覆盖状态优先级、精确 24 小时边界、无效日期、任务 tone 和习惯完成率。

@@ -41,6 +41,8 @@ import { SheetCompat } from '../common/ui/SheetCompat';
 import { MaterialPresets } from '../common/style/SystemMaterialCompat';
 import { SemanticTone } from '../common/semantic/SemanticContract';
 import { SemanticTopAtmosphere } from './components/semantic/SemanticTopAtmosphere';
+import { ThemeManager } from '../common/theme/ThemeManager';
+import { RootTabThemeScope } from './components/RootTabThemeScope';
 
 const TAB_VERTICAL_PADDING = 86;
 
@@ -469,10 +471,18 @@ struct Index {
   }
 
   private getEffectiveTabColor(item: HdsTabDescriptor): ResourceColor {
-    if (this.currentThemeKey === 'colorful') {
-      return item.id === HdsTabId.LIST ? this.theme.brand : item.color;
-    }
-    return this.theme.tabIcon;
+    const rootTheme: ITheme = this.getRootTabTheme(item);
+    return this.getFloatingTabs() ? rootTheme.brand : rootTheme.tabIcon;
+  }
+
+  private getEffectiveTabUnselectedColor(): ResourceColor | undefined {
+    return this.getFloatingTabs()
+      ? $r('app.color.tab_bar_icon_unselected')
+      : $r('app.color.tab_bar_icon_unselected_soft');
+  }
+
+  private getRootTabTheme(item: HdsTabDescriptor): ITheme {
+    return ThemeManager.resolveRootTheme(this.theme, this.currentThemeKey, item.brandPalette);
   }
 
   private publishRootTabId(index: number): void {
@@ -486,33 +496,38 @@ struct Index {
     const symbol: boolean = !item.isImage;
     const displayIcon: Resource = HdsTabsCustomization.getDisplayIcon(item.id, this.tabSymbolRendering);
     const selectedColor: ResourceColor = this.getEffectiveTabColor(item);
+    const unselectedColor: ResourceColor | undefined = this.getEffectiveTabUnselectedColor();
 
     let style = BottomTabBarStyle.of(
-      symbol ? this.getTabBarSymbol(displayIcon, selectedColor) : displayIcon,
+      symbol ? this.getTabBarSymbol(displayIcon, selectedColor, unselectedColor) : displayIcon,
       item.title
     );
 
     style.iconStyle({
       selectedColor: selectedColor,
-      unselectedColor: $r('app.color.tab_bar_icon_unselected')
+      unselectedColor: unselectedColor
     });
 
     style.labelStyle({
       selectedColor: selectedColor,
-      unselectedColor: $r('app.color.tab_bar_icon_unselected')
+      unselectedColor: unselectedColor
     })
 
     return style;
   }
 
-  private getTabBarSymbol(icon: Resource, selectedColor: ResourceColor): TabBarSymbol {
+  private getTabBarSymbol(
+    icon: Resource,
+    selectedColor: ResourceColor,
+    unselectedColor: ResourceColor
+  ): TabBarSymbol {
     const renderingStrategy: SymbolRenderingStrategy = HdsTabsCustomization.isSingleSymbolRendering(
       this.tabSymbolRendering
     ) ? SymbolRenderingStrategy.SINGLE : SymbolRenderingStrategy.MULTIPLE_OPACITY;
     return {
       normal: new SymbolGlyphModifier(icon)
         .fontSize(24)
-        .fontColor([$r('app.color.tab_bar_icon_unselected')])
+        .fontColor([unselectedColor])
         .renderingStrategy(renderingStrategy),
 
       selected: new SymbolGlyphModifier(icon)
@@ -570,61 +585,73 @@ struct Index {
   private mainTabContent(tab: HdsTabDescriptor) {
     if (tab.id === HdsTabId.LIST) {
       TabContent() {
-        MainHomePage({
-          currentTabIndex: this.currentIndex,
-          aiSheetController: this.aiSheetController,
-          categoryFilter: $categoryFilter,
-          isCategorySideBarShown: $isCategorySideBarShown,
-          onSemanticToneChanged: (tone: SemanticTone): void => {
-            AppStorage.set('rootListSemanticTone', tone);
-          },
-          onAtmosphereScrollProgressChanged: (progress: number): void => {
-            this.listAtmosphereScrollProgress = progress;
-          }
-        })
-          .width('100%')
-          .height('100%')
-          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-          .animation({ duration: 300, curve: Curve.EaseInOut })
-          .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
+          MainHomePage({
+            theme: this.getRootTabTheme(tab),
+            currentTabIndex: this.currentIndex,
+            aiSheetController: this.aiSheetController,
+            categoryFilter: $categoryFilter,
+            isCategorySideBarShown: $isCategorySideBarShown,
+            onSemanticToneChanged: (tone: SemanticTone): void => {
+              AppStorage.set('rootListSemanticTone', tone);
+            },
+            onAtmosphereScrollProgressChanged: (progress: number): void => {
+              this.listAtmosphereScrollProgress = progress;
+            }
+          })
+            .width('100%')
+            .height('100%')
+            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+            .animation({ duration: 300, curve: Curve.EaseInOut })
+            .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        }
       }
       .tabBar(this.getTabBarStyle(tab))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     } else if (tab.id === HdsTabId.OVERVIEW) {
       TabContent() {
-        OverviewPage({ currentTabIndex: this.currentIndex })
-          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-          .animation({ duration: 300, curve: Curve.EaseInOut })
-          .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
+          OverviewPage({ rootTheme: this.getRootTabTheme(tab), currentTabIndex: this.currentIndex })
+            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+            .animation({ duration: 300, curve: Curve.EaseInOut })
+            .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        }
       }
       .tabBar(this.getTabBarStyle(tab))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     } else if (tab.id === HdsTabId.CAPTURE) {
       TabContent() {
-        CapturePage({ currentTabIndex: this.currentIndex })
-          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-          .animation({ duration: 300, curve: Curve.EaseInOut })
-          .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
+          CapturePage({ rootTheme: this.getRootTabTheme(tab), currentTabIndex: this.currentIndex })
+            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+            .animation({ duration: 300, curve: Curve.EaseInOut })
+            .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        }
       }
       .tabBar(this.getTabBarStyle(tab))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     } else if (tab.id === HdsTabId.AI) {
       TabContent() {
-        AIPage({
-          isHdsTabActive: this.currentIndex === this.getVisibleTabIndex(tab.id)
-        })
-          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-          .animation({ duration: 300, curve: Curve.EaseInOut })
-          .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
+          AIPage({
+            rootTheme: this.getRootTabTheme(tab),
+            isHdsTabActive: this.currentIndex === this.getVisibleTabIndex(tab.id)
+          })
+            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+            .animation({ duration: 300, curve: Curve.EaseInOut })
+            .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        }
       }
       .tabBar(this.getTabBarStyle(tab))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     } else {
       TabContent() {
-        UserPage()
-          .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-          .animation({ duration: 300, curve: Curve.EaseInOut })
-          .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
+          UserPage({ rootTheme: this.getRootTabTheme(tab) })
+            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+            .animation({ duration: 300, curve: Curve.EaseInOut })
+            .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+        }
       }
       .tabBar(this.getTabBarStyle(tab))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
@@ -701,6 +728,9 @@ struct Index {
 
       if (this.isShowUI) {
         SemanticTopAtmosphere({
+          theme: this.getRootTabTheme(this.getCurrentTab()),
+          currentThemeKey: this.currentThemeKey,
+          currentTabId: this.getCurrentTab().id,
           visible: this.semanticGlowEnabled,
           scrollProgress: this.getCurrentTab().id === HdsTabId.LIST ? this.listAtmosphereScrollProgress : 0
         })

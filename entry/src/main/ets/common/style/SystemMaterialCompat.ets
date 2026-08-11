@@ -49,6 +49,15 @@ export function buildImmersiveMaterial(options?: ImmersiveMaterialOptions): uiMa
   });
 }
 
+export function buildImmersiveMaterialCompat(
+  options?: ImmersiveMaterialOptions
+): uiMaterial.Material | undefined {
+  if (!canUseSystemMaterial()) {
+    return undefined;
+  }
+  return buildImmersiveMaterial(options);
+}
+
 export class ImmersiveMaterialModifier implements AttributeModifier<CommonAttribute> {
   private options?: ImmersiveMaterialOptions;
   private enabled: boolean;

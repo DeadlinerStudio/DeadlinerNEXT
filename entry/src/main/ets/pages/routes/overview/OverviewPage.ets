@@ -29,10 +29,13 @@ import {
 import { ImmersivePopupSurface } from '../../../common/ui/ImmersivePopupSurface';
 import { Toast } from '../../../common/ui/Toast';
 import { SheetCompat } from '../../../common/ui/SheetCompat';
+import { ITheme } from '../../../common/theme/ThemeModel';
 
 @Component
 export struct OverviewPage {
   @Consume('appPathStack') appPathStack: NavPathStack;
+  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop rootTheme: ITheme = {} as ITheme;
   @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
   @StorageLink(C.KEY_SHOW_PAPERTALK_SHARE) showPaperTalkShare: boolean = true;
   @StorageLink(C.KEY_ENABLE_TABLET_UI) tabletUi: boolean = true;
@@ -43,6 +46,10 @@ export struct OverviewPage {
   @StorageLink(APP_BREAKPOINT_STORAGE_KEY) currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
   private context = getContext(this) as common.UIAbilityContext;
   private dummyScroller: Scroller = new Scroller();
+
+  private pageTheme(): ITheme {
+    return this.isNavDestination ? this.theme : this.rootTheme;
+  }
 
   @State viewModel: OverviewViewModel = new OverviewViewModel();
 
@@ -602,6 +609,7 @@ export struct OverviewPage {
       Scroll() {
         Column() {
           DashboardSection({
+            theme: this.pageTheme(),
             metrics: this.viewModel.metrics,
             dailyStats: this.viewModel.lastMonthDailyStats,
             lastMonthName: this.viewModel.lastMonthName,
@@ -698,6 +706,7 @@ export struct OverviewPage {
             })
           } else if (this.selectedIndexes[0] === 2) {
             DashboardSection({
+              theme: this.pageTheme(),
               metrics: this.viewModel.metrics,
               dailyStats: this.viewModel.lastMonthDailyStats,
               lastMonthName: this.viewModel.lastMonthName,

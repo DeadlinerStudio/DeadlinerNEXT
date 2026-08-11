@@ -63,7 +63,7 @@ export function formatInspirationRelativeTime(isoTime: string): string {
 
 @Component
 export struct InspirationItemCard {
-  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop theme: ITheme;
 
   @Prop item: InspirationItem = { id: 0, text: '', createdAt: '', updatedAt: '' };
   @Prop selectionMode: boolean = false;
@@ -212,6 +212,7 @@ export struct InspirationItemSwipeable {
       .clip(true)
 
       InspirationItemCard({
+        theme: this.theme,
         item: this.item,
         selectionMode: this.selectionMode,
         selected: this.selected,

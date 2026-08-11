@@ -502,6 +502,21 @@ export struct TaskListSection {
     }
   }
 
+  private async openTaskEdit(taskId: number): Promise<void> {
+    try {
+      const task = await this.repo.getDDLById(taskId);
+      if (!task) {
+        Toast.show({ message: '找不到该任务' });
+        return;
+      }
+      this.editingTask = task;
+      this.isEditSheetShow = true;
+    } catch (e) {
+      console.error('Open task edit failed:', e);
+      Toast.show({ message: '无法打开任务编辑' });
+    }
+  }
+
   private async handleBatchEdit(): Promise<void> {
     if (this.selectedIds.length !== 1) {
       Toast.show({ message: '请选择一个任务进行编辑' });
@@ -627,6 +642,7 @@ export struct TaskListSection {
                         categoryName: item.categoryName,
                         categoryIconKey: item.categoryIconKey,
                         categoryColorHex: item.categoryColorHex,
+                        swipeId: item.dbId,
 
                         selectionMode: this.isSelectionMode,
                         selected: this.selectedIds.includes(item.dbId),
@@ -644,6 +660,12 @@ export struct TaskListSection {
                         },
                         onSecondaryAction: async () => {
                           this.handleSecondaryAction(item.dbId, item.title, item.taskState)
+                        },
+                        onEditAction: () => {
+                          void this.openTaskEdit(item.dbId);
+                        },
+                        onDeleteAction: () => {
+                          this.handleDelete(item.dbId, item.title);
                         },
                         onClickItem: () => {
                           this.openTaskDetail(item.dbId);

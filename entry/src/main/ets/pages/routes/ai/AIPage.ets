@@ -29,6 +29,7 @@ export struct AIPage {
   @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
   @StorageLink(APP_BREAKPOINT_STORAGE_KEY) currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop rootTheme: ITheme = {} as ITheme;
 
   @Prop @Watch('onHdsTabActive') isHdsTabActive: boolean = false;
   @Prop isNavDestination: boolean = false;
@@ -40,6 +41,10 @@ export struct AIPage {
   @State historyPreviewVersion: number = 0;
   @State deletingHistoryId: string = '';
   private flowTimerId: number = -1;
+
+  private pageTheme(): ITheme {
+    return this.isNavDestination ? this.theme : this.rootTheme;
+  }
 
   aboutToAppear(): void {
     if (this.shouldPlayAiFlow()) {
@@ -261,6 +266,7 @@ export struct AIPage {
   @Builder
   private workspaceBuilder() {
     AIWorkspaceView({
+      theme: this.pageTheme(),
       bypassHuaweiLogin: true,
       topAvoidHeight: this.workspaceTopAvoidHeight(),
       bottomPadding: this.usesWideLayout() ? 42 : 28,
@@ -303,18 +309,18 @@ export struct AIPage {
         Circle()
           .width(this.usesExtraWideLayout() ? 42 : 38)
           .height(this.usesExtraWideLayout() ? 42 : 38)
-          .fill(active ? this.theme.brand : $r('app.color.background_tertiary'))
+          .fill(active ? this.pageTheme().brand : $r('app.color.background_tertiary'))
           .fillOpacity(active ? 0.16 : 1)
 
         if (active) {
           Image($r('app.media.lifi'))
-            .fillColor(this.theme.brand)
+            .fillColor(this.pageTheme().brand)
             .width(this.usesExtraWideLayout() ? 24 : 22)
             .height(this.usesExtraWideLayout() ? 24 : 22)
         } else {
           SymbolGlyph(icon)
             .fontSize(17)
-            .fontColor([subdued ? $r('app.color.font_secondary') : this.theme.brand])
+            .fontColor([subdued ? $r('app.color.font_secondary') : this.pageTheme().brand])
         }
       }
 
@@ -329,7 +335,7 @@ export struct AIPage {
             Text(this.selectedHistoryId ? '历史' : '当前')
               .fontSize(11)
               .fontWeight(FontWeight.Medium)
-              .fontColor(this.theme.brand)
+              .fontColor(this.pageTheme().brand)
               .padding({ left: 8, right: 8, top: 4, bottom: 4 })
               .backgroundColor($r('app.color.background_secondary'))
               .borderRadius(999)
@@ -362,7 +368,7 @@ export struct AIPage {
     .borderRadius(this.conversationRailCardRadius())
     .border({
       width: active ? 1 : 0,
-      color: active ? this.theme.brand : Color.Transparent
+      color: active ? this.pageTheme().brand : Color.Transparent
     })
     .opacity(subdued ? 0.76 : 1)
   }

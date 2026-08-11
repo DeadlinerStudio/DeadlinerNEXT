@@ -9,7 +9,7 @@ import { MaterialPresets } from '../../common/style/SystemMaterialCompat';
 @Component
 export struct CategoryEditorSheet {
   @Link isShown: boolean;
-  @Prop editingCategory: CategoryDisplayModel | null = null;
+  @Prop @Watch('onEditingCategoryChanged') editingCategory: CategoryDisplayModel | null = null;
   onSaved: (category: CategoryDisplayModel) => void = (_category: CategoryDisplayModel): void => {};
 
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
@@ -27,7 +27,20 @@ export struct CategoryEditorSheet {
   private readonly colorOptions: CategoryColorOption[] = CategoryColorPalette.all();
 
   aboutToAppear(): void {
-    if (this.editingCategory === null) return;
+    this.applyEditingCategory();
+  }
+
+  private onEditingCategoryChanged(): void {
+    this.applyEditingCategory();
+  }
+
+  private applyEditingCategory(): void {
+    if (this.editingCategory === null) {
+      this.name = '';
+      this.iconKey = 'folder';
+      this.colorHex = '#3B82F6';
+      return;
+    }
     this.name = this.editingCategory.name;
     this.iconKey = this.editingCategory.iconKey;
     this.colorHex = this.editingCategory.colorHex;

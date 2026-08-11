@@ -4,6 +4,10 @@ import { HabitGoalType, HabitPeriod } from '../../../../../model/DDLModels';
 import { AITextInput } from '../../../../components/AITextInput';
 import { LoadingMask } from '../../../../components/LoadingMask';
 import { ITheme } from '../../../../../common/theme/ThemeModel';
+import {
+  buildImmersiveMaterialCompat,
+  canUseSystemMaterial
+} from '../../../../../common/style/SystemMaterialCompat';
 
 const COMMON_RADIUS = 24;
 const ITEM_HEIGHT = 56;
@@ -92,20 +96,36 @@ export struct HabitFormView {
             .fontColor($r('app.color.font_secondary'))
             .padding({ left: 4 })
 
-          ChipGroup({
-            items: this.periodOptions,
-            itemStyle: {
-              size: ChipSize.NORMAL,
-              backgroundColor: this.inputBgColor,
-              fontColor: $r('app.color.font_secondary'),
-              selectedBackgroundColor: this.theme.accent,
-              selectedFontColor: Color.White
-            },
-            selectedIndexes: this.selectedPeriodIndex,
-            onChange: (indexes: number[]) => {
-              this.selectedPeriodIndex = indexes;
-            }
-          })
+          if (canUseSystemMaterial()) {
+            ChipGroup({
+              items: this.periodOptions,
+              itemStyle: {
+                size: ChipSize.NORMAL,
+                backgroundColor: this.inputBgColor,
+                selectedBackgroundColor: this.theme.accent
+              },
+              selectedBackgroundSystemMaterial: buildImmersiveMaterialCompat({
+                materialColor: this.theme.accent
+              }),
+              selectedIndexes: this.selectedPeriodIndex,
+              onChange: (indexes: number[]) => {
+                this.selectedPeriodIndex = indexes;
+              }
+            })
+          } else {
+            ChipGroup({
+              items: this.periodOptions,
+              itemStyle: {
+                size: ChipSize.NORMAL,
+                backgroundColor: this.inputBgColor,
+                selectedBackgroundColor: this.theme.accent
+              },
+              selectedIndexes: this.selectedPeriodIndex,
+              onChange: (indexes: number[]) => {
+                this.selectedPeriodIndex = indexes;
+              }
+            })
+          }
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -140,20 +160,36 @@ export struct HabitFormView {
                 .fontColor($r('app.color.font_secondary'))
                 .padding({ left: 4 })
 
-              ChipGroup({
-                items: this.goalTypeOptions,
-                itemStyle: {
-                  size: ChipSize.NORMAL,
-                  backgroundColor: this.inputBgColor,
-                  fontColor: $r('app.color.font_secondary'),
-                  selectedBackgroundColor: this.theme.accent,
-                  selectedFontColor: Color.White
-                },
-                selectedIndexes: this.selectedGoalTypeIndex,
-                onChange: (indexes: number[]) => {
-                  this.selectedGoalTypeIndex = indexes;
-                }
-              })
+              if (canUseSystemMaterial()) {
+                ChipGroup({
+                  items: this.goalTypeOptions,
+                  itemStyle: {
+                    size: ChipSize.NORMAL,
+                    backgroundColor: this.inputBgColor,
+                    selectedBackgroundColor: this.theme.accent
+                  },
+                  selectedBackgroundSystemMaterial: buildImmersiveMaterialCompat({
+                    materialColor: this.theme.accent
+                  }),
+                  selectedIndexes: this.selectedGoalTypeIndex,
+                  onChange: (indexes: number[]) => {
+                    this.selectedGoalTypeIndex = indexes;
+                  }
+                })
+              } else {
+                ChipGroup({
+                  items: this.goalTypeOptions,
+                  itemStyle: {
+                    size: ChipSize.NORMAL,
+                    backgroundColor: this.inputBgColor,
+                    selectedBackgroundColor: this.theme.accent
+                  },
+                  selectedIndexes: this.selectedGoalTypeIndex,
+                  onChange: (indexes: number[]) => {
+                    this.selectedGoalTypeIndex = indexes;
+                  }
+                })
+              }
             }
             .layoutWeight(1)
           }

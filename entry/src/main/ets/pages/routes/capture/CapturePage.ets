@@ -32,6 +32,7 @@ export struct CapturePage {
   @StorageLink('topAvoidExtraHeight') topAvoidExtraHeight: number = 0;
 
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop rootTheme: ITheme = {} as ITheme;
 
   @StorageLink(APP_BREAKPOINT_STORAGE_KEY) currentBreakpoint: string = APP_BREAKPOINT_DEFAULT;
   
@@ -57,6 +58,10 @@ export struct CapturePage {
   @Prop @Watch('onTabSwitch') currentTabIndex: number = 0;
   @Prop isNavDestination: boolean = false;
   readonly TARGET_INDEX: number = 2;
+
+  private pageTheme(): ITheme {
+    return this.isNavDestination ? this.theme : this.rootTheme;
+  }
 
   aboutToAppear(): void {
     this.loadItems();
@@ -184,6 +189,7 @@ export struct CapturePage {
   @Builder
   private inspirationRowBuilder(item: InspirationItem) {
     InspirationItemCard({
+      theme: this.pageTheme(),
       item: item,
       selectionMode: this.selectionMode,
       selected: this.isSelected(item.id),
@@ -340,7 +346,7 @@ export struct CapturePage {
 
         Text('稍后再整理')
           .fontSize(14)
-          .fontColor(this.selectionMode ? $r('app.color.font_secondary') : this.theme.brand)
+          .fontColor(this.selectionMode ? $r('app.color.font_secondary') : this.pageTheme().brand)
           .width('100%')
 
         Text('这里适合放灵感、计划草稿、稍后可能要做的事。先别急着把它变得太正式，先让它被保留下来。')
@@ -368,7 +374,7 @@ export struct CapturePage {
           .type(ButtonType.Capsule)
           .width('100%')
           .height(42)
-          .backgroundColor(this.theme.brand)
+          .backgroundColor(this.pageTheme().brand)
           .fontColor(Color.White)
           .onClick(() => this.saveInputAsInspiration())
       }
@@ -395,7 +401,7 @@ export struct CapturePage {
 
           Text('稍后再整理')
             .fontSize(13)
-            .fontColor(this.selectionMode ? $r('app.color.font_secondary') : this.theme.brand)
+            .fontColor(this.selectionMode ? $r('app.color.font_secondary') : this.pageTheme().brand)
             .width('100%')
 
           Text('这里适合放灵感、计划草稿、稍后可能要做的事。先别急着把它变得太正式，先让它被保留下来。')
@@ -413,7 +419,7 @@ export struct CapturePage {
           .type(ButtonType.Capsule)
           .width(132)
           .height(40)
-          .backgroundColor(this.theme.brand)
+          .backgroundColor(this.pageTheme().brand)
           .fontColor(Color.White)
           .fontSize(14)
           .onClick(() => this.saveInputAsInspiration())

@@ -182,6 +182,7 @@ export struct SettingsGridItem {
 @Component
 export struct SettingsSwitch {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop selectedColor: ResourceColor | undefined = undefined;
 
   // 基础信息
   title: string | Resource = '';
@@ -197,6 +198,10 @@ export struct SettingsSwitch {
 
   // 内部按压状态
   @State isPressed: boolean = false;
+
+  private effectiveSelectedColor(): ResourceColor {
+    return this.selectedColor !== undefined ? this.selectedColor : this.theme.brand;
+  }
 
   build() {
     Row() {
@@ -231,7 +236,7 @@ export struct SettingsSwitch {
 
       // 3. 右侧开关
       Toggle({ type: ToggleType.Switch, isOn: this.isOn })
-        .selectedColor(this.theme.brand) // 选中时的品牌色
+        .selectedColor(this.effectiveSelectedColor()) // 选中时的品牌色
         .switchPointColor('#FFFFFF') // 滑块颜色
         .height(24) // 限制高度，使其与图标协调
         .hitTestBehavior(HitTestMode.None) // [关键点]：让 Toggle 不拦截点击，事件交给 Row 统一处理
@@ -310,6 +315,7 @@ export struct SettingsVerticalDivider {
 @Component
 export struct SettingsUserProfile {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop dialogBrandColor: ResourceColor | undefined = undefined;
   @StorageLink('isLoggedIn') @Watch('onLoginStatusChange') isLoggedIn: boolean = false;
   @StorageProp('userProfileRefreshTrigger') @Watch('onTriggerRefresh') refreshTrigger: number = 0;
 
@@ -383,13 +389,17 @@ export struct SettingsUserProfile {
     }
   }
 
+  private effectiveDialogBrandColor(): ResourceColor {
+    return this.dialogBrandColor !== undefined ? this.dialogBrandColor : this.theme.brand;
+  }
+
   private showLogoutDialog() {
     AlertDialog.show(DialogCompat.withAlertBlurStyle({
       title: '退出登录',
       message: '确定要退出当前账号吗？',
       primaryButton: {
         value: '取消',
-        fontColor: this.theme.brand,
+        fontColor: this.effectiveDialogBrandColor(),
         action: () => {}
       },
       secondaryButton: {

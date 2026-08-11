@@ -617,10 +617,10 @@ export struct HabitRow {
         }
         .padding({ left: 12, right: 12, top: 12, bottom: 12 })
         .width('100%')
-        .height(72)
+        .height(68)
       }
       .width('100%')
-      .height(72)
+      .height(68)
 
       // 选中态遮罩层
       if (this.isSelected) {
@@ -628,7 +628,7 @@ export struct HabitRow {
       }
     }
     .width('100%')
-    .height(72)
+    .height(68)
     .borderRadius(24)
     .clip(true)
     .onClick(() => {

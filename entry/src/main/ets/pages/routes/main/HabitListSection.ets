@@ -699,8 +699,8 @@ export struct HabitListSection {
         this.currentEditingHabit = undefined;
       },
       title: {
-        title: '编辑待办',
-        subtitle: '修改待办信息。'
+        title: '编辑习惯',
+        subtitle: '修改习惯信息。'
       }
     }))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])

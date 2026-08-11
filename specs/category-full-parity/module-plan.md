@@ -4,8 +4,9 @@
 
 - `category-contract`：KMP 的分类命令、结果 DTO、分类筛选状态与缺失引用规则。
 - `category-infra`：KMP C ABI、Harmony NAPI、`KmpPersistenceService` 与 `CategoryRepository` 的读写桥接和最近成功快照。
-- `category-editor`：任务/习惯共用的 `CategoryPickerSheet`、快速新建分类与表单接线。
-- `category-sidebar`：现有 `SideBarContainer` 的筛选区和管理模式；包含创建、编辑、删除确认。
+- `category-selection`：单选/多选共用的完整分类面板；统一目录加载、未分类、分类项、横滑编辑删除、添加按钮和编辑 Sheet。
+- `category-editor`：任务/习惯共用的 `CategoryPickerSheet` 与表单接线；仅包装单选模式和提交结果。
+- `category-sidebar`：现有 `SideBarContainer` 的安全区与多选筛选状态；分类内容由共享面板承载。
 - `category-projection`：任务、习惯模型和卡片投影；同时为主页任务/习惯列表执行分类筛选。
 
 ## 平台映射
@@ -17,7 +18,7 @@
 
 ## 文件拆分策略
 
-- 新的分类筛选状态、选择器和管理内容使用独立文件，避免继续膨胀 `Index.ets`、`MainHomePage.ets` 和现有表单文件。
+- 分类选择项与完整选择面板使用独立文件；Sidebar 和 Picker 只保留模式适配及受控状态接线，避免重复目录与管理 UI。
 - 现有大型列表页仅增加状态输入与调用，不承载分类管理 UI。
 - 单个核心文件尽量不超过 1000 行有效代码；若必须逃逸，先申请开发者批准。
 

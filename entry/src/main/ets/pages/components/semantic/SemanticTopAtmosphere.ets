@@ -1,19 +1,29 @@
+import { ColorMetrics } from '@kit.ArkUI';
 import { SemanticTone } from '../../../common/semantic/SemanticContract';
 import { ITheme } from '../../../common/theme/ThemeModel';
 import { HdsTabId } from '../../../model/HdsTabsCustomization';
 
 @Component
 export struct SemanticTopAtmosphere {
-  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
-  @StorageProp('currentThemeKey') currentThemeKey: string = 'vibrant';
+  @Prop theme: ITheme;
+  @Prop currentThemeKey: string = 'vibrant';
   @StorageProp('currentIndicatorKey') currentIndicatorKey: string = 'vibrant';
   @StorageLink('rootListSemanticTone') listSemanticToneKey: string = SemanticTone.ACCENT;
-  @StorageLink('rootSemanticTabId') currentTabId: string = HdsTabId.LIST;
+  @Prop currentTabId: string = HdsTabId.LIST;
   @Prop visible: boolean = true;
   @Prop scrollProgress: number = 0;
 
   private progress(): number {
     return Math.max(0, Math.min(1, this.scrollProgress));
+  }
+
+  private transparentVersion(color: ResourceColor): ResourceColor {
+    try {
+      const resolvedColor: ColorMetrics = ColorMetrics.resourceColor(color);
+      return ColorMetrics.rgba(resolvedColor.red, resolvedColor.green, resolvedColor.blue, 0).color;
+    } catch {
+      return '#00000000';
+    }
   }
 
   @Builder
@@ -26,7 +36,7 @@ export struct SemanticTopAtmosphere {
         direction: GradientDirection.Bottom,
         colors: [
           [color, 0.0],
-          ['#00000000', 0.6]
+          [this.transparentVersion(color), 0.6]
         ]
       })
       .opacity(0.18)
@@ -46,16 +56,14 @@ export struct SemanticTopAtmosphere {
       } else {
         this.colorLayer(this.theme.indicatorUndergo, 'list-accent-' + this.currentIndicatorKey)
       }
-    } else if (this.currentThemeKey !== 'colorful') {
-      this.colorLayer(this.theme.brand, 'brand-' + this.currentThemeKey)
     } else if (this.currentTabId === HdsTabId.OVERVIEW) {
-      this.colorLayer($r('app.color.module_overview'), 'colorful-overview')
+      this.colorLayer(this.theme.brand, 'brand-' + this.currentThemeKey + '-overview')
     } else if (this.currentTabId === HdsTabId.CAPTURE) {
-      this.colorLayer($r('app.color.module_capture'), 'colorful-capture')
+      this.colorLayer(this.theme.brand, 'brand-' + this.currentThemeKey + '-capture')
     } else if (this.currentTabId === HdsTabId.AI) {
-      this.colorLayer($r('app.color.module_ai'), 'colorful-ai')
+      this.colorLayer(this.theme.brand, 'brand-' + this.currentThemeKey + '-ai')
     } else {
-      this.colorLayer($r('app.color.module_user'), 'colorful-user')
+      this.colorLayer(this.theme.brand, 'brand-' + this.currentThemeKey + '-user')
     }
   }
 

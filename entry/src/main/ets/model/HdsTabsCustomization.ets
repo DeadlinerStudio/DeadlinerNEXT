@@ -1,3 +1,5 @@
+import { TabBrandPalette } from '../common/theme/ThemeModel';
+
 export enum HdsTabId {
   LIST = 'list',
   OVERVIEW = 'overview',
@@ -15,7 +17,7 @@ export interface HdsTabDescriptor {
   id: string;
   title: string;
   icon: Resource;
-  color: ResourceColor;
+  brandPalette: TabBrandPalette;
   isImage: boolean;
   canHide: boolean;
 }
@@ -34,7 +36,10 @@ export class HdsTabsCustomization {
       id: HdsTabId.LIST,
       title: '清单',
       icon: $r('sys.symbol.house_fill'),
-      color: $r('app.color.module_list'),
+      brandPalette: {
+        brand: $r('app.color.module_list'),
+        brand50: $r('app.color.module_list_50')
+      },
       isImage: false,
       canHide: false
     },
@@ -42,7 +47,10 @@ export class HdsTabsCustomization {
       id: HdsTabId.OVERVIEW,
       title: '概览',
       icon: $r('sys.symbol.data_proportion_fill'),
-      color: $r('app.color.module_overview'),
+      brandPalette: {
+        brand: $r('app.color.module_overview'),
+        brand50: $r('app.color.module_overview_50')
+      },
       isImage: false,
       canHide: true
     },
@@ -50,7 +58,10 @@ export class HdsTabsCustomization {
       id: HdsTabId.CAPTURE,
       title: '灵感',
       icon: $r('app.media.capture'),
-      color: $r('app.color.module_capture'),
+      brandPalette: {
+        brand: $r('app.color.module_capture'),
+        brand50: $r('app.color.module_capture_50')
+      },
       isImage: true,
       canHide: true
     },
@@ -58,7 +69,10 @@ export class HdsTabsCustomization {
       id: HdsTabId.AI,
       title: 'AI',
       icon: $r('app.media.lifi'),
-      color: $r('app.color.module_ai'),
+      brandPalette: {
+        brand: $r('app.color.module_ai'),
+        brand50: $r('app.color.module_ai_50')
+      },
       isImage: true,
       canHide: true
     },
@@ -66,7 +80,10 @@ export class HdsTabsCustomization {
       id: HdsTabId.USER,
       title: '我的',
       icon: $r('sys.symbol.person_crop_circle_fill_1'),
-      color: $r('app.color.module_user'),
+      brandPalette: {
+        brand: $r('app.color.module_user'),
+        brand50: $r('app.color.module_user_50')
+      },
       isImage: false,
       canHide: false
     }

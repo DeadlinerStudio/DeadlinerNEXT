@@ -7,6 +7,7 @@ import { BlurBackgroundModifier } from '../../../utils/animation/BlurBackgroundM
 
 @Component
 export struct DashboardSection {
+  @Prop theme: ITheme;
   @Prop metrics: Metric[] = [];
   @Prop dailyStats: DailyStat[] = [];
   @Prop lastMonthName: string = '';
@@ -49,7 +50,7 @@ export struct DashboardSection {
         .width('100%')
         .attributeModifier(new FloatUpModifier(1))
     } else if (this.analysis !== null) {
-      AIAnalysisCard({ analysis: this.analysis })
+      AIAnalysisCard({ theme: this.theme, analysis: this.analysis })
         .width('100%')
         .attributeModifier(new FloatUpModifier(1))
     }
@@ -223,8 +224,7 @@ struct AnalyzingCard {
 @Component
 struct AIAnalysisCard {
   @Prop analysis: MonthlyAnalysisResult | null = null;
-
-  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop theme: ITheme;
 
   build() {
     if (this.analysis === null) {

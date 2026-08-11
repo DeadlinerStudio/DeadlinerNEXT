@@ -1,4 +1,4 @@
-import { UIThemePalette, IndicatorSet, createUITheme, INDICATORS_IOS, ITheme, ThemeMap, IndicatorMap,
+import { UIThemePalette, IndicatorSet, createUITheme, INDICATORS_IOS, ITheme, TabBrandPalette, ThemeMap, IndicatorMap,
   THEME_DEFAULT_INDICATOR_MAP,
   INDICATORS_VIBRANT} from "./ThemeModel";
 import { ThemeControl } from "@kit.ArkUI";
@@ -17,6 +17,9 @@ export interface CustomThemeConfig {
 export class ThemeManager {
   private static pref: preferences.Preferences | undefined = undefined;
   private static readonly STORE_NAME = 'deadliner_theme_config';
+  private static rootThemeCacheBase: ITheme | undefined = undefined;
+  private static rootThemeCacheKey: string = '';
+  private static rootThemeCache: Map<TabBrandPalette, ITheme> = new Map<TabBrandPalette, ITheme>();
 
   // 两个独立的存储 Key
   private static readonly KEY_THEME_UI = 'key_current_theme_ui';        // 存 'classic', 'custom', 'lavender' 等
@@ -145,6 +148,42 @@ export class ThemeManager {
       return ThemeManager.mergeTheme(ThemeMap['vibrant'], INDICATORS_VIBRANT);
     }
     return theme;
+  }
+
+  /**
+   * 为主 Tab 的一级页面派生局部主题。
+   * 全局 currentTheme 始终保持基础主题，避免 Tab 色泄漏到 Navigation 二级页面。
+   */
+  static resolveRootTheme(baseTheme: ITheme, uiKey: string, palette: TabBrandPalette): ITheme {
+    if (uiKey !== 'colorful') {
+      return baseTheme;
+    }
+
+    if (ThemeManager.rootThemeCacheBase !== baseTheme || ThemeManager.rootThemeCacheKey !== uiKey) {
+      ThemeManager.rootThemeCacheBase = baseTheme;
+      ThemeManager.rootThemeCacheKey = uiKey;
+      ThemeManager.rootThemeCache.clear();
+    }
+
+    const cachedTheme: ITheme | undefined = ThemeManager.rootThemeCache.get(palette);
+    if (cachedTheme) {
+      return cachedTheme;
+    }
+
+    const scopedUI: UIThemePalette = {
+      brand: palette.brand,
+      brand50: palette.brand50,
+      accent: baseTheme.accent,
+      bgPrimary: baseTheme.bgPrimary,
+      widgetBgStart: baseTheme.widgetBgStart,
+      widgetBgEnd: baseTheme.widgetBgEnd,
+      widgetDecor: baseTheme.widgetDecor,
+      tabIcon: palette.brand,
+      useWhiteGlow: baseTheme.useWhiteGlow
+    };
+    const scopedTheme: ITheme = ThemeManager.mergeTheme(scopedUI, baseTheme);
+    ThemeManager.rootThemeCache.set(palette, scopedTheme);
+    return scopedTheme;
   }
 
   /**

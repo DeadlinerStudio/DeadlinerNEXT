@@ -106,6 +106,7 @@ struct UserQuickEntry {
 @Component
 export struct UserPage {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop rootTheme: ITheme = {} as ITheme;
 
   @Consume('appPathStack') appPathStack: NavPathStack;
   @Provide('userLocalPathStack') userLocalPathStack: NavPathStack = new NavPathStack();
@@ -223,7 +224,7 @@ export struct UserPage {
         action: () => {
           this.isBasicMode = false;
         },
-        fontColor: this.theme.brand
+        fontColor: this.rootTheme.brand
       },
       secondaryButton: {
         value: '确认开启',
@@ -250,12 +251,12 @@ export struct UserPage {
       offset: { dx: 0, dy: -20 },
       primaryButton: {
         value: '取消',
-        fontColor: this.theme.brand,
+        fontColor: this.rootTheme.brand,
         action: () => {}
       },
       secondaryButton: {
         value: '恢复',
-        fontColor: this.theme.brand,
+        fontColor: this.rootTheme.brand,
         action: () => {
           void this.restorePresetCategories();
         }
@@ -389,7 +390,7 @@ export struct UserPage {
       UserQuickEntry({
         title: tab.title,
         icon: HdsTabsCustomization.getDisplayIcon(tab.id, this.tabSymbolRendering),
-        iconColor: tab.color,
+        iconColor: tab.brandPalette.brand,
         isImage: tab.isImage,
         onItemClick: () => {
           this.openHiddenTab(tab.id);
@@ -435,7 +436,7 @@ export struct UserPage {
         Column({ space: 16 }) {
           if (!this.isBasicMode) {
             SettingsSection({ mainUserPage: true }) {
-              SettingsUserProfile()
+              SettingsUserProfile({ dialogBrandColor: this.rootTheme.brand })
             }
           }
 
@@ -520,6 +521,7 @@ export struct UserPage {
                 title: "基础模式",
                 subtitle: "仅保留核心任务管理功能",
                 icon: $r('sys.symbol.leaf'),
+                selectedColor: this.rootTheme.brand,
                 isOn: this.isBasicMode,
                 onChange: (isOn) => {
                   if (isOn) {
@@ -536,6 +538,7 @@ export struct UserPage {
                 title: "基础模式",
                 subtitle: "仅保留核心任务管理功能",
                 icon: $r('sys.symbol.leaf'),
+                selectedColor: this.rootTheme.brand,
                 isOn: this.isBasicMode,
                 onChange: (isOn) => {
                   if (isOn) {

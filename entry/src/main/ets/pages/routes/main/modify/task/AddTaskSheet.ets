@@ -3,6 +3,7 @@ import { TaskFormView } from './TaskFormView';
 import { TaskFormHelper } from './TaskFormHelper';
 import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
 import { getImmersiveTitleBarStyle } from '../../../../../common/style/NavStyles';
+import { HdsTitleBarMenuButton } from '../../../../components/HdsTitleBarMenuButton';
 
 export interface AddTaskParams {
   name: string;
@@ -100,8 +101,10 @@ export struct AddTaskSheet {
       style: getImmersiveTitleBarStyle(false),
       content: {
         title: { mainTitle: "创建新任务" },
-        menu: { value: [{ content: { icon: $r('sys.symbol.checkmark'), action: async () => this.saveTask() } }] },
-        subIcon: { content: { icon: $r('sys.symbol.xmark'), action: this.onDone } }
+        subIcon: { content: { icon: $r('sys.symbol.xmark'), action: this.onDone } },
+        menu: {
+          value: [{ content: { icon: $r('sys.symbol.checkmark'), action: (): void => { void this.saveTask(); } } }]
+        }
       }
     })
     .titleMode(HdsNavigationTitleMode.MODAL)

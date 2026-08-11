@@ -36,7 +36,7 @@ struct HdsTabsCustomizationRow {
         icon: HdsTabsCustomization.getDisplayIcon(this.tab.id, this.symbolRendering),
         isImage: this.tab.isImage,
         fontSize: 22,
-        fontColor: this.tab.color
+        fontColor: this.tab.brandPalette.brand
       })
         .width(28)
 

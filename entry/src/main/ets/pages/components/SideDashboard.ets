@@ -8,7 +8,7 @@ import { ITheme } from '../../common/theme/ThemeModel';
 
 @Component
 export struct SideDashboard {
-  @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @Prop theme: ITheme;
 
   @State currentDate: Date = new Date();
 
@@ -21,16 +21,13 @@ export struct SideDashboard {
   @State hasNextDue: boolean = false; // 控制是否显示 Next Due 的样式
 
   // 配色变量
-  @State colorMonth: ResourceColor = this.theme.accent
   @State colorDay: ResourceColor = $r('app.color.font_primary')
   @State colorWeek: ResourceColor = $r('app.color.font_secondary')
 
-  @State colorRing: ResourceColor = this.theme.brand
   @State colorYearBar: ResourceColor = $r('app.color.func_manual')
   @State colorNextDue: ResourceColor = $r('app.color.chart_red')
 
   @State cardBg: ResourceColor = $r('app.color.background_secondary')
-  @State dashboardBg: ResourceColor = this.theme.bgPrimary
 
   @StorageProp(C.KEY_ENGLISH_SOMEWHERE) @Watch('onLangModeChange') englishEnable: boolean = true;
   @StorageProp('IsAppDataReady') @Watch('onLangModeChange') _initialized: boolean = false;
@@ -248,7 +245,7 @@ export struct SideDashboard {
       Column() {
         Text(this.currentDate.toLocaleString(this.langTag, { month: 'short' }).toUpperCase())
           .fontSize(16)
-          .fontColor(this.colorMonth) // Accent Color
+          .fontColor(this.theme.accent) // Accent Color
           .fontWeight(FontWeight.Bold)
           .margin({ bottom: 2 })
 
@@ -278,7 +275,7 @@ export struct SideDashboard {
         Progress({ value: this.todayProgress, total: 100, type: ProgressType.Ring })
           .width(64)
           .height(64)
-          .color(this.colorRing) // Brand Blue
+          .color(this.theme.brand) // Brand Color
           .style({ strokeWidth: 8 })
 
         Column() {

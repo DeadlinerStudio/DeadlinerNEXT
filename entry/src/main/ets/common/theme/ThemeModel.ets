@@ -17,6 +17,15 @@ export interface UIThemePalette {
 }
 
 /**
+ * 主 Tab 的语义品牌色。
+ * 颜色归属于 Tab，是否应用到页面由 ThemeManager 决定。
+ */
+export interface TabBrandPalette {
+  brand: ResourceColor;
+  brand50: ResourceColor;
+}
+
+/**
  * 功能/指示器配置 (Undergo, Passed, Charts)
  * 负责进度条、状态圆环、图表颜色
  */

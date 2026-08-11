@@ -5,6 +5,7 @@ import { ITheme } from "../../common/theme/ThemeModel";
 import { ThemeManager } from '../../common/theme/ThemeManager';
 import { ImmersivePopupSurface } from "../../common/ui/ImmersivePopupSurface";
 import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
+import { curves } from '@kit.ArkUI';
 
 @Component
 export struct ArchivedDDLItemCard {
@@ -262,7 +263,13 @@ export struct DDLItemCardSimplified {
 
       // 2. 内容层
       Column() {
-        Row() {
+        Row({ space: 8 }) {
+          if (this.isStarred) {
+            SymbolGlyph($r('sys.symbol.star_fill'))
+              .fontSize(20)
+              .fontColor([this.indicatorColor])
+          }
+
           Text(this.title)
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
@@ -270,58 +277,45 @@ export struct DDLItemCardSimplified {
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
-            .margin({ right: 4 })
+
+          if (this.categoryName.length > 0) {
+            Row({ space: 4 }) {
+              SymbolGlyph(CategoryIconResolver.resolve(this.categoryIconKey))
+                .fontSize(12)
+                .fontColor([this.categoryColorHex])
+
+              Text(this.categoryName)
+                .fontSize(11)
+                .fontColor(this.categoryColorHex)
+                .maxLines(1)
+            }
+          }
 
           Text(this.remainingTimeAlt)
             .fontSize(12)
             .fontColor(this.titleColor)
             .maxLines(1)
-
-          if (this.isStarred) {
-            SymbolGlyph($r('sys.symbol.star_fill'))
-              .fontSize(20)
-              .fontColor([this.indicatorColor])
-              .margin({ left: 8 })
-          }
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
 
-        if (this.categoryName.length > 0 || this.note.length > 0) {
-          Row({ space: 8 }) {
-            if (this.categoryName.length > 0) {
-              Row({ space: 4 }) {
-                SymbolGlyph(CategoryIconResolver.resolve(this.categoryIconKey))
-                  .fontSize(12)
-                  .fontColor([this.categoryColorHex])
-
-                Text(this.categoryName)
-                  .fontSize(11)
-                  .fontColor(this.categoryColorHex)
-                  .maxLines(1)
-              }
-            }
-
-            if (this.note.length > 0) {
-              Text(this.note)
-                .fontSize(12)
-                .fontColor(this.noteColor)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1)
-            }
-          }
-          .width('100%')
-          .margin({ top: 6 })
+        if (this.note.length > 0) {
+          Text(this.note)
+            .fontSize(12)
+            .fontColor(this.noteColor)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+            .margin({ top: 4 })
         }
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .padding({ top: 14, bottom: 14, left: 16, right: 16 })
       .justifyContent(FlexAlign.SpaceBetween)
     }
     .width('100%')
-    .height(76)
+    .height(72)
     .borderRadius(24)
     // .backgroundColor(this.globalBgColor)
     .clip(true)
@@ -384,6 +378,8 @@ struct SelectionOverlay {
 @Component
 export struct DDLItemCardSwipeable {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
+  @StorageProp('currentIndicatorKey') currentIndicatorKey: string = 'vibrant';
+  @StorageLink('activeTaskCardSwipeId') @Watch('onActiveSwipeIdChange') activeSwipeId: number = -1;
 
   // 数据 Props
   @Prop title: string;
@@ -395,6 +391,7 @@ export struct DDLItemCardSwipeable {
   @Prop categoryName: string = '';
   @Prop categoryIconKey: string = '';
   @Prop categoryColorHex: string = '';
+  @Prop swipeId: number = -1;
 
   // 交互 Props
   @Prop selectionMode: boolean = false;
@@ -404,20 +401,35 @@ export struct DDLItemCardSwipeable {
   onClickItem?: () => void;
   onPrimaryAction?: () => void;
   onSecondaryAction?: () => void;
+  onDeleteAction?: () => void;
+  onEditAction?: () => void;
   onLongPressSelect?: () => void;
   onToggleSelect?: () => void;
   @Prop primaryActionSymbol: Resource = $r('sys.symbol.checkmark_circle');
   @Prop secondaryActionSymbol: Resource = $r('sys.symbol.trash');
   @Prop secondaryActionColor: ResourceColor = $r('app.color.chart_red');
+  @Prop editActionSymbol: Resource = $r('sys.symbol.square_and_pencil');
+  @Prop deleteActionSymbol: Resource = $r('sys.symbol.trash');
 
   // 内部状态
   @State offsetX: number = 0;
+  @State panStartOffset: number = 0;
   @State cardWidth: number = 0;
 
   // 颜色状态
   @State completeColor: ResourceColor = $r('app.color.chart_green'); // R.color.chart_green
-  @State surfaceVariant: ResourceColor = this.theme.bgPrimary;
   @State fontColor: ResourceColor = this.theme.bgPrimary
+  @State editColor: ResourceColor = $r('app.color.chart_blue');
+  @State deleteColor: ResourceColor = $r('app.color.chart_red');
+
+  private readonly CARD_HEIGHT: number = 70;
+  private readonly ACTION_BUTTON_SIZE: number = 48;
+  private readonly ACTION_BASE_GAP: number = 8;
+  private readonly ACTION_MAX_GAP: number = 24;
+  private readonly ACTION_SIDE_PADDING: number = 0;
+  private readonly ACTION_REVEAL_WIDTH: number = 112;
+  private readonly ACTION_REVEAL_TRIGGER_DISTANCE: number = 84;
+  private readonly ACTION_CLOSE_DISTANCE: number = 32;
 
   build() {
     Stack() {
@@ -425,55 +437,98 @@ export struct DDLItemCardSwipeable {
       // 1. 背景层 (滑动时露出)
       // ==================
       if (Math.abs(this.offsetX) > 0 && !this.selectionMode) {
-        Stack() {
-          // 根据滑动方向决定背景图标和颜色
-          // 这里简化了颜色插值(lerp)，直接根据方向显示
+        Row() {
           if (this.offsetX > 0) {
-            // 向右滑 -> 完成 (StartToEnd)
-            Row() {
-              Stack({ alignContent: Alignment.Center }) {
-                SymbolGlyph(this.primaryActionSymbol)
-                  .fontSize(24) // 图标的实际大小
-                  .fontColor([this.fontColor])
+            Row({ space: this.actionGap() }) {
+              Button({ type: ButtonType.Normal, stateEffect: true }) {
+                Column({ space: 2 }) {
+                  SymbolGlyph(this.primaryActionSymbol)
+                    .fontSize(19)
+                    .fontColor([this.fontColor])
+                  Text(this.primaryActionLabel())
+                    .fontSize(10)
+                    .fontColor(this.fontColor)
+                    .maxLines(1)
+                }
               }
-              .width(48)
-              .height(48)
-              .borderRadius(24) // 容器的圆形形状
-              .backgroundColor(this.completeColor)
-              .shadow({ radius: 4, color: this.completeColor });
+              .width(this.fullActionWidth())
+              .height(this.ACTION_BUTTON_SIZE)
+              .padding(0)
+              .borderRadius(this.ACTION_BUTTON_SIZE / 2)
+              .backgroundColor(this.primaryButtonColor())
+              .onClick((): void => this.runPrimaryAction())
+
+              Button({ type: ButtonType.Normal, stateEffect: true }) {
+                Column({ space: 2 }) {
+                  SymbolGlyph(this.secondaryActionSymbol)
+                    .fontSize(19)
+                    .fontColor([this.fontColor])
+                  Text(this.secondaryActionLabel())
+                    .fontSize(10)
+                    .fontColor(this.fontColor)
+                    .maxLines(1)
+                }
+              }
+              .width(this.ACTION_BUTTON_SIZE)
+              .height(this.ACTION_BUTTON_SIZE)
+              .padding(0)
+              .borderRadius(this.ACTION_BUTTON_SIZE / 2)
+              .backgroundColor(this.secondaryButtonColor())
+              .onClick((): void => this.runSecondaryAction())
             }
-            .width('100%')
             .height('100%')
-            .padding({ left: 20 })
-            .justifyContent(FlexAlign.Start)
+            .width(this.actionGroupWidth())
+            .padding({ left: this.ACTION_SIDE_PADDING, right: this.ACTION_SIDE_PADDING })
             .alignItems(VerticalAlign.Center)
-            // .backgroundColor(this.surfaceVariant)
+
+            Blank()
           } else {
-            // 向左滑 -> 删除 (EndToStart)
-            Row() {
-              Stack({ alignContent: Alignment.Center }) {
-                SymbolGlyph(this.secondaryActionSymbol)
-                  .fontSize(24) // 图标的实际大小
-                  .fontColor([this.fontColor])
+            Blank()
+
+            Row({ space: this.actionGap() }) {
+              Button({ type: ButtonType.Normal, stateEffect: true }) {
+                Column({ space: 2 }) {
+                  SymbolGlyph(this.editActionSymbol)
+                    .fontSize(19)
+                    .fontColor([this.fontColor])
+                  Text('编辑')
+                    .fontSize(10)
+                    .fontColor(this.fontColor)
+                }
               }
-              .width(48)
-              .height(48)
-              .borderRadius(24) // 容器的圆形形状
-              .backgroundColor(this.secondaryActionColor)
-              .shadow({ radius: 4, color: this.secondaryActionColor });
+              .width(this.ACTION_BUTTON_SIZE)
+              .height(this.ACTION_BUTTON_SIZE)
+              .padding(0)
+              .borderRadius(this.ACTION_BUTTON_SIZE / 2)
+              .backgroundColor(this.editButtonColor())
+              .onClick((): void => this.runEditAction())
+
+              Button({ type: ButtonType.Normal, stateEffect: true }) {
+                Column({ space: 2 }) {
+                  SymbolGlyph(this.deleteActionSymbol)
+                    .fontSize(19)
+                    .fontColor([this.fontColor])
+                  Text('删除')
+                    .fontSize(10)
+                    .fontColor(this.fontColor)
+                }
+              }
+              .width(this.fullActionWidth())
+              .height(this.ACTION_BUTTON_SIZE)
+              .padding(0)
+              .borderRadius(this.ACTION_BUTTON_SIZE / 2)
+              .backgroundColor(this.deleteButtonColor())
+              .onClick((): void => this.runDeleteAction())
             }
-            .width('100%')
             .height('100%')
-            .padding({ right: 20 })
+            .width(this.actionGroupWidth())
+            .padding({ left: this.ACTION_SIDE_PADDING, right: this.ACTION_SIDE_PADDING })
             .justifyContent(FlexAlign.End)
             .alignItems(VerticalAlign.Center)
-            // .backgroundColor(this.surfaceVariant)
           }
         }
         .width('100%')
-        .height(76)
-        .borderRadius(24)
-        .clip(true)
+        .height(this.CARD_HEIGHT)
       }
 
       // ==================
@@ -498,7 +553,7 @@ export struct DDLItemCardSwipeable {
         }
       }
       .width('100%') // 确保填满
-      .height(76)    // 确保高度一致
+      .height(this.CARD_HEIGHT) // 确保高度一致
       .borderRadius(24) // 【新增】由父容器统一控制圆角
       .clip(true)       // 【新增】强制裁剪子元素超出圆角的部分
       .translate({ x: this.offsetX }) // 核心位移
@@ -518,32 +573,30 @@ export struct DDLItemCardSwipeable {
 
           // 2. 拖动手势 (仅在非选择模式下启用)
           PanGesture({ direction: PanDirection.Horizontal })
+            .onActionStart(() => {
+              if (this.selectionMode) return;
+              this.claimSwipeFocus();
+              this.panStartOffset = this.offsetX;
+            })
             .onActionUpdate((event) => {
               if (this.selectionMode) return;
-              this.offsetX = event.offsetX;
+              const maxOffset = this.cardWidth * 0.82;
+              const minOffset = this.hasTrailingActions() ? -maxOffset : 0;
+              const accumulatedOffset = this.panStartOffset + event.offsetX;
+              this.offsetX = Math.max(minOffset, Math.min(maxOffset, accumulatedOffset));
             })
-            .onActionEnd(() => {
+            .onActionEnd((event: GestureEvent) => {
               if (this.selectionMode) return;
-
-              const threshold = this.cardWidth * 0.4; // 滑动超过 40% 触发
-
-              if (this.offsetX > threshold) {
-                // 触发完成
-                if (this.onPrimaryAction) this.onPrimaryAction();
-                // 动画回弹或保持(取决于你的业务逻辑，这里模拟 Compose 的回弹)
-                this.resetSwipe();
-              } else if (this.offsetX < -threshold) {
-                if (this.onSecondaryAction) this.onSecondaryAction();
-                this.resetSwipe();
-              } else {
-                // 未达到阈值，回弹
-                this.resetSwipe();
-              }
+              this.finishSwipe(event.offsetX);
             }),
 
           // 3. 点击手势
           TapGesture()
             .onAction(() => {
+              if (Math.abs(this.offsetX) > 0) {
+                this.resetSwipe();
+                return;
+              }
               if (this.selectionMode) {
                 if (this.onToggleSelect) this.onToggleSelect();
               } else {
@@ -554,11 +607,155 @@ export struct DDLItemCardSwipeable {
       )
     }
     .width('100%')
-    .height(76)
+    .height(this.CARD_HEIGHT)
   }
 
-  private resetSwipe() {
-    animateTo({ duration: 300, curve: Curve.FastOutSlowIn }, () => {
+  private primaryActionLabel(): string {
+    if (this.status === DDLStatus.COMPLETED) return '撤销完成';
+    if (this.status === DDLStatus.ABANDONED) return '恢复';
+    return '完成';
+  }
+
+  private secondaryActionLabel(): string {
+    if (this.status === DDLStatus.COMPLETED || this.status === DDLStatus.ABANDONED) return '归档';
+    return '放弃';
+  }
+
+  private primaryButtonColor(): ResourceColor {
+    if (this.currentIndicatorKey !== 'ios') return this.completeColor;
+    if (this.status === DDLStatus.ABANDONED) return $r('app.color.ios_orange');
+    return $r('app.color.ios_green');
+  }
+
+  private secondaryButtonColor(): ResourceColor {
+    if (this.currentIndicatorKey === 'ios' &&
+      this.status !== DDLStatus.COMPLETED && this.status !== DDLStatus.ABANDONED) {
+      return $r('app.color.ios_orange');
+    }
+    return this.secondaryActionColor;
+  }
+
+  private editButtonColor(): ResourceColor {
+    if (this.currentIndicatorKey === 'ios') return $r('app.color.ios_blue');
+    return this.editColor;
+  }
+
+  private deleteButtonColor(): ResourceColor {
+    if (this.currentIndicatorKey === 'ios') return $r('app.color.warning');
+    return this.deleteColor;
+  }
+
+  private hasTrailingActions(): boolean {
+    return this.onEditAction !== undefined && this.onDeleteAction !== undefined;
+  }
+
+  private claimSwipeFocus(): void {
+    if (this.swipeId < 0 || this.activeSwipeId === this.swipeId) return;
+    this.activeSwipeId = this.swipeId;
+  }
+
+  private onActiveSwipeIdChange(): void {
+    if (this.activeSwipeId === this.swipeId || Math.abs(this.offsetX) === 0) return;
+    this.resetSwipe();
+  }
+
+  private revealedDistance(): number {
+    return Math.abs(this.offsetX);
+  }
+
+  private actionGroupWidth(): number {
+    return Math.max(this.ACTION_REVEAL_WIDTH, this.revealedDistance());
+  }
+
+  private actionGap(): number {
+    const extraDistance = Math.max(0, this.revealedDistance() - this.ACTION_REVEAL_WIDTH);
+    const gapGrowth = Math.min(this.ACTION_MAX_GAP - this.ACTION_BASE_GAP, extraDistance);
+    return this.ACTION_BASE_GAP + gapGrowth;
+  }
+
+  private fullActionWidth(): number {
+    const separationDistance = this.ACTION_MAX_GAP - this.ACTION_BASE_GAP;
+    const stretchDistance = Math.max(0,
+      this.revealedDistance() - this.ACTION_REVEAL_WIDTH - separationDistance);
+    return this.ACTION_BUTTON_SIZE + stretchDistance;
+  }
+
+  private finishSwipe(gestureOffset: number): void {
+    const fullSwipeThreshold = this.cardWidth * 0.62;
+    const revealThreshold = this.ACTION_REVEAL_TRIGGER_DISTANCE;
+
+    if (this.offsetX > fullSwipeThreshold) {
+      this.runPrimaryAction();
+      return;
+    }
+    if (this.offsetX < -fullSwipeThreshold) {
+      this.runDeleteAction();
+      return;
+    }
+
+    if (this.panStartOffset <= -revealThreshold && gestureOffset > 0) {
+      if (this.offsetX >= revealThreshold) {
+        this.revealActions(this.ACTION_REVEAL_WIDTH);
+      } else if (gestureOffset >= this.ACTION_CLOSE_DISTANCE) {
+        this.resetSwipe();
+      } else {
+        this.revealActions(-this.ACTION_REVEAL_WIDTH);
+      }
+      return;
+    }
+
+    if (this.panStartOffset >= revealThreshold && gestureOffset < 0) {
+      if (this.offsetX <= -revealThreshold && this.hasTrailingActions()) {
+        this.revealActions(-this.ACTION_REVEAL_WIDTH);
+      } else if (Math.abs(gestureOffset) >= this.ACTION_CLOSE_DISTANCE) {
+        this.resetSwipe();
+      } else {
+        this.revealActions(this.ACTION_REVEAL_WIDTH);
+      }
+      return;
+    }
+
+    if (this.offsetX >= revealThreshold) {
+      this.revealActions(this.ACTION_REVEAL_WIDTH);
+    } else if (this.offsetX <= -revealThreshold) {
+      this.revealActions(-this.ACTION_REVEAL_WIDTH);
+    } else {
+      this.resetSwipe();
+    }
+  }
+
+  private runPrimaryAction(): void {
+    this.resetSwipe();
+    if (this.onPrimaryAction) this.onPrimaryAction();
+  }
+
+  private runSecondaryAction(): void {
+    this.resetSwipe();
+    if (this.onSecondaryAction) this.onSecondaryAction();
+  }
+
+  private runEditAction(): void {
+    this.resetSwipe();
+    if (this.onEditAction) this.onEditAction();
+  }
+
+  private runDeleteAction(): void {
+    this.resetSwipe();
+    if (this.onDeleteAction) this.onDeleteAction();
+  }
+
+  private revealActions(targetOffset: number): void {
+    this.getUIContext().animateTo({
+      curve: curves.responsiveSpringMotion(0.32, 0.78)
+    }, () => {
+      this.offsetX = targetOffset;
+    })
+  }
+
+  private resetSwipe(): void {
+    this.getUIContext().animateTo({
+      curve: curves.responsiveSpringMotion(0.38, 0.72)
+    }, () => {
       this.offsetX = 0;
     })
   }

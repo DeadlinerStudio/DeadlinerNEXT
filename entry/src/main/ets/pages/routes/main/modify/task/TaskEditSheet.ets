@@ -5,6 +5,7 @@ import { DateTimeUtils } from '../../../../../utils/DateTimeUtils';
 import { TaskFormView } from './TaskFormView';
 import { Toast } from '../../../../../common/ui/Toast';
 import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
+import { MaterialPresets } from '../../../../../common/style/SystemMaterialCompat';
 
 @Component
 export struct TaskEditSheet {
@@ -98,6 +99,7 @@ export struct TaskEditSheet {
           })
           .width('100%')
           .backgroundColor(this.theme.accent)
+          .attributeModifier(MaterialPresets.buttonGlow(true, undefined, this.theme.accent))
           .margin({ top: 8 })
 
         Blank().height(60)

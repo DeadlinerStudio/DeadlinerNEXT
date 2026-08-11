@@ -4,9 +4,11 @@ import { CategoryDisplayModel } from '../../common/kmp/KmpCategoryRepositoryAdap
 import { CategoryRepository } from '../../common/repository/CategoryRepository';
 import { SheetCompat } from '../../common/ui/SheetCompat';
 
+const FORM_CONTROL_RADIUS = 24;
+
 @Component
 export struct CategoryAssignmentField {
-  @Link categoryUid: string | null;
+  @Link @Watch('onCategoryUidChanged') categoryUid: string | null;
   @State private category: CategoryDisplayModel | null = null;
   @State private isPickerShown: boolean = false;
   private readonly repository: CategoryRepository = CategoryRepository.getInstance();
@@ -15,18 +17,26 @@ export struct CategoryAssignmentField {
     void this.resolveCategory();
   }
 
+  private onCategoryUidChanged(): void {
+    void this.resolveCategory();
+  }
+
   private async resolveCategory(): Promise<void> {
     if (this.categoryUid === null) {
       this.category = null;
       return;
     }
-    const categories: CategoryDisplayModel[] = await this.repository.listCategories();
-    this.category = null;
-    for (let index = 0; index < categories.length; index += 1) {
-      if (categories[index].uid === this.categoryUid) {
-        this.category = categories[index];
-        return;
+    try {
+      const categories: CategoryDisplayModel[] = await this.repository.listCategories();
+      this.category = null;
+      for (let index = 0; index < categories.length; index += 1) {
+        if (categories[index].uid === this.categoryUid) {
+          this.category = categories[index];
+          return;
+        }
       }
+    } catch (error) {
+      console.error('[CategoryAssignment] Resolve category failed: ' + String(error));
     }
   }
 
@@ -56,7 +66,7 @@ export struct CategoryAssignmentField {
       .padding({ left: 14, right: 14, top: 12, bottom: 12 })
     }
     .width('100%')
-    .borderRadius(16)
+    .borderRadius(FORM_CONTROL_RADIUS)
     .backgroundColor($r('sys.color.comp_background_tertiary'))
     .onClick((): void => { this.isPickerShown = true; })
     .bindSheet($$this.isPickerShown, this.categoryPickerBuilder(), SheetCompat.immersive({

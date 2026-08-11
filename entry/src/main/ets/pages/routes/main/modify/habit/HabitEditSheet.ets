@@ -5,6 +5,7 @@ import { HabitFormView } from './HabitFormView';
 import { HabitFormHelper } from './HabitFormHelper';
 import { Toast } from '../../../../../common/ui/Toast';
 import { CategoryAssignmentField } from '../../../../components/CategoryAssignmentField';
+import { MaterialPresets } from '../../../../../common/style/SystemMaterialCompat';
 
 @Component
 export struct HabitEditSheet {
@@ -161,6 +162,7 @@ export struct HabitEditSheet {
           })
           .width('100%')
           .backgroundColor(this.theme.accent)
+          .attributeModifier(MaterialPresets.buttonGlow(true, undefined, this.theme.accent))
           .margin({ top: 8 })
 
         Blank().height(60)

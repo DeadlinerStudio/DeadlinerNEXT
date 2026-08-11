@@ -20,6 +20,8 @@
 - [x] 在 SideBar 增加分类管理模式与软删除确认
 - [x] 接入任务/习惯卡片分类投影和刷新
 - [x] 大型改动完成后再统一编译
+- [x] 提取单选/多选共用的完整分类选择与管理面板
+- [x] 将 Sidebar 和 CategoryPickerSheet 收敛为模式与状态包装层
 
 ## 阶段 4：验证与回写
 
@@ -45,4 +47,9 @@
 - 2026-08-07：分类编辑器可选项同步 iOS 原语：36 个语义图标和 20 个 `color_token`→HEX 调色板集中定义；当前 HarmonyOS SDK 不包含 `cart_mirroring`，购物分类使用编译可用的 `cart` 兼容符号，`assembleHap` 成功。
 - 2026-08-09：分类编辑 Sheet 统一为原生标题与关闭按钮、透明模糊背景和 `FIT_CONTENT`/`MEDIUM`/`LARGE` 多档 detents；编辑内容去除重复标题，保存按钮接入主题品牌色沉浸光感，`assembleHap` 成功。
 - 2026-08-09：添加页分类字段和分类选择 Sheet 统一为 16 圆角；选择 Sheet 使用原生标题/关闭按钮与多档 detents，未分类选中态和新建分类入口均适配主题品牌色，`assembleHap` 成功。
+- 2026-08-10：分类编辑器监听编辑对象变化并回填名称、图标与颜色；任务/习惯编辑字段监听分类 UID 变化并回填显示。分类选择 Sheet 直接复用 `CategoryFilterSideBar.ets` 导出的分类行 Builder，保证选中态、圆角与图标呈现一致；`assembleHap` 成功。
+- 2026-08-10：设备崩溃日志定位到顶层 `CategorySelectionRow` Builder 被 HDS 的 `customItemBuilder` 调用时没有组件渲染上下文。将其改为同文件导出的 ArkUI 子组件，并将回调字段命名为 `onSelect` 以避免与组件 `onClick` 修饰器冲突；`assembleHap` 成功。
+- 2026-08-10：后续设备日志确认 HDS 的 `customItemBuilder` 也不能直接实例化 ArkUI 子组件，会以普通函数方式调用类构造器。新增 Sidebar 实例 Builder 作为 HDS 适配层，内部创建同一共享分类行组件；检查生成 ArkTS 输出已确认正确生成 `new CategorySelectionRow(this, ...)`，`assembleHap` 成功。
+- 2026-08-10：分类选择项拆分为独立 `CategorySelectionItem` 组件，并通过 `CategorySelectionMode.SINGLE` / `MULTIPLE` 显式区分任务编辑器单选与 Sidebar 多选语义；两侧 Builder 仅负责创建该共享组件。检查生成 ArkTS 输出与 `assembleHap` 均成功。
+- 2026-08-10：进一步将 Sidebar 的目录加载、全部/未分类、HDS 分类列表、横滑编辑删除、添加按钮及分类编辑 Sheet 提取为完整 `CategorySelectionPanel`。`CategoryPickerSheet` 仅包装 `SINGLE` 模式，Sidebar 仅包装安全区和 `MULTIPLE` 筛选状态；生成 ArkTS 上下文检查与 `assembleHap` 成功。
 - 大文件扫描发现的 `SearchPage.ets`（1105 行）与 `DatabaseHelper.ets`（1083 行）均为本轮之前已有的大文件；本轮未继续向其扩展分类管理职责。第三方 `oh_modules` 文件不属于本仓库治理范围。
