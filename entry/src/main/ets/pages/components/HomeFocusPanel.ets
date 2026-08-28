@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { common } from '@kit.AbilityKit';
 import { ITheme } from '../../common/theme/ThemeModel';
 import { SettingsConstants as C } from '../../common/local/SettingsConstants';
@@ -149,7 +150,7 @@ export struct HomeFocusPanel {
 
       this.snapshot = this.buildSnapshot(allDDLs, allHabits, completedHabitIds);
     } catch (e) {
-      console.error('[HomeFocusPanel] Refresh failed:', e);
+      AppLog.error('Native', '[HomeFocusPanel] Refresh failed:', e);
     } finally {
       this.isRefreshing = false;
     }

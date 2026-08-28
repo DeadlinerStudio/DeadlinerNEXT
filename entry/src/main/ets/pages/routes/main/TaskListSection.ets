@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import { DDLStatus } from "../../../model/DDLStatus";
 import { DDLItemCardSwipeable } from "../../components/TaskItemCard";
 import { curves, LengthMetrics, promptAction } from "@kit.ArkUI";
@@ -89,7 +90,7 @@ export struct TaskListSection {
 
     // 监听同步完成事件，自动刷新
     getContext(this).eventHub.on('sync_done', () => {
-      console.info('[Event] Received sync_done event, reloading...');
+      AppLog.info('Native', '[Event] Received sync_done event, reloading...');
       void this.loadData();
     });
 
@@ -97,7 +98,6 @@ export struct TaskListSection {
     // ArkUI has received the first frame instead of serializing lifecycle startup behind it.
     void this.loadData();
     void this.runStartupMaintenance();
-    this.repo.syncNow().catch((e: Error) => console.error(e.message));
   }
 
   aboutToDisappear(): void {
@@ -109,7 +109,7 @@ export struct TaskListSection {
       await this.repo.checkAndAutoArchive();
       await this.loadData();
     } catch (error) {
-      console.error('[TaskList] Startup maintenance failed: ' + String(error));
+      AppLog.error('Native', '[TaskList] Startup maintenance failed: ' + String(error));
     }
   }
 
@@ -146,9 +146,9 @@ export struct TaskListSection {
         return this.mapToUI(item, now, categories, snapshot.statusForTask(item.id));
       });
 
-      console.info(`[TaskList] Loaded ${this.taskList.length} items.`);
+      AppLog.info('Native', `[TaskList] Loaded ${this.taskList.length} items.`);
     } catch (e) {
-      console.error(`[TaskList] Load data failed: ${e}`);
+      AppLog.error('Native', `[TaskList] Load data failed: ${e}`);
     } finally {
       // 无论成功失败，都要关闭刷新动画
       this.isRefreshing = false;
@@ -272,7 +272,7 @@ export struct TaskListSection {
       await this.loadData();
       Toast.show({ message: successMessage });
     } catch (e) {
-      console.error(`Task action failed: ${e}`);
+      AppLog.error('Native', `Task action failed: ${e}`);
       Toast.show({ message: '操作失败' });
     }
   }
@@ -346,7 +346,7 @@ export struct TaskListSection {
             await this.loadData();
             Toast.show({ message: $r('app.string.toast_deletion') });
           } catch (e) {
-            console.error(`Delete failed: ${e}`);
+            AppLog.error('Native', `Delete failed: ${e}`);
             Toast.show({ message: '删除失败' });
           }
         }
@@ -412,7 +412,7 @@ export struct TaskListSection {
       this.exitSelectionMode();
       await this.loadData();
     } catch (e) {
-      console.error('Batch complete failed:', e);
+      AppLog.error('Native', 'Batch complete failed:', e);
     }
   }
 
@@ -448,7 +448,7 @@ export struct TaskListSection {
       this.exitSelectionMode();
       await this.loadData();
     } catch (e) {
-      console.error('Batch archive failed:', e);
+      AppLog.error('Native', 'Batch archive failed:', e);
       Toast.show({ message: '批量归档失败' });
     }
   }
@@ -480,7 +480,7 @@ export struct TaskListSection {
             this.exitSelectionMode();
             await this.loadData();
           } catch (e) {
-            console.error('Batch delete failed:', e);
+            AppLog.error('Native', 'Batch delete failed:', e);
           }
         }
       }
@@ -497,7 +497,7 @@ export struct TaskListSection {
       this.detailTask = task;
       this.isDetailSheetShow = true;
     } catch (e) {
-      console.error('Open detail failed:', e);
+      AppLog.error('Native', 'Open detail failed:', e);
       Toast.show({ message: '无法打开任务详情' });
     }
   }
@@ -512,7 +512,7 @@ export struct TaskListSection {
       this.editingTask = task;
       this.isEditSheetShow = true;
     } catch (e) {
-      console.error('Open task edit failed:', e);
+      AppLog.error('Native', 'Open task edit failed:', e);
       Toast.show({ message: '无法打开任务编辑' });
     }
   }
@@ -535,7 +535,7 @@ export struct TaskListSection {
       this.exitSelectionMode();
       this.isEditSheetShow = true;
     } catch (e) {
-      console.error('Open task edit failed:', e);
+      AppLog.error('Native', 'Open task edit failed:', e);
       Toast.show({ message: '无法打开任务编辑' });
     }
   }
@@ -722,7 +722,7 @@ export struct TaskListSection {
               try {
                 await this.repo.syncNow();
               } catch (e) {
-                console.error('Manual sync failed');
+                AppLog.error('Native', 'Manual sync failed');
               }
               await this.loadData();
               this.isRefreshing = false;

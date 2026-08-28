@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { SettingsConstants } from "../../../../common/local/SettingsConstants";
 import { LocalValues } from "../../../../common/local/LocalValues";
 import { promptAction, SymbolGlyphModifier } from '@kit.ArkUI';
@@ -206,7 +207,7 @@ export struct SettingsWebDavPage {
                     Toast.show({ message: '无数据变更或同步遇到问题，请检查网络/配置。' });
                   }
                 } catch (e) {
-                  console.error(`Sync Error: ${e}`);
+                  AppLog.error('Native', `Sync Error: ${e}`);
                   Toast.show({ message: `发生错误: ${e.message}` });
                 } finally {
                   this.isSyncing = false;

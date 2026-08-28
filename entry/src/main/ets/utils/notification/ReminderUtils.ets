@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { reminderAgentManager } from '@kit.BackgroundTasksKit';
 import { notificationManager } from '@kit.NotificationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
@@ -21,7 +22,7 @@ export class ReminderUtils {
 
     // 防御性处理：如果时间是过去的，或者太近（小于1秒），强制设为 1 秒后触发，避免报错
     if (diffInSeconds < 1) {
-      console.warn(`[ReminderUtils] Target time is too close or past. Adjusting to 1s.`);
+      AppLog.warn('Native', `[ReminderUtils] Target time is too close or past. Adjusting to 1s.`);
       diffInSeconds = 1;
     }
 
@@ -47,7 +48,7 @@ export class ReminderUtils {
       ringDuration: 0,
     };
 
-    console.info(`[ReminderUtils] Converting Calendar to Timer. Target: ${targetTime.toLocaleTimeString()} (in ${diffInSeconds}s)`);
+    AppLog.info('Native', `[ReminderUtils] Converting Calendar to Timer. Target: ${targetTime.toLocaleTimeString()} (in ${diffInSeconds}s)`);
     return await ReminderUtils.publish(targetReminder);
   }
 
@@ -88,11 +89,11 @@ export class ReminderUtils {
   // 通用发布逻辑
   private static async publish(reminder: reminderAgentManager.ReminderRequest): Promise<number> {
     try {
-      console.info(`[ReminderUtils] Publishing ID:${reminder.notificationId} Type:${reminder.reminderType}`);
+      AppLog.info('Native', `[ReminderUtils] Publishing ID:${reminder.notificationId} Type:${reminder.reminderType}`);
       return await reminderAgentManager.publishReminder(reminder);
     } catch (err) {
       const error = err as BusinessError;
-      console.error(`[ReminderUtils] FAILED: Code=${error.code}, Msg=${error.message}`);
+      AppLog.error('Native', `[ReminderUtils] FAILED: Code=${error.code}, Msg=${error.message}`);
       throw Error(error.message);
     }
   }
@@ -101,7 +102,7 @@ export class ReminderUtils {
   static async cancel(reminderId: number) {
     try {
       await reminderAgentManager.cancelReminder(reminderId);
-      console.info(`[ReminderUtils] Canceled ID: ${reminderId}`);
+      AppLog.info('Native', `[ReminderUtils] Canceled ID: ${reminderId}`);
     } catch (e) {
       // 忽略 ID 不存在的错误
     }

@@ -1,3 +1,4 @@
+import { AppLog } from '../common/logging/AppLog';
 import { common, Want } from '@kit.AbilityKit';
 import { MonthlyAnalysisResult } from '../ai/model/AIModels';
 import { Metric } from './OverviewUtils';
@@ -47,7 +48,7 @@ export class PaperTalkUtils {
       await context.startAbility(printWant);
       return;
     } catch (error) {
-      console.error(`[PaperTalkUtils] Open PaperTalk failed: ${JSON.stringify(error)}`);
+      AppLog.error('Native', `[PaperTalkUtils] Open PaperTalk failed: ${JSON.stringify(error)}`);
     }
 
     const storeWant: Want = {

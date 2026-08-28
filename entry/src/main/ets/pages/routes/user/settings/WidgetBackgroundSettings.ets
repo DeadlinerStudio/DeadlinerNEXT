@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { HdsNavDestination, HdsNavigationTitleMode, HdsNavDestinationAttribute } from '@kit.UIDesignKit';
 import { promptAction } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
@@ -70,7 +71,7 @@ struct WidgetBackgroundSettings {
         await this.saveImageToSandbox(result.photoUris[0]);
       }
     } catch (e) {
-      console.error('Photo picker failed', e);
+      AppLog.error('Native', 'Photo picker failed', e);
     }
   }
 
@@ -112,7 +113,7 @@ struct WidgetBackgroundSettings {
       const w = imageInfo.size.width;
       const h = imageInfo.size.height;
 
-      console.info(`[Settings] Original Size: ${w}x${h}`);
+      AppLog.info('Native', `[Settings] Original Size: ${w}x${h}`);
 
       // 4. 计算缩放后的尺寸 (保持比例，限制最大边为 1024，或者短边为 512)
       // 这里策略是：让短边至少为 512，保证清晰度
@@ -135,7 +136,7 @@ struct WidgetBackgroundSettings {
       targetW = Math.round(w * scale);
       targetH = Math.round(h * scale);
 
-      console.info(`[Settings] Target Size: ${targetW}x${targetH} (Scale: ${scale})`);
+      AppLog.info('Native', `[Settings] Target Size: ${targetW}x${targetH} (Scale: ${scale})`);
 
       // 5. 设置解码参数：只缩放，不裁切
       // 移除 desiredRegion，避免“拉伸”BUG
@@ -151,7 +152,7 @@ struct WidgetBackgroundSettings {
       // 7. 计算亮度
       // 虽然是全图亮度，但在 Cover 模式下，通常全图亮度和中心区域亮度差别不会导致文字彻底看不清
       const isDarkBg = await this.calculatePixelMapBrightness(pixelMap);
-      console.info(`[Settings] Background is dark? ${isDarkBg}`);
+      AppLog.info('Native', `[Settings] Background is dark? ${isDarkBg}`);
 
       LocalValues.getInstance().setWidgetIsWhiteText(isDarkBg);
       this.widgetData.isWhiteText = isDarkBg;
@@ -162,7 +163,7 @@ struct WidgetBackgroundSettings {
 
       const data: ArrayBuffer = await imagePacker.packing(pixelMap, packingOpts);
 
-      console.info(`[Settings] Final saved size: ${data.byteLength / 1024} KB`);
+      AppLog.info('Native', `[Settings] Final saved size: ${data.byteLength / 1024} KB`);
 
       const targetFile = fs.openSync(targetPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
       fs.writeSync(targetFile.fd, data);
@@ -181,7 +182,7 @@ struct WidgetBackgroundSettings {
       Toast.show({ message: '背景已设置' });
 
     } catch (e) {
-      console.error('Save/Scale image failed', JSON.stringify(e));
+      AppLog.error('Native', 'Save/Scale image failed', JSON.stringify(e));
       Toast.show({ message: '图片处理失败' });
     } finally {
       if (pixelMap) pixelMap.release();
@@ -222,12 +223,12 @@ struct WidgetBackgroundSettings {
       }
 
       const avgLuminance = totalLuminance / sampledCount;
-      console.info(`[Settings] Avg Luminance: ${avgLuminance}`);
+      AppLog.info('Native', `[Settings] Avg Luminance: ${avgLuminance}`);
 
       // 阈值：< 140 算深色 (需要白字)
       return avgLuminance < 140;
     } catch (e) {
-      console.error('Calc brightness failed', e);
+      AppLog.error('Native', 'Calc brightness failed', e);
       return true; // 失败默认当深色处理
     }
   }
@@ -235,7 +236,7 @@ struct WidgetBackgroundSettings {
   updateDesktopWidget() {
     const context = this.context;
     if (context) {
-      console.info('[WidgetBackgroundSettings] Updating widgets now...');
+      AppLog.info('Native', '[WidgetBackgroundSettings] Updating widgets now...');
       WidgetUpdater.updateAllWidgets(context);
     }
   }

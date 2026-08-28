@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import {
   DividerShowType,
   HdsListItem,
@@ -84,7 +85,7 @@ export struct AIPage {
 
     this.isAiFlowShown = true;
 
-    console.log('[DEBUG] play AI flow')
+    AppLog.debug('Native', '[DEBUG] play AI flow')
 
     this.flowTimerId = setTimeout(() => {
       animateTo({ duration: 500, curve: Curve.EaseOut }, () => {

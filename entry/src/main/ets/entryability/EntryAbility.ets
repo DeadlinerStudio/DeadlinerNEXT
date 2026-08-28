@@ -1,3 +1,4 @@
+import { AppLog } from '../common/logging/AppLog';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { display, ThemeControl, window } from '@kit.ArkUI';
@@ -27,6 +28,7 @@ export default class EntryAbility extends UIAbility {
   private mainWindowClass: window.Window | undefined = undefined;
 
   async onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): Promise<void> {
+    AppLog.initialize(this.context);
     try {
       this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
       AppStorage.setOrCreate(C.KEY_ENABLE_API23, API23_UI_DEFAULT);
@@ -43,15 +45,15 @@ export default class EntryAbility extends UIAbility {
       await LocalValues.getInstance().init(this.context);
 
       if (this.mainWindowClass) {
-        hilog.info(DOMAIN, 'testTag', 'LocalValues loaded after window created, refreshing window mode...');
+        AppLog.info('HiLog', DOMAIN, 'testTag', 'LocalValues loaded after window created, refreshing window mode...');
         this.updateWindowMode(this.mainWindowClass);
       }
 
       void this.initializeDeferredServices(migrationReady);
     } catch (err) {
-      hilog.error(DOMAIN, 'testTag', 'Startup failed. Cause: %{public}s', String(err));
+      AppLog.error('HiLog', DOMAIN, 'testTag', 'Startup failed. Cause: %{public}s', String(err));
     }
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
+    AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
 
     void this.initializeNonBlockingServices(want);
   }
@@ -61,11 +63,11 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
+    AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
+    AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
 
     this.mainWindowClass = windowStage.getMainWindowSync();
 
@@ -74,11 +76,11 @@ export default class EntryAbility extends UIAbility {
 
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
-        hilog.error(DOMAIN, 'testTag', 'Failed to load content: %{public}s', JSON.stringify(err));
+        AppLog.error('HiLog', DOMAIN, 'testTag', 'Failed to load content: %{public}s', JSON.stringify(err));
         return;
       }
 
-      hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
+      AppLog.info('HiLog', DOMAIN, 'testTag', 'Succeeded in loading the content.');
 
       this.handleResponsiveImmersive(windowStage);
 
@@ -93,20 +95,20 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageDestroy(): void {
     // Main window is destroyed, release UI related resources
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
+    AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
   }
 
   onForeground(): void {
     // Ability has brought to foreground
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
-    console.info('[GuideDebug][EntryAbility] onForeground');
+    AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
+    AppLog.info('Native', '[GuideDebug][EntryAbility] onForeground');
     WidgetUpdater.updateAllWidgets(this.context)
   }
 
   onBackground(): void {
     // Ability has back to background
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
-    console.info('[GuideDebug][EntryAbility] onBackground');
+    AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
+    AppLog.info('Native', '[GuideDebug][EntryAbility] onBackground');
     WidgetUpdater.updateAllWidgets(this.context)
   }
 
@@ -116,7 +118,7 @@ export default class EntryAbility extends UIAbility {
         this.updateWindowMode(windowClass);
       }
     }).catch((err: BusinessError) => {
-      hilog.debug(DOMAIN, 'testTag', 'Window not ready during config update (Expected in onCreate): ' + err.code);
+      AppLog.debug('HiLog', DOMAIN, 'testTag', 'Window not ready during config update (Expected in onCreate): ' + err.code);
     });
   }
 
@@ -125,9 +127,9 @@ export default class EntryAbility extends UIAbility {
     try {
       await migrationReady;
       await AIService.getInstance().init(this.context);
-      console.info('[EntryAbility] KMP-dependent services initialized after migration.');
+      AppLog.info('Native', '[EntryAbility] KMP-dependent services initialized after migration.');
     } catch (error) {
-      hilog.error(DOMAIN, 'testTag', 'Deferred KMP startup failed: %{public}s', String(error));
+      AppLog.error('HiLog', DOMAIN, 'testTag', 'Deferred KMP startup failed: %{public}s', String(error));
     }
   }
 
@@ -138,7 +140,7 @@ export default class EntryAbility extends UIAbility {
       const json: string = buffer.from(file.buffer).toString();
       auth.init(this.context, json);
 
-      console.info('[EntryAbility] Initializing ReminderDataManager...');
+      AppLog.info('Native', '[EntryAbility] Initializing ReminderDataManager...');
       await ReminderDataManager.getInstance().init(this.context);
       await ManualDataManager.getInstance().loadMenu(this.context);
       await TaskRepository.getInstance().initialReminderCheck();
@@ -148,7 +150,7 @@ export default class EntryAbility extends UIAbility {
       this.checkLoginStatus();
       this.handleWidgetRoute(want);
     } catch (error) {
-      hilog.error(DOMAIN, 'testTag', 'Deferred startup service failed: %{public}s', String(error));
+      AppLog.error('HiLog', DOMAIN, 'testTag', 'Deferred startup service failed: %{public}s', String(error));
     }
   }
 
@@ -158,17 +160,17 @@ export default class EntryAbility extends UIAbility {
     auth.getCurrentUser()
       .then((user) => {
         if (user) {
-          hilog.info(0x0000, 'EntryAbility', 'User already logged in: %{public}s | %{public}s', user.getUid(), user.getDisplayName());
+          AppLog.info('HiLog', 0x0000, 'EntryAbility', 'User already logged in: %{public}s | %{public}s', user.getUid(), user.getDisplayName());
           // 状态确认：已登录
           AppStorage.setOrCreate('isLoggedIn', true);
         } else {
-          hilog.info(0x0000, 'EntryAbility', 'User not logged in');
+          AppLog.info('HiLog', 0x0000, 'EntryAbility', 'User not logged in');
           // 状态确认：未登录
           AppStorage.setOrCreate('isLoggedIn', false);
         }
       })
       .catch((err: BusinessError) => {
-        hilog.error(0x0000, 'EntryAbility', 'Check user failed: %{public}s', err.message);
+        AppLog.error('HiLog', 0x0000, 'EntryAbility', 'Check user failed: %{public}s', err.message);
         AppStorage.setOrCreate('isLoggedIn', false);
       });
   }
@@ -235,7 +237,7 @@ export default class EntryAbility extends UIAbility {
         isStatusBarLightIcon: isDark
       });
 
-      hilog.info(DOMAIN, 'testTag', `Width: ${widthVp}vp breakpoint=${breakpoint}. Mode: Immersive`);
+      AppLog.info('HiLog', DOMAIN, 'testTag', `Width: ${widthVp}vp breakpoint=${breakpoint}. Mode: Immersive`);
     } else {
       windowClass.setWindowLayoutFullScreen(false);
       windowClass.setWindowSystemBarProperties({
@@ -245,7 +247,7 @@ export default class EntryAbility extends UIAbility {
         isStatusBarLightIcon: isDark
       });
 
-      hilog.info(DOMAIN, 'testTag', `Width: ${widthVp}vp breakpoint=${breakpoint}. Mode: Normal`);
+      AppLog.info('HiLog', DOMAIN, 'testTag', `Width: ${widthVp}vp breakpoint=${breakpoint}. Mode: Normal`);
     }
 
     this.updateAvoidRects(windowClass);
@@ -261,11 +263,11 @@ export default class EntryAbility extends UIAbility {
 
   private async requestNotificationPermissionIfNeeded(): Promise<void> {
     const isFirstLaunch = await LocalValues.getInstance().getIsAppFirstLaunch();
-    console.info(`[GuideDebug][EntryAbility] requestNotificationPermissionIfNeeded isFirstLaunch=${isFirstLaunch}`);
+    AppLog.info('Native', `[GuideDebug][EntryAbility] requestNotificationPermissionIfNeeded isFirstLaunch=${isFirstLaunch}`);
     AppStorage.setOrCreate('NotificationPermissionRequestInProgress', false);
 
     if (isFirstLaunch) {
-      console.info('[GuideDebug][EntryAbility] requestNotificationPermissionIfNeeded:skipFirstLaunch');
+      AppLog.info('Native', '[GuideDebug][EntryAbility] requestNotificationPermissionIfNeeded:skipFirstLaunch');
       return;
     }
 
@@ -273,21 +275,21 @@ export default class EntryAbility extends UIAbility {
   }
 
   private requestNotificationPermission() {
-    console.info('[GuideDebug][EntryAbility] requestNotificationPermission:start');
+    AppLog.info('Native', '[GuideDebug][EntryAbility] requestNotificationPermission:start');
     AppStorage.setOrCreate('NotificationPermissionRequestInProgress', true);
     notificationManager.isNotificationEnabled().then((enabled: boolean) => {
-      console.info(`[GuideDebug][EntryAbility] requestNotificationPermission:before enabled=${enabled}`);
+      AppLog.info('Native', `[GuideDebug][EntryAbility] requestNotificationPermission:before enabled=${enabled}`);
     }).catch((err: BusinessError) => {
-      console.error(`[GuideDebug][EntryAbility] requestNotificationPermission:beforeCheckFailed code=${err.code} message=${err.message}`);
+      AppLog.error('Native', `[GuideDebug][EntryAbility] requestNotificationPermission:beforeCheckFailed code=${err.code} message=${err.message}`);
     });
 
     notificationManager.requestEnableNotification(this.context).then(() => {
-      hilog.info(DOMAIN, 'testTag', '[ANS] requestEnableNotification success');
-      console.info('[GuideDebug][EntryAbility] requestNotificationPermission:success');
+      AppLog.info('HiLog', DOMAIN, 'testTag', '[ANS] requestEnableNotification success');
+      AppLog.info('Native', '[GuideDebug][EntryAbility] requestNotificationPermission:success');
       AppStorage.setOrCreate('NotificationPermissionRequestInProgress', false);
     }).catch((err: BusinessError) => {
-      hilog.error(DOMAIN, 'testTag', '[ANS] requestEnableNotification failed, code is %{public}d', err.code);
-      console.error(`[GuideDebug][EntryAbility] requestNotificationPermission:failed code=${err.code} message=${err.message}`);
+      AppLog.error('HiLog', DOMAIN, 'testTag', '[ANS] requestEnableNotification failed, code is %{public}d', err.code);
+      AppLog.error('Native', `[GuideDebug][EntryAbility] requestNotificationPermission:failed code=${err.code} message=${err.message}`);
       AppStorage.setOrCreate('NotificationPermissionRequestInProgress', false);
     });
   }

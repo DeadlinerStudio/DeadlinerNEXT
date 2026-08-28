@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { SettingsConstants as C } from '../../common/local/SettingsConstants';
 import { ITheme } from '../../common/theme/ThemeModel';
 import { Habit, HabitGoalType, HabitPeriod, HabitRecordStatus } from '../../model/DDLModels';
@@ -462,7 +463,7 @@ export struct HabitRow {
         }
       }
     } catch (error) {
-      console.error('[HabitRow] Load category badge failed: ' + String(error));
+      AppLog.error('Native', '[HabitRow] Load category badge failed: ' + String(error));
     }
   }
 

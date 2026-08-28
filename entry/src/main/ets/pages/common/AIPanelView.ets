@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { i18n } from '@kit.LocalizationKit';
 import util from '@ohos.util';
 import {
@@ -268,7 +269,7 @@ export struct AIWorkspaceView {
       this.appendResultToUI(result);
 
     } catch (err) {
-      console.error("[AIPanelView] Error:", JSON.stringify(err));
+      AppLog.error('Native', "[AIPanelView] Error:", JSON.stringify(err));
       const errItem = new DisplayItem(DisplayItemType.AIChat);
       errItem.text = `抱歉，遇到问题：${err instanceof Error ? err.message : '未知网络错误'}`;
       this.displayItems.push(errItem);
@@ -325,7 +326,7 @@ export struct AIWorkspaceView {
       this.clearProposalToolRequest(req.tool, req.id);
 
     } catch (err) {
-      console.error("[AIPanelView] Tool Error:", JSON.stringify(err));
+      AppLog.error('Native', "[AIPanelView] Tool Error:", JSON.stringify(err));
       const errItem = new DisplayItem(DisplayItemType.AIChat);
       errItem.text = `工具执行失败：${err instanceof Error ? err.message : '未知错误'}`;
       this.displayItems.push(errItem);
@@ -885,7 +886,7 @@ export struct AIWorkspaceView {
       }
 
     } catch (err) {
-      console.error("[AIPanelView] 创建习惯失败", JSON.stringify(err));
+      AppLog.error('Native', "[AIPanelView] 创建习惯失败", JSON.stringify(err));
     } finally {
       this.repoBusy = false;
     }

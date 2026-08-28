@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import {
   BottomBuilderShowType,
   HdsNavDestination
@@ -579,7 +580,7 @@ export struct SearchPage {
       await this.refreshCurrentResults();
       getContext(this).eventHub.emit('sync_done');
     } catch (e) {
-      console.error('Task complete failed', e);
+      AppLog.error('Native', 'Task complete failed', e);
     }
   }
 
@@ -610,7 +611,7 @@ export struct SearchPage {
       void this.refreshCurrentResults();
       getContext(this).eventHub.emit('sync_done');
     }).catch((e: Error) => {
-      console.error('Task archive failed', e);
+      AppLog.error('Native', 'Task archive failed', e);
     });
   }
 
@@ -631,7 +632,7 @@ export struct SearchPage {
       await this.refreshCurrentResults();
       getContext(this).eventHub.emit('sync_done');
     } catch (e) {
-      console.error('Habit toggle failed', e);
+      AppLog.error('Native', 'Habit toggle failed', e);
     } finally {
       this.togglingHabitIds.delete(item.habit.id);
     }

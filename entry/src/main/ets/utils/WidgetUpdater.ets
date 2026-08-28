@@ -1,3 +1,4 @@
+import { AppLog } from '../common/logging/AppLog';
 import { formBindingData, formProvider } from '@kit.FormKit';
 import { preferences } from '@kit.ArkData';
 import { TaskRepository } from '../common/repository/TaskRepository';
@@ -26,7 +27,7 @@ export class WidgetUpdater {
       const formIds = (await pref.get('formIds', [])) as Array<string>;
 
       if (formIds.length === 0) {
-        console.warn('[WidgetUpdater] No widgets to update.');
+        AppLog.warn('Native', '[WidgetUpdater] No widgets to update.');
         return;
       }
 
@@ -85,7 +86,7 @@ export class WidgetUpdater {
         else capsuleData.summary = `有任务待完成`;
       }
 
-      console.log('[WidgetUpdater] validTask.length ', validTasks.length, ' | capsuleData ', capsuleData.remainingCount, capsuleData.summary)
+      AppLog.debug('Native', '[WidgetUpdater] validTask.length ', validTasks.length, ' | capsuleData ', capsuleData.remainingCount, capsuleData.summary)
 
       const bindingCapsule = formBindingData.createFormBindingData({
         'widgetData': capsuleData
@@ -133,7 +134,7 @@ export class WidgetUpdater {
       hudData.totalCount = activeTasks.length;    // 总共 (活跃)
       hudData.habitCount = pendingHabitCount;
 
-      console.log(`[WidgetUpdater] todoCount: ${hudData.todoCount} | totalCount: ${hudData.totalCount}`)
+      AppLog.debug('Native', `[WidgetUpdater] todoCount: ${hudData.todoCount} | totalCount: ${hudData.totalCount}`)
 
       const bindingHud = formBindingData.createFormBindingData({ 'hudData': hudData });
 
@@ -160,12 +161,12 @@ export class WidgetUpdater {
         try {
           const stat = fs.statSync(fsPath);
           if (stat.size > 1024 * 1024) {
-            console.error('[WidgetUpdater] ⚠️ WARNING: Image size > 1MB');
+            AppLog.error('Native', '[WidgetUpdater] ⚠️ WARNING: Image size > 1MB');
           }
           file = fs.openSync(fsPath, fs.OpenMode.READ_ONLY);
           widgetData.backgroundImage = 'memory://' + formImageKey;
         } catch (err) {
-          console.error(`[WidgetUpdater] Failed to open image: ${err}`);
+          AppLog.error('Native', `[WidgetUpdater] Failed to open image: ${err}`);
           widgetData.backgroundImage = null;
         }
       }
@@ -218,31 +219,31 @@ export class WidgetUpdater {
       for (const id of formIds) {
         const type = await pref.get(id, 'widget') as string;
 
-        console.info(`[WidgetUpdater] Dispatching to ID: ${id} | Type: ${type}`);
+        AppLog.info('Native', `[WidgetUpdater] Dispatching to ID: ${id} | Type: ${type}`);
 
         try {
           if (type === 'widget_capsule'|| type === 'widget_lock_capsule') {
-            console.debug(`[WidgetUpdater] Updating CAPSULE form ${id}`);
+            AppLog.debug('Native', '[WidgetUpdater] Updating CAPSULE form ' + id);
             await formProvider.updateForm(id, bindingCapsule);
           } else if (type === 'widget_transparent_clock_card') {
             await formProvider.updateForm(id, bindingHud);
           } else {
-            console.debug(`[WidgetUpdater] Updating LIST form ${id}`);
+            AppLog.debug('Native', '[WidgetUpdater] Updating LIST form ' + id);
             await formProvider.updateForm(id, bindingList);
           }
         } catch (updateErr) {
           // 单个卡片更新失败不应阻断其他卡片
-          console.error(`[WidgetUpdater] Failed to update form ${id} (${type}): ${updateErr}`);
+          AppLog.error('Native', `[WidgetUpdater] Failed to update form ${id} (${type}): ${updateErr}`);
 
           // 可选：如果更新报 16501001 (ID不存在)，可以在这里顺手清理 pref
           // await WidgetUpdater.cleanInvalidId(context, id);
         }
       }
 
-      console.info(`[WidgetUpdater] Updated ${formIds.length} widgets.`);
+      AppLog.info('Native', `[WidgetUpdater] Updated ${formIds.length} widgets.`);
 
     } catch (e) {
-      console.error(`[WidgetUpdater] Update failed: ${e}`);
+      AppLog.error('Native', `[WidgetUpdater] Update failed: ${e}`);
     }
   }
 

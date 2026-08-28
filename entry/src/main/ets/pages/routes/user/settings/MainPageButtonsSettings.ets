@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { HdsNavDestination, HdsNavDestinationAttribute } from '@kit.UIDesignKit';
 import { SettingsConstants as C } from '../../../../common/local/SettingsConstants';
 import { MainButtonType } from '../../../../common/local/LocalModels';
@@ -57,7 +58,7 @@ struct TopBarSchematic {
 
   onTypeChange() {
     // 如果日志打印了，说明数据传进来了，UI 应该刷新
-    console.info(`TopBarSchematic update: left=${this.leftType}, right=${this.rightType}`);
+    AppLog.info('Native', `TopBarSchematic update: left=${this.leftType}, right=${this.rightType}`);
   }
 
   build() {

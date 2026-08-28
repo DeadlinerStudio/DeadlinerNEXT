@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../../common/logging/AppLog';
 import { promptAction } from '@kit.ArkUI';
 import { i18n } from '@kit.LocalizationKit';
 import { HabitRepository } from '../../../../../common/repository/HabitRepository';
@@ -93,7 +94,7 @@ export class HabitFormHelper {
       Toast.show({ message: '创建成功' });
       return true;
     } catch (e) {
-      console.error(`Add habit failed: ${e}`);
+      AppLog.error('Native', `Add habit failed: ${e}`);
       Toast.show({ message: '创建失败: ' + (e.message || e) });
       return false;
     }

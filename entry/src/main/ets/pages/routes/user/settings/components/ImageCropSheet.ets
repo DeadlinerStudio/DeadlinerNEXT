@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../../common/logging/AppLog';
 import { Toast } from '../../../../../common/ui/Toast';
 import * as image_cropper from "@candies/image_cropper";
 import { ImageCropper } from "@candies/image_cropper";
@@ -92,7 +93,7 @@ export struct ImageCropSheet {
         this.sourceUri = photoSelectResult.photoUris[0];
       }
     } catch (err) {
-      console.error('[ImageCrop] Pick image failed:', err);
+      AppLog.error('Native', '[ImageCrop] Pick image failed:', err);
     }
   }
 
@@ -107,7 +108,7 @@ export struct ImageCropSheet {
       this.imageSource = image.createImageSource(file.fd);
       this.isLoading = false;
     } catch (e) {
-      console.error('[ImageCrop] Load image failed:', e);
+      AppLog.error('Native', '[ImageCrop] Load image failed:', e);
       this.isLoading = false;
       this.imageSource = undefined;
     }
@@ -123,7 +124,7 @@ export struct ImageCropSheet {
     try {
       const pixelMap = await this.controller.getCroppedImage();
       if (!pixelMap) {
-        console.error('[ImageCrop] Get cropped image failed');
+        AppLog.error('Native', '[ImageCrop] Get cropped image failed');
         this.isLoading = false;
         return;
       }
@@ -171,7 +172,7 @@ export struct ImageCropSheet {
             return;
           }
         } catch (lubanErr) {
-          console.error(`[ImageCrop] Luban compress failed: ${lubanErr}`);
+          AppLog.error('Native', `[ImageCrop] Luban compress failed: ${lubanErr}`);
         }
       }
 
@@ -188,7 +189,7 @@ export struct ImageCropSheet {
       if (this.onComplete) this.onComplete(savedUri, this.isBlurEnabled);
 
     } catch (e) {
-      console.error('[ImageCrop] Crop and save failed:', e);
+      AppLog.error('Native', '[ImageCrop] Crop and save failed:', e);
       this.isLoading = false;
     }
   }

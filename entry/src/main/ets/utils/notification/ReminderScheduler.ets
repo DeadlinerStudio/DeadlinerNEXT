@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { ReminderDataManager } from './ReminderDataManager';
 import { ActiveReminder } from '../../model/ActiveReminder';
 import { DateTimeUtils } from '../../utils/DateTimeUtils';
@@ -40,7 +41,7 @@ export class ReminderScheduler {
       const systemReminders = await reminderAgentManager.getValidReminders();
       if (systemReminders.length === 0 && activeReminders.length > 0) {
         // 如果系统返回空，但本地有记录，可能是接口延迟或权限问题，保守处理，暂不视为僵尸
-        console.warn(`[Scheduler] System returned 0 reminders but local has ${activeReminders.length}. Skipping sync.`);
+        AppLog.warn('Native', `[Scheduler] System returned 0 reminders but local has ${activeReminders.length}. Skipping sync.`);
         return [];
       }
 
@@ -49,13 +50,13 @@ export class ReminderScheduler {
 
       for (const record of activeReminders) {
         if (!systemIds.has(record.reminderId)) {
-          console.warn(`[Scheduler] Potential zombie found: ${record.targetId} (ID:${record.reminderId}).`);
+          AppLog.warn('Native', `[Scheduler] Potential zombie found: ${record.targetId} (ID:${record.reminderId}).`);
           zombieIds.push(record.targetId);
         }
       }
       return zombieIds;
     } catch (e) {
-      console.error(`[Scheduler] Sync failed: ${e}.`);
+      AppLog.error('Native', `[Scheduler] Sync failed: ${e}.`);
       return [];
     }
   }
@@ -87,13 +88,13 @@ export class ReminderScheduler {
   }
 
   private static async performDDLRefresh(allDDLs: DDLItem[]) {
-    console.info('[Scheduler] Start refreshing DDLs...');
+    AppLog.info('Native', '[Scheduler] Start refreshing DDLs...');
 
     const isEnabled = LocalValues.getInstance().getDDLWarning();
     const manager = ReminderDataManager.getInstance();
 
     if (!isEnabled) {
-      console.info('[Scheduler] DDL Warning is DISABLED. Clearing existing reminders...');
+      AppLog.info('Native', '[Scheduler] DDL Warning is DISABLED. Clearing existing reminders...');
       await ReminderScheduler.clearAllDDLReminders(manager.getAllByType('DDL'), []);
       return;
     }
@@ -131,8 +132,8 @@ export class ReminderScheduler {
   // =========================================================
   // 2. 习惯打卡 (循环 - 使用 Alarm)
   // =========================================================
-  static async refreshHabits(allHabits: Habit[]) {
-    console.info('[Scheduler] Start refreshing HABIT reminders...');
+  static async refreshHabits(plans: HabitReminderPlan[]): Promise<void> {
+    AppLog.info('Native', '[Scheduler] Start refreshing HABIT reminders...');
 
     const isEnabled = LocalValues.getInstance().getHabitReminder();
     const manager = ReminderDataManager.getInstance();
@@ -151,7 +152,7 @@ export class ReminderScheduler {
 
     if (!isEnabled) {
       if (activeReminders.length > 0) {
-        console.info('[Scheduler] Habit Reminder is DISABLED. Clearing existing reminders...');
+        AppLog.info('Native', '[Scheduler] Habit Reminder is DISABLED. Clearing existing reminders...');
         for (const record of activeReminders) {
           await ReminderScheduler.cancelAndRemove(record.type, record.targetId, record.reminderId, "Feature disabled");
         }
@@ -225,7 +226,7 @@ export class ReminderScheduler {
       const recordDate = new Date(existingRecord.triggerTime);
 
       if (recordDate.getHours() === hour && recordDate.getMinutes() === minute) {
-        console.info('[Scheduler] Daily Summary time unchanged. Skip.');
+        AppLog.info('Native', '[Scheduler] Daily Summary time unchanged. Skip.');
         return;
       }
       await ReminderScheduler.cancelAndRemove('SUMMARY', TARGET_ID, existingRecord.reminderId, "Time update");
@@ -235,7 +236,7 @@ export class ReminderScheduler {
     try {
       const daysOfWeek = [1, 2, 3, 4, 5, 6, 7]; // 每天
 
-      console.info(`[Scheduler] Publishing Daily Summary at ${hour}:${minute}`);
+      AppLog.info('Native', `[Scheduler] Publishing Daily Summary at ${hour}:${minute}`);
 
       const reminderId = await ReminderUtils.publishAlarm(
         "每日摘要",
@@ -257,7 +258,7 @@ export class ReminderScheduler {
       };
       await manager.addOrUpdate(newRecord);
     } catch (e) {
-      console.error(`[Scheduler] Failed to publish summary: ${e}`);
+      AppLog.error('Native', `[Scheduler] Failed to publish summary: ${e}`);
     }
   }
 
@@ -266,7 +267,7 @@ export class ReminderScheduler {
   // ==========================================
 
   private static async cancelAndRemove(type: 'SUMMARY' | 'HABIT' | 'DDL', targetId: string, reminderId: number, reason: string) {
-    console.info(`[Scheduler] Canceling ${type}:${targetId} (ID:${reminderId}). Reason: ${reason}`);
+    AppLog.info('Native', `[Scheduler] Canceling ${type}:${targetId} (ID:${reminderId}). Reason: ${reason}`);
     await ReminderUtils.cancel(reminderId);
     await ReminderDataManager.getInstance().removeScoped(type, targetId);
   }
@@ -295,7 +296,7 @@ export class ReminderScheduler {
         }
       }
     } catch (e) {
-      console.warn(`[Scheduler] Failed to enumerate system DDL reminders: ${e}`);
+      AppLog.warn('Native', `[Scheduler] Failed to enumerate system DDL reminders: ${e}`);
     }
 
     for (const reminderId of idsToCancel) {
@@ -315,7 +316,7 @@ export class ReminderScheduler {
       const timeStr = formatDeadline(deadlineDate);
 
       if (remindTime.getTime() < now) {
-        console.info(`[Scheduler] Reminder time (${remindTime.toLocaleString()}) is in the past. Skip publishing.`);
+        AppLog.info('Native', `[Scheduler] Reminder time (${remindTime.toLocaleString()}) is in the past. Skip publishing.`);
         return;
       }
 
@@ -337,27 +338,18 @@ export class ReminderScheduler {
       await ReminderDataManager.getInstance().addOrUpdate(newRecord);
 
     } catch (e) {
-      console.error(`[Scheduler] Publish DDL failed: ${e}`);
+      AppLog.error('Native', `[Scheduler] Publish DDL failed: ${e}`);
     }
   }
 
   private static async publishHabit(habit: Habit) {
     if (!habit.alarmTime) return;
     try {
-      const parts = habit.alarmTime.split(':');
-      const hour = parseInt(parts[0]);
-      const minute = parseInt(parts[1]);
-      const daysOfWeek = [1, 2, 3, 4, 5, 6, 7];
-
-      console.info(`[Scheduler] Publishing Habit:${habit.name} at ${hour}:${minute}`);
-
-      const reminderId = await ReminderUtils.publishAlarm(
-        `打卡提醒: ${habit.name}`,
-        `坚持就是胜利！该完成"${habit.name}"了。`,
-        hour,
-        minute,
-        daysOfWeek,
-        habit.id // 使用业务 ID 确保覆盖
+      AppLog.info('Native', '[Scheduler] Publishing Habit:' + candidate.habit.name + ' at ' + candidate.fireAt.toString());
+      const reminderId: number = await ReminderUtils.publishCalendar(
+        '打卡提醒: ' + candidate.habit.name,
+        '坚持就是胜利！该完成“' + candidate.habit.name + '”了。',
+        candidate.fireAt
       );
 
       const recordTime = new Date();
@@ -372,7 +364,7 @@ export class ReminderScheduler {
       await ReminderDataManager.getInstance().addOrUpdate(newRecord);
 
     } catch (e) {
-      console.error(`[Scheduler] Publish habit failed: ${e}`);
+      AppLog.error('Native', `[Scheduler] Publish habit failed: ${e}`);
     }
   }
 }

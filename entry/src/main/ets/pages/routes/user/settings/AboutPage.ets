@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { HdsNavDestination, HdsNavDestinationAttribute } from "@kit.UIDesignKit";
 import { LocalValues } from "../../../../common/local/LocalValues";
 import { SettingsConstants as C } from "../../../../common/local/SettingsConstants";
@@ -52,7 +53,7 @@ export struct AboutPage {
       this.versionName = bundleInfo.versionName;
       this.versionCode = bundleInfo.versionCode.toString()
     } catch (error) {
-      console.error('获取版本号失败:', JSON.stringify(error));
+      AppLog.error('Native', '获取版本号失败:', JSON.stringify(error));
       this.versionName = '1.0.0';
     }
   }
@@ -79,7 +80,7 @@ export struct AboutPage {
           try {
             await HuaweiAccountUtils.signOutAsync();
           } catch (error) {
-            console.error('Sign out after privacy revoke failed', JSON.stringify(error));
+            AppLog.error('Native', 'Sign out after privacy revoke failed', JSON.stringify(error));
           } finally {
             AppStorage.setOrCreate('isLoggedIn', false);
             this.context.terminateSelf();
@@ -111,7 +112,7 @@ export struct AboutPage {
     };
 
     this.context.startAbility(want).catch((err: object) => {
-      console.error("Open System Browser failed", JSON.stringify(err));
+      AppLog.error('Native', "Open System Browser failed", JSON.stringify(err));
     });
   }
 

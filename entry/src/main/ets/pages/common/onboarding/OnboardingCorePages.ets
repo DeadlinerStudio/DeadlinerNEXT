@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import lottie, { AnimationItem } from '@ohos/lottie';
 import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
@@ -268,7 +269,7 @@ export struct LottieScenePage {
       this.tryLoadAnimation();
     } catch (error) {
       this.hasLoadFailed = true;
-      console.error(`[LottieScenePage] Failed to load ${this.scene.fileName}`, error);
+      AppLog.error('Native', `[LottieScenePage] Failed to load ${this.scene.fileName}`, error);
     }
   }
 

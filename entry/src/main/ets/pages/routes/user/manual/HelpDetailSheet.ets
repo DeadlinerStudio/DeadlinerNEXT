@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { ManualDataManager, ManualItem } from "../../../../common/manual/ManualModel";
 import { common } from "@kit.AbilityKit";
 import { BrandPageHeader } from "../../../components/BrandPageHeader";
@@ -17,7 +18,7 @@ export struct HelpDetailSheet {
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   aboutToAppear(): void {
-    console.log('[ManualSheetDebug] ', this.item?.id)
+    AppLog.debug('Native', '[ManualSheetDebug] ', this.item?.id ?? '')
     this.loadMarkdown();
   }
 

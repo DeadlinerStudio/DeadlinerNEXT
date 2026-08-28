@@ -1,3 +1,4 @@
+import { AppLog } from '../common/logging/AppLog';
 import { LengthMetrics, mediaquery, promptAction, SymbolGlyphModifier, display } from '@kit.ArkUI';
 import { LocalValues } from '../common/local/LocalValues';
 import { MainHomePage } from './routes/main/MainHomePage';
@@ -185,7 +186,7 @@ struct Index {
       `pathStackSize=${this.appPathStack.size()} wideScreen=${this.isWideScreen} ` +
       `breakpoint=${this.currentBreakpoint} tabletUi=${this.tabletUi}` +
       `${extra ? ` | ${extra}` : ''}`;
-    console.info(message);
+    AppLog.info('Native', message);
   }
 
   onNotificationPermissionFlowChange(): void {
@@ -278,19 +279,19 @@ struct Index {
       const sysProfile = await HuaweiAccountUtils.getHuaweiAccountProfile(ctx, false);
 
       if (!sysProfile.nickname || sysProfile.nickname.trim() === '') {
-        console.info('[Fix] Detect logged-in user with missing profile. Triggering Force Auth...');
+        AppLog.info('Native', '[Fix] Detect logged-in user with missing profile. Triggering Force Auth...');
 
         const fixedProfile = await HuaweiAccountUtils.getHuaweiAccountProfile(ctx, true);
 
         if (fixedProfile.nickname) {
-          console.info('[Fix] User repaired successfully.');
+          AppLog.info('Native', '[Fix] User repaired successfully.');
           Toast.show({ message: '用户信息已同步' });
         }
       } else {
-        console.info('[Fix] User profile is healthy.');
+        AppLog.info('Native', '[Fix] User profile is healthy.');
       }
     } catch (e) {
-      console.error('[Fix] Profile check failed:', e);
+      AppLog.error('Native', '[Fix] Profile check failed:', e);
     }
   }
 
@@ -409,7 +410,7 @@ struct Index {
       onDeclinePrivacy: () => {
         this.logGuideState('onboarding:onDeclinePrivacy');
         this.context.terminateSelf().catch(() => {
-          console.error('Terminate failed');
+          AppLog.error('Native', 'Terminate failed');
         });
       },
       privacyUrl: this.privacyUrl,
@@ -668,7 +669,7 @@ struct Index {
       controller: this.tabsController,
       onTabClick: (index: number) => {
         if (index === this.currentIndex) {
-          console.debug('[MainPage] 重复点击了第 ' + index.toString() + ' 页，触发回到顶部');
+          AppLog.debug('Native', '[MainPage] 重复点击了第 ' + index.toString() + ' 页，触发回到顶部');
           AppStorage.setOrCreate('Event_ScrollToTop_' + index.toString(), Date.now());
         }
       },

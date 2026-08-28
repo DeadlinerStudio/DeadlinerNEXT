@@ -1,3 +1,4 @@
+import { AppLog } from '../logging/AppLog';
 import { relationalStore, ValuesBucket } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { util } from '@kit.ArkTS';
@@ -82,15 +83,15 @@ export class DatabaseHelper {
 
         store.version = C.VERSION_V2;
       } else if (store.version < C.VERSION_V2) {
-        console.info(`[DatabaseHelper] Upgrading DB from ${store.version} to ${C.VERSION_V2}`);
+        AppLog.info('Native', `[DatabaseHelper] Upgrading DB from ${store.version} to ${C.VERSION_V2}`);
         await this.upgradeToV2(store);
         store.version = C.VERSION_V2;
       }
 
       this.rdbStore = store;
-      console.info('[DatabaseHelper] Init success');
+      AppLog.info('Native', '[DatabaseHelper] Init success');
     } catch (err) {
-      console.error(`[DatabaseHelper] Init failed: ${err.message}`);
+      AppLog.error('Native', `[DatabaseHelper] Init failed: ${err.message}`);
     } finally {
       this.initPromise = null;
     }
@@ -238,11 +239,11 @@ export class DatabaseHelper {
       this.rdbStore.commit();
       return result;
     } catch (e) {
-      console.error(`[DatabaseHelper] Transaction failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] Transaction failed: ${e}`);
       try {
         this.rdbStore.rollBack();
       } catch (rollbackError) {
-        console.error(`[DatabaseHelper] Rollback failed: ${rollbackError}`);
+        AppLog.error('Native', `[DatabaseHelper] Rollback failed: ${rollbackError}`);
       }
       return null;
     }
@@ -283,7 +284,7 @@ export class DatabaseHelper {
       }
       return insertId;
     } catch (e) {
-      console.error(`[DatabaseHelper] insertSubTask failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] insertSubTask failed: ${e}`);
       return -1;
     }
   }
@@ -326,7 +327,7 @@ export class DatabaseHelper {
     const v = await this.nextVersionUTC();
     const ddlId = await this.getSubTaskDDLId(id);
     if (ddlId === null) {
-      console.warn(`[DatabaseHelper] updateSubTaskStatus: Missing ddlId for subtask ${id}`);
+      AppLog.warn('Native', `[DatabaseHelper] updateSubTaskStatus: Missing ddlId for subtask ${id}`);
       return;
     }
 
@@ -347,12 +348,12 @@ export class DatabaseHelper {
       // 4. 执行更新
       const rows = await this.rdbStore.update(bucket, predicates);
       if (rows === 0) {
-        console.warn(`[DatabaseHelper] updateSubTaskStatus: No rows updated for id ${id}`);
+        AppLog.warn('Native', `[DatabaseHelper] updateSubTaskStatus: No rows updated for id ${id}`);
         return;
       }
       await this.touchDDLVersion(ddlId, v);
     } catch (e) {
-      console.error(`[DatabaseHelper] updateSubTaskStatus failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] updateSubTaskStatus failed: ${e}`);
     }
   }
 
@@ -365,7 +366,7 @@ export class DatabaseHelper {
     const v = await this.nextVersionUTC();
     const ddlId = await this.getSubTaskDDLId(id);
     if (ddlId === null) {
-      console.warn(`[DatabaseHelper] updateSubTaskContent: Missing ddlId for subtask ${id}`);
+      AppLog.warn('Native', `[DatabaseHelper] updateSubTaskContent: Missing ddlId for subtask ${id}`);
       return;
     }
 
@@ -381,12 +382,12 @@ export class DatabaseHelper {
     try {
       const rows = await this.rdbStore.update(bucket, predicates);
       if (rows === 0) {
-        console.warn(`[DatabaseHelper] updateSubTaskContent: No rows updated for id ${id}`);
+        AppLog.warn('Native', `[DatabaseHelper] updateSubTaskContent: No rows updated for id ${id}`);
         return;
       }
       await this.touchDDLVersion(ddlId, v);
     } catch (e) {
-      console.error(`[DatabaseHelper] updateSubTaskContent failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] updateSubTaskContent failed: ${e}`);
     }
   }
 
@@ -399,7 +400,7 @@ export class DatabaseHelper {
     const v = await this.nextVersionUTC();
     const ddlId = await this.getSubTaskDDLId(id);
     if (ddlId === null) {
-      console.warn(`[DatabaseHelper] deleteSubTask: Missing ddlId for subtask ${id}`);
+      AppLog.warn('Native', `[DatabaseHelper] deleteSubTask: Missing ddlId for subtask ${id}`);
       return;
     }
 
@@ -415,12 +416,12 @@ export class DatabaseHelper {
     try {
       const rows = await this.rdbStore.update(bucket, predicates);
       if (rows === 0) {
-        console.warn(`[DatabaseHelper] deleteSubTask: No rows updated for id ${id}`);
+        AppLog.warn('Native', `[DatabaseHelper] deleteSubTask: No rows updated for id ${id}`);
         return;
       }
       await this.touchDDLVersion(ddlId, v);
     } catch (e) {
-      console.error(`[DatabaseHelper] deleteSubTask failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] deleteSubTask failed: ${e}`);
     }
   }
 
@@ -483,13 +484,13 @@ export class DatabaseHelper {
 
         // 5. 提交事务！此时数据才真正写入磁盘
         this.rdbStore.commit();
-        console.info(`[DatabaseHelper] Insert success. UID: ${uid}`);
+        AppLog.info('Native', `[DatabaseHelper] Insert success. UID: ${uid}`);
       } else {
         // 插入失败，回滚
         this.rdbStore.rollBack();
       }
     } catch (e) {
-      console.error(`[DatabaseHelper] Insert failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] Insert failed: ${e}`);
       this.rdbStore.rollBack(); // 发生异常，回滚，就像什么都没发生过一样
       return -1;
     }
@@ -688,7 +689,7 @@ export class DatabaseHelper {
     try {
       return await this.rdbStore.insert(C.TABLE_INSPIRATION, bucket);
     } catch (error) {
-      console.error(`[DatabaseHelper] insertInspiration failed: ${error}`);
+      AppLog.error('Native', `[DatabaseHelper] insertInspiration failed: ${error}`);
       return -1;
     }
   }
@@ -1011,7 +1012,7 @@ export class DatabaseHelper {
       }
       return id;
     } catch (e) {
-      console.error(`[DatabaseHelper] insertHabit failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] insertHabit failed: ${e}`);
       return -1;
     }
   }
@@ -1115,7 +1116,7 @@ export class DatabaseHelper {
       }
       return id;
     } catch (e) {
-      console.error(`[DatabaseHelper] insertHabitRecord failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] insertHabitRecord failed: ${e}`);
       return -1;
     }
   }
@@ -1264,11 +1265,11 @@ export class DatabaseHelper {
     try {
       const rows = await this.rdbStore.update(bucket, predicates);
       if (rows > 0) {
-        console.info(`[DatabaseHelper] Auto-archived ${rows} items.`);
+        AppLog.info('Native', `[DatabaseHelper] Auto-archived ${rows} items.`);
       }
       return rows;
     } catch (e) {
-      console.error(`[DatabaseHelper] Auto-archive failed: ${e}`);
+      AppLog.error('Native', `[DatabaseHelper] Auto-archive failed: ${e}`);
       return 0;
     }
   }

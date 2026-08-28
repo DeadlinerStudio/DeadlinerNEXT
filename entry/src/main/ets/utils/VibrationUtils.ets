@@ -1,9 +1,10 @@
 import { LocalValues } from "../common/local/LocalValues"
 import { vibrator } from "@kit.SensorServiceKit"
+import { AppLog } from '../common/logging/AppLog';
 
 export class VibrationUtils {
   private static assureVibrationEnable(): boolean {
-    console.debug(`[Vibration] ${LocalValues.getInstance().getVibration()}`)
+    AppLog.debug('Native', '[Vibration] ' + LocalValues.getInstance().getVibration())
     return LocalValues.getInstance().getVibration()
   }
 

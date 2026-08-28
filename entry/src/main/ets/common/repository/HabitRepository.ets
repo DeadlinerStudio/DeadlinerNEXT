@@ -1,3 +1,4 @@
+import { AppLog } from '../logging/AppLog';
 import { Habit, HabitPeriod, HabitGoalType, HabitRecord, HabitRecordStatus } from '../../model/DDLModels';
 import { ReminderScheduler } from '../../utils/notification/ReminderScheduler';
 import { TaskRepository } from './TaskRepository';
@@ -56,7 +57,43 @@ export class HabitRepository {
     await this.initializeKmp();
     const uid: string | null = await this.kmpTaskAdapter.taskUidForLegacyId(ddlId);
     const id: number = await this.kmpHabits.create(
-      name, period, timesPerPeriod, goalType, totalTarget, description, color, iconKey, sortOrder, alarmTime, uid, categoryUid
+      name, period, timesPerPeriod, goalType, totalTarget, description, color, iconKey, sortOrder, alarmTime, uid,
+      categoryUid, weekdaysMask
+    );
+    if (uid !== null) await this.kmpTaskAdapter.deleteHabitCarrierIfPresent(uid);
+    this.scheduleReminderRefresh();
+    this.triggerDataSync();
+    return id;
+  }
+
+  public async repairLegacyTaskCarriers(): Promise<number> {
+    await this.initializeKmp();
+    const repaired: number = await this.kmpHabits.repairLegacyTaskCarriers();
+    if (repaired > 0) {
+      AppLog.info('Native', '[HabitRepo] Removed legacy task carriers: ' + repaired.toString());
+      this.triggerDataSync();
+    }
+    return repaired;
+  }
+
+  public async createHabit(
+    name: string,
+    period: HabitPeriod,
+    timesPerPeriod: number = 1,
+    goalType: HabitGoalType = HabitGoalType.PER_PERIOD,
+    totalTarget: number | null = null,
+    description: string = '',
+    color: number | null = null,
+    iconKey: string | null = null,
+    sortOrder: number = 0,
+    alarmTime: string | null = null,
+    categoryUid: string | null = null,
+    weekdaysMask: number = 127
+  ): Promise<number> {
+    await this.initializeKmp();
+    const id: number = await this.kmpHabits.create(
+      name, period, timesPerPeriod, goalType, totalTarget, description, color, iconKey, sortOrder, alarmTime, null,
+      categoryUid, weekdaysMask
     );
     this.scheduleReminderRefresh();
     this.triggerDataSync();
@@ -200,7 +237,7 @@ export class HabitRepository {
     try {
       await ReminderScheduler.refreshHabits(await this.getAllHabits());
     } catch (error) {
-      console.error('[HabitRepo] Reminder refresh failed: ' + String(error));
+      AppLog.error('Native', '[HabitRepo] Reminder refresh failed: ' + String(error));
     } finally {
       this.reminderUpdateTimer = -1;
     }

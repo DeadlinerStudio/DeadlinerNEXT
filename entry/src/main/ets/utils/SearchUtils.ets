@@ -1,3 +1,4 @@
+import { AppLog } from '../common/logging/AppLog';
 import { LocalValues } from "../common/local/LocalValues";
 import { HabitRepository } from "../common/repository/HabitRepository";
 import { InspirationRepository } from "../common/repository/InspirationRepository";
@@ -103,7 +104,7 @@ export class SearchUtils {
       const inspirations = await this.inspirationRepo.getAllInspirations();
       this.allInspirationsCache = inspirations;
     } catch (e) {
-      console.error('[SearchLogic] Preload failed:', e);
+      AppLog.error('Native', '[SearchLogic] Preload failed:', e);
     }
   }
 

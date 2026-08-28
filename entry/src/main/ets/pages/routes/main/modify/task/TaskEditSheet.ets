@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../../common/logging/AppLog';
 import { promptAction } from '@kit.ArkUI';
 import { ITheme } from '../../../../../common/theme/ThemeModel';
 import { DDLItem } from '../../../../../model/DDLModels';
@@ -43,7 +44,7 @@ export struct TaskEditSheet {
       this.endTime = new Date(this.editingTask.endTime);
       this.categoryUid = this.editingTask.categoryUid ?? null;
     } else {
-      console.error('[Edit] Invalid data')
+      AppLog.error('Native', '[Edit] Invalid data')
     }
   }
 
@@ -72,7 +73,7 @@ export struct TaskEditSheet {
       Toast.show({ message: '修改已保存' });
 
     } catch (e) {
-      console.error('Save edit failed:', e);
+      AppLog.error('Native', 'Save edit failed:', e);
       Toast.show({ message: '保存失败' });
     }
   }

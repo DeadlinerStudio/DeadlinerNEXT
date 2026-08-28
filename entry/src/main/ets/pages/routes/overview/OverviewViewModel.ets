@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import { LocalValues } from '../../../common/local/LocalValues';
 import { DDLItem } from '../../../model/DDLModels';
 import { AIService } from '../../../ai/AIServcice';
@@ -163,7 +164,7 @@ export class OverviewViewModel {
       this.lastMonthName = this.monthLabel(state.lastMonth.monthStart);
       completedTaskTitles = state.lastMonth.completedTaskTitles;
     } catch (e) {
-      console.error('[OverviewViewModel] Load KMP state error: ' + String(e));
+      AppLog.error('Native', '[OverviewViewModel] Load KMP state error: ' + String(e));
     } finally {
       this.isLoading = false;
     }
@@ -339,7 +340,7 @@ export class OverviewViewModel {
 
   private loadMonthlyAnalysisInBackground(completedTaskTitles: string[], loadToken: number): void {
     this.loadMonthlyAnalysis(completedTaskTitles, loadToken).catch((e: Error) => {
-      console.error('[OverviewViewModel] Background monthly analysis error: ' + e.message);
+      AppLog.error('Native', '[OverviewViewModel] Background monthly analysis error: ' + e.message);
     });
   }
 
@@ -359,7 +360,7 @@ export class OverviewViewModel {
           return;
         }
       } catch (e) {
-        console.error('[OverviewViewModel] Decode monthly analysis error: ' + String(e));
+        AppLog.error('Native', '[OverviewViewModel] Decode monthly analysis error: ' + String(e));
       }
     }
 
@@ -405,7 +406,7 @@ export class OverviewViewModel {
       await LocalValues.getInstance().setMonthlyAnalysis(JSON.stringify(finalResult));
       await LocalValues.getInstance().setLastAnalyzedMonth(monthKey);
     } catch (e) {
-      console.error('[OverviewViewModel] Generate monthly analysis error: ' + String(e));
+      AppLog.error('Native', '[OverviewViewModel] Generate monthly analysis error: ' + String(e));
     } finally {
       this.isAnalyzing = false;
     }

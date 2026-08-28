@@ -1,3 +1,4 @@
+import { AppLog } from '../common/logging/AppLog';
 import { appInfoManager } from "@kit.AppGalleryKit";
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
@@ -13,7 +14,7 @@ export class DynamicIconUtils {
     try {
       return await appInfoManager.queryDynamicIcons()
     } catch (error) {
-      console.error('[DynamicIcon]', "queryDynamicIcons exception code: " + error.code + ", exception message: " + error.message);
+      AppLog.error('Native', '[DynamicIcon]', "queryDynamicIcons exception code: " + error.code + ", exception message: " + error.message);
       return [];
     }
   }
@@ -22,7 +23,7 @@ export class DynamicIconUtils {
     try {
       await appInfoManager.selectDynamicIcon(dynamicId)
     } catch (error) {
-      console.error('[DynamicIcon]',
+      AppLog.error('Native', '[DynamicIcon]',
         "selectDynamicIcon exception code: " + error.code + ", exception message: " + error.message);
     }
   }
@@ -31,7 +32,7 @@ export class DynamicIconUtils {
     try {
       await appInfoManager.disableDynamicIcon();
     } catch (error) {
-      console.error('[DynamicIcon]',
+      AppLog.error('Native', '[DynamicIcon]',
         "disableDynamicIcon exception code: " + error.code + ", exception message: " + error.message);
     }
   }
@@ -45,9 +46,9 @@ export class DynamicIconUtils {
       await pref.put(DynamicIconUtils.KEY_SEASON_MODE_ENABLED, enabled);
       await pref.flush();
 
-      console.info(`[DynamicIcon] season mode saved: ${enabled}`);
+      AppLog.info('Native', `[DynamicIcon] season mode saved: ${enabled}`);
     } catch (error) {
-      console.error('[DynamicIcon]',
+      AppLog.error('Native', '[DynamicIcon]',
         "setSeasonModeEnabled exception code: " + error.code + ", exception message: " + error.message);
     }
   }
@@ -61,7 +62,7 @@ export class DynamicIconUtils {
 
       return value as boolean;
     } catch (error) {
-      console.error('[DynamicIcon]',
+      AppLog.error('Native', '[DynamicIcon]',
         "isSeasonModeEnabled exception code: " + error.code + ", exception message: " + error.message);
       return false;
     }
@@ -115,7 +116,7 @@ export class DynamicIconUtils {
     const enabled = await DynamicIconUtils.isSeasonModeEnabled(context);
 
     if (!enabled) {
-      console.info('[DynamicIcon] season mode disabled, skip refresh');
+      AppLog.info('Native', '[DynamicIcon] season mode disabled, skip refresh');
       return;
     }
 
@@ -123,11 +124,11 @@ export class DynamicIconUtils {
     const dynamicId = DynamicIconUtils.getCurrentSeasonDynamicIconId(dynamicIconInfos);
 
     if (!dynamicId) {
-      console.error('[DynamicIcon]', 'refreshSeasonIconIfNeeded failed: no matched current season icon');
+      AppLog.error('Native', '[DynamicIcon]', 'refreshSeasonIconIfNeeded failed: no matched current season icon');
       return;
     }
 
-    console.info(`[DynamicIcon] refresh season icon: dynamicId=${dynamicId}`);
+    AppLog.info('Native', `[DynamicIcon] refresh season icon: dynamicId=${dynamicId}`);
 
     await DynamicIconUtils.setDynamicIcon(dynamicId);
   }

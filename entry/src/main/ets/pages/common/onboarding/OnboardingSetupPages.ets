@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import auth from '@hw-agconnect/auth';
 import { LoginWithHuaweiIDButton, loginComponentManager } from '@kit.AccountKit';
 import { promptAction } from '@kit.ArkUI';
@@ -73,7 +74,7 @@ export struct HuaweiLoginPage {
     new loginComponentManager.LoginWithHuaweiIDButtonController()
       .onClickLoginWithHuaweiIDButton((error: BusinessError, response: loginComponentManager.HuaweiIDCredential) => {
         if (error) {
-          console.error(`System Login Failed: ${error.code}, ${error.message}`);
+          AppLog.error('Native', `System Login Failed: ${error.code}, ${error.message}`);
           return;
         }
         if (response) {
@@ -104,7 +105,7 @@ export struct HuaweiLoginPage {
         Toast.show({ message: '登录成功' });
       },
       onSignInFail: (e: BusinessError) => {
-        console.error(`AGC Login Failed: ${e.code}, ${e.message}`);
+        AppLog.error('Native', `AGC Login Failed: ${e.code}, ${e.message}`);
         if (e.code !== 1001502012) {
           Toast.show({ message: `登录验证失败: ${e.message}` });
         }
@@ -128,7 +129,7 @@ export struct HuaweiLoginPage {
         this.avatarUri = profile.avatar;
       }
     } catch (e) {
-      console.error('[Guide] Failed to load profile:', e);
+      AppLog.error('Native', '[Guide] Failed to load profile:', e);
     }
   }
 
@@ -264,7 +265,7 @@ export struct NotificationPage {
     try {
       this.allowNotification = await notificationManager.isNotificationEnabled();
     } catch (error) {
-      console.error('[Guide] notification permission check failed:', error);
+      AppLog.error('Native', '[Guide] notification permission check failed:', error);
     }
   }
 
@@ -276,13 +277,13 @@ export struct NotificationPage {
     }
 
     this.hasAutoRequestedPermission = true;
-    console.info('[GuideDebug][NotificationPage] autoRequestPermission:start');
+    AppLog.info('Native', '[GuideDebug][NotificationPage] autoRequestPermission:start');
     notificationManager.requestEnableNotification().then(() => {
       this.allowNotification = true;
-      console.info('[GuideDebug][NotificationPage] autoRequestPermission:success');
+      AppLog.info('Native', '[GuideDebug][NotificationPage] autoRequestPermission:success');
     }).catch((err: BusinessError) => {
       this.allowNotification = false;
-      console.error(`[GuideDebug][NotificationPage] autoRequestPermission:failed code=${err.code} message=${err.message}`);
+      AppLog.error('Native', `[GuideDebug][NotificationPage] autoRequestPermission:failed code=${err.code} message=${err.message}`);
     });
   }
 
@@ -678,7 +679,7 @@ export struct AiPage {
                   await AIService.getInstance().extractTasks('Hi');
                   Toast.show({ message: '验证通过，配置已生效' });
                 } catch (error) {
-                  console.error('[Guide] ai verify failed:', error);
+                  AppLog.error('Native', '[Guide] ai verify failed:', error);
                   Toast.show({ message: '验证失败，请检查 Key 与网络' });
                 } finally {
                   this.isTesting = false;

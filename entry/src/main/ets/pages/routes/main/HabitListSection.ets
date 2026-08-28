@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import { TopSafeContainer } from "../../components/TopSafeContainer"
 import { HabitRepository } from '../../../common/repository/HabitRepository';
 import { Habit, HabitGoalType, HabitPeriod, HabitRecordStatus, HabitStatus } from '../../../model/DDLModels';
@@ -95,7 +96,7 @@ export struct HabitListSection {
   }
 
   private onSyncEvent = () => {
-    console.debug('HabitListSection received sync_done event');
+    AppLog.debug('Native', 'HabitListSection received sync_done event');
     this.refreshAll(this.selectedDate);
   }
 
@@ -165,7 +166,7 @@ export struct HabitListSection {
       this.exitSelectionMode();
 
     } catch (e) {
-      console.error('Set alarm failed:', e);
+      AppLog.error('Native', 'Set alarm failed:', e);
       Toast.show({ message: '设置失败' });
     }
   }
@@ -397,7 +398,7 @@ export struct HabitListSection {
       if (afterItem) {
         const afterRate = afterItem.doneCount / afterItem.targetCount;
         if (beforeRate < 1 && afterRate >= 1) {
-          console.info("🎉 Habit Completed!");
+          AppLog.info('Native', "🎉 Habit Completed!");
           this.confetti.fire();
         }
       }
@@ -437,7 +438,7 @@ export struct HabitListSection {
       this.refreshAll(this.selectedDate);
       this.exitSelectionMode();
     } catch (e) {
-      console.error('Batch complete failed:', e);
+      AppLog.error('Native', 'Batch complete failed:', e);
       Toast.show({ message: '操作失败' });
     }
   }
@@ -472,7 +473,7 @@ export struct HabitListSection {
             this.exitSelectionMode();
             getContext(this).eventHub.emit('sync_done');
           } catch (e) {
-            console.error('Batch delete failed:', e);
+            AppLog.error('Native', 'Batch delete failed:', e);
             Toast.show({ message: '删除失败' });
           }
         }
@@ -496,7 +497,7 @@ export struct HabitListSection {
       this.refreshAll(this.selectedDate);
       this.exitSelectionMode();
     } catch (e) {
-      console.error('Batch archive failed:', e);
+      AppLog.error('Native', 'Batch archive failed:', e);
       Toast.show({ message: '归档失败' });
     }
   }

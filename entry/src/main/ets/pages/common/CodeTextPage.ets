@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { LengthMetrics } from '@kit.ArkUI';
 import { HdsNavDestination, HdsNavDestinationTitleMode, ScrollEffectType, HdsNavDestinationAttribute } from '@kit.UIDesignKit';
 import { TopSafeContainer } from '../components/TopSafeContainer';
@@ -35,7 +36,7 @@ struct CodeTextPage {
       this.content = textDecoder.decodeWithStream(fileData);
 
     } catch (error) {
-      console.error(`[CodeTextPage] Failed to load file: ${fileName}`, error);
+      AppLog.error('Native', `[CodeTextPage] Failed to load file: ${fileName}`, error);
       this.content = "无法加载文件内容。";
     }
   }

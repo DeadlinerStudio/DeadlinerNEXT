@@ -1,3 +1,4 @@
+import { AppLog } from '../logging/AppLog';
 import { asset } from '@kit.AssetStoreKit';
 import { util } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
@@ -22,9 +23,9 @@ export class SecureStorage {
       addQuery.set(asset.Tag.CONFLICT_RESOLUTION, asset.ConflictResolution.OVERWRITE);
 
       await asset.add(addQuery);
-      console.info(`[SecureStorage] Saved ${alias} successfully.`);
+      AppLog.info('Native', `[SecureStorage] Saved ${alias} successfully.`);
     } catch (e) {
-      console.error(`[SecureStorage] Save failed: ${JSON.stringify(e)}`);
+      AppLog.error('Native', `[SecureStorage] Save failed: ${JSON.stringify(e)}`);
       throw Error(e);
     }
   }
@@ -52,7 +53,7 @@ export class SecureStorage {
       const err = e as BusinessError;
       // 如果是“未找到”错误，返回空字符串，否则打印日志
       if (err.code !== asset.ErrorCode.NOT_FOUND) {
-        console.error(`[SecureStorage] Get failed: ${JSON.stringify(e)}`);
+        AppLog.error('Native', `[SecureStorage] Get failed: ${JSON.stringify(e)}`);
       }
       return '';
     }
@@ -70,7 +71,7 @@ export class SecureStorage {
       // 忽略未找到的错误
       const err = e as BusinessError;
       if (err.code !== asset.ErrorCode.NOT_FOUND) {
-        console.error(`[SecureStorage] Delete failed: ${JSON.stringify(e)}`);
+        AppLog.error('Native', `[SecureStorage] Delete failed: ${JSON.stringify(e)}`);
       }
     }
   }

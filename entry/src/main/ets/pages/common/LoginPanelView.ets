@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { LoginWithHuaweiIDButton, loginComponentManager } from '@kit.AccountKit';
 import { promptAction } from '@kit.ArkUI';
 import { HuaweiAccountController, HuaweiAccountUtils } from '../../utils/account/HuaweiAccountUtils';
@@ -25,7 +26,7 @@ export struct LoginPanelView {
         if (error) {
           // 系统级登录失败（用户取消、网络错误等），这里通常不需要我们额外弹窗，
           // 因为系统控件往往会有自带的提示，或者我们可以简单 Log
-          console.error(`System Login Failed: ${error.code}, ${error.message}`);
+          AppLog.error('Native', `System Login Failed: ${error.code}, ${error.message}`);
           return;
         }
 
@@ -46,7 +47,7 @@ export struct LoginPanelView {
         if (ctx) {
           let userResult = s.getUser();
           let profile = await HuaweiAccountUtils.getHuaweiAccountProfile(ctx);
-          console.log(`[User] Profile photoUrl: ${profile.avatar} | displayName: ${profile.nickname}`)
+          AppLog.debug('Native', `[User] Profile photoUrl: ${profile.avatar} | displayName: ${profile.nickname}`)
           userResult.updateProfile({
             displayName: profile.nickname ?? "华为用户",
             photoUrl: profile.avatar ?? "empty",
@@ -55,7 +56,7 @@ export struct LoginPanelView {
               if (user) {
                 let photo = user.getPhotoUrl();
                 let name = user.getDisplayName();
-                console.log(`[User] photoUrl: ${photo} | displayName: ${name}`)
+                AppLog.debug('Native', `[User] photoUrl: ${photo} | displayName: ${name}`)
               }
             })
 
@@ -63,14 +64,14 @@ export struct LoginPanelView {
           })
         }
 
-        console.info('AGC Login Success');
+        AppLog.info('Native', 'AGC Login Success');
         Toast.show({ message: '登录成功' });
 
         // 更新全局状态，通知外部关闭弹窗或刷新 UI
         AppStorage.setOrCreate('isLoggedIn', true);
       },
       onSignInFail: (e: BusinessError) => {
-        console.error(`AGC Login Failed: ${e.code}, ${e.message}`);
+        AppLog.error('Native', `AGC Login Failed: ${e.code}, ${e.message}`);
         // 只有非取消类的错误才弹窗，避免打扰用户
         if (e.code !== 1001502012) {
           Toast.show({ message: `登录验证失败: ${e.message}` });

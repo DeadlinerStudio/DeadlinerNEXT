@@ -1,3 +1,4 @@
+import { AppLog } from '../logging/AppLog';
 import { LocalValues } from '../local/LocalValues';
 import { DDLItem, DeadlineType, SubTask } from '../../model/DDLModels';
 import { TaskState, TaskStateAction } from '../../model/TaskStateMachine';
@@ -56,35 +57,6 @@ export class TaskRepository {
     const currentRevision: number = AppStorage.get<number>('KmpDataRevision') ?? 0;
     AppStorage.setOrCreate('KmpDataRevision', currentRevision + 1);
     if (this.context !== null) this.context.eventHub.emit('sync_done');
-  }
-
-  private scheduleSync(): void {
-    if (this.syncTimer !== -1) clearTimeout(this.syncTimer);
-    if (!LocalValues.getInstance().getCloudSyncEnable()) return;
-    this.syncTimer = setTimeout(() => {
-      this.performSync();
-    }, this.syncDelayMs);
-  }
-
-  private async performSync(): Promise<void> {
-    if (this.inBasicMode()) return;
-    if (this.isSyncing) {
-      this.hasPendingSync = true;
-      return;
-    }
-    this.isSyncing = true;
-    this.hasPendingSync = false;
-    try {
-      await this.initializeKmp();
-      await this.syncKmpWebDav();
-      this.invalidateTaskCache();
-      this.notifyDataChange();
-    } catch (error) {
-      console.error('[TaskRepo] KMP auto-sync failed: ' + String(error));
-    } finally {
-      this.isSyncing = false;
-      if (this.hasPendingSync) this.performSync();
-    }
   }
 
   private triggerUpdates(): void {
@@ -223,7 +195,7 @@ export class TaskRepository {
       this.scheduleReminderRefresh();
       return true;
     } catch (error) {
-      console.error('[TaskRepo] KMP manual sync failed: ' + String(error));
+      AppLog.error('Native', '[TaskRepo] KMP manual sync failed: ' + String(error));
       return false;
     } finally {
       this.isSyncing = false;
@@ -293,7 +265,7 @@ export class TaskRepository {
     try {
       await ReminderScheduler.refreshReminders(await this.getAllDDLs());
     } catch (error) {
-      console.error('[TaskRepo] Reminder refresh failed: ' + String(error));
+      AppLog.error('Native', '[TaskRepo] Reminder refresh failed: ' + String(error));
     } finally {
       this.reminderUpdateTimer = -1;
     }

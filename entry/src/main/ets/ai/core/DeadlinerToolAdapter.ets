@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { TaskCreateParams } from '../../common/kmp/KmpTaskRepositoryAdapter';
 import { HabitRepository } from '../../common/repository/HabitRepository';
 import { TaskRepository } from '../../common/repository/TaskRepository';
@@ -247,7 +248,7 @@ export class DeadlinerToolAdapter {
   }
 
   public async execute(call: AdapterToolCall): Promise<AdapterToolExecution> {
-    console.info(`[DeadlinerToolAdapter] execute tool=${call.toolName} id=${call.id} args=${call.argsJson}`);
+    AppLog.info('Native', `[DeadlinerToolAdapter] execute tool=${call.toolName} id=${call.id} args=${call.argsJson}`);
     const args = this.parseArgs(call.argsJson);
     switch (call.toolName) {
       case 'read_tasks':
@@ -403,7 +404,7 @@ export class DeadlinerToolAdapter {
 
       try {
         const taskId = await TaskRepository.getInstance().insertDDL(params);
-        console.info(`[DeadlinerToolAdapter] create_task inserted id=${taskId} name=${normalized.name}`);
+        AppLog.info('Native', `[DeadlinerToolAdapter] create_task inserted id=${taskId} name=${normalized.name}`);
         const task: AdapterTaskPayload = {
           id: taskId,
           name: normalized.name,
@@ -416,7 +417,7 @@ export class DeadlinerToolAdapter {
           data: task
         });
       } catch (err) {
-        console.error(`[DeadlinerToolAdapter] create_task failed index=${index} err=${JSON.stringify(err)}`);
+        AppLog.error('Native', `[DeadlinerToolAdapter] create_task failed index=${index} err=${JSON.stringify(err)}`);
         batchItems.push({
           ok: false,
           itemIndex: index,
@@ -465,7 +466,7 @@ export class DeadlinerToolAdapter {
 
     const updated: DDLItem = this.copyTaskWithNewEndTime(task, DateTimeUtils.toLocalISOString(dueDate));
     await TaskRepository.getInstance().updateDDL(updated);
-    console.info(`[DeadlinerToolAdapter] update_deadline updated id=${taskId} due=${newDueTime}`);
+    AppLog.info('Native', `[DeadlinerToolAdapter] update_deadline updated id=${taskId} due=${newDueTime}`);
 
     const taskPayload: AdapterTaskPayload = {
       id: updated.id,
@@ -577,7 +578,7 @@ export class DeadlinerToolAdapter {
           0,
           null
         );
-        console.info(`[DeadlinerToolAdapter] create_habit inserted id=${habitId} name=${normalized.name} ddlId=${ddlId}`);
+        AppLog.info('Native', '[DeadlinerToolAdapter] create_habit inserted id=' + habitId.toString() + ' name=' + normalized.name);
 
         const habit: AdapterHabitPayload = {
           id: habitId,
@@ -594,7 +595,7 @@ export class DeadlinerToolAdapter {
           data: habit
         });
       } catch (err) {
-        console.error(`[DeadlinerToolAdapter] create_habit failed index=${index} err=${JSON.stringify(err)}`);
+        AppLog.error('Native', `[DeadlinerToolAdapter] create_habit failed index=${index} err=${JSON.stringify(err)}`);
         batchItems.push({
           ok: false,
           itemIndex: index,

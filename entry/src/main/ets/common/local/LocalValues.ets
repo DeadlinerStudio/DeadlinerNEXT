@@ -1,3 +1,4 @@
+import { AppLog } from '../logging/AppLog';
 import { preferences } from '@kit.ArkData';
 import { SettingsConstants as C } from './SettingsConstants';
 import { SecureStorage } from './SecureStorage';
@@ -229,9 +230,9 @@ export class LocalValues {
 
       AppStorage.setOrCreate('IsAppDataReady', true);
 
-      console.info('SettingsValue initialized successfully');
+      AppLog.info('Native', 'SettingsValue initialized successfully');
     } catch (err) {
-      console.error(`Failed to load settings: ${JSON.stringify(err)}`);
+      AppLog.error('Native', `Failed to load settings: ${JSON.stringify(err)}`);
       AppStorage.setOrCreate('IsAppDataReady', true);
     }
   }
@@ -246,7 +247,7 @@ export class LocalValues {
       await this.pref.put(key, value); // 更新磁盘
       await this.pref.flush();
     } catch (err) {
-      console.error(`Failed to save ${key}: ${JSON.stringify(err)}`);
+      AppLog.error('Native', `Failed to save ${key}: ${JSON.stringify(err)}`);
     }
   }
 
@@ -402,7 +403,7 @@ export class LocalValues {
       await this.pref.put(C.KEY_PRIVACY_AGREE, true);
       await this.pref?.flush();
     } catch (e) {
-      console.error('Save preference failed', e);
+      AppLog.error('Native', 'Save preference failed', e);
     }
   }
 
@@ -414,7 +415,7 @@ export class LocalValues {
       await this.pref.put(C.KEY_PRIVACY_AGREE, false);
       await this.pref?.flush();
     } catch (e) {
-      console.error('Save preference failed', e);
+      AppLog.error('Native', 'Save preference failed', e);
     }
   }
 
@@ -464,9 +465,9 @@ export class LocalValues {
       AppStorage.setOrCreate(C.KEY_NOTIFY_SUMMARY_ENABLE, false);
       AppStorage.setOrCreate(C.KEY_NOTIFY_SUMMARY_TIME, '21:00');
 
-      console.info('LocalValues', 'All advanced settings cleared successfully.');
+      AppLog.info('Native', 'LocalValues', 'All advanced settings cleared successfully.');
     } catch (e) {
-      console.error('LocalValues', `Failed to clear advanced settings: ${e.message}`);
+      AppLog.error('Native', 'LocalValues', `Failed to clear advanced settings: ${e.message}`);
     }
   }
 
@@ -829,7 +830,7 @@ export class LocalValues {
       await this.pref.put(key, HdsTabsCustomization.encodeTabIds(tabIds));
       await this.pref.flush();
     } catch (err) {
-      console.error('Failed to save ' + key + ': ' + JSON.stringify(err));
+      AppLog.error('Native', 'Failed to save ' + key + ': ' + JSON.stringify(err));
     }
   }
 }

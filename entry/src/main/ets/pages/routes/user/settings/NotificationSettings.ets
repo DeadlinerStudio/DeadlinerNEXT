@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { LocalValues } from '../../../../common/local/LocalValues';
 import { SettingsConstants as C } from '../../../../common/local/SettingsConstants';
 import { SettingsDivider, SettingsSection,
@@ -59,7 +60,7 @@ struct NotificationSettings {
       const isEnabled = await notificationManager.isNotificationEnabled();
       this.allowNotification = isEnabled;
     } catch (e) {
-      console.error('Check permission failed:', e);
+      AppLog.error('Native', 'Check permission failed:', e);
     }
   }
 

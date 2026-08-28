@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import {
   DividerShowType,
   HdsNavDestination,
@@ -86,7 +87,7 @@ export struct CapturePage {
       const data = await this.repo.getAllInspirations();
       this.items = data;
     } catch (error) {
-      console.error('[CapturePage] loadItems failed', error);
+      AppLog.error('Native', '[CapturePage] loadItems failed', error);
     }
     this.isLoading = false;
   }

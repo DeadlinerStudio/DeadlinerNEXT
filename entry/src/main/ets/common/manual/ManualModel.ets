@@ -1,3 +1,4 @@
+import { AppLog } from '../logging/AppLog';
 import { util } from '@kit.ArkTS';
 import { common } from '@kit.AbilityKit';
 
@@ -87,7 +88,7 @@ export class ManualDataManager {
       return rawSections;
 
     } catch (error) {
-      console.error('[ManualDataManager] Load menu failed:', error);
+      AppLog.error('Native', '[ManualDataManager] Load menu failed:', error);
       return [];
     }
   }
@@ -118,7 +119,7 @@ export class ManualDataManager {
       const textDecoder = new util.TextDecoder('utf-8', { ignoreBOM: true });
       return textDecoder.decodeWithStream(fileData);
     } catch (error) {
-      console.error(`[ManualDataManager] Load content failed: ${fileName}`, error);
+      AppLog.error('Native', `[ManualDataManager] Load content failed: ${fileName}`, error);
       return '# 加载失败\n无法找到文档内容。';
     }
   }

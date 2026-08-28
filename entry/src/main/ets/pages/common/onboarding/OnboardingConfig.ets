@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import { util } from '@kit.ArkTS';
 import { GuidePageId, GuideSceneConfig, LottieSceneMeta, MaterialOption, RawFileResourceManager } from './OnboardingTypes';
 
@@ -49,7 +50,7 @@ export async function loadGuideSceneConfigs(resourceManager: RawFileResourceMana
       return mapGuideSceneConfigs(configs);
     }
   } catch {
-    console.error('[Guide] Failed to load guide_scenes.json');
+    AppLog.error('Native', '[Guide] Failed to load guide_scenes.json');
   }
   return [];
 }

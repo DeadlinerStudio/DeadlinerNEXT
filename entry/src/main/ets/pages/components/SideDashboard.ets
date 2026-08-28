@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { Theme } from '@kit.ArkUI'
 import { DeadlineType, DDLItem, HabitStatus, Habit } from '../../model/DDLModels';
 import { common } from '@kit.AbilityKit';
@@ -97,7 +98,7 @@ export struct SideDashboard {
       this.findNextDeadline(allDDLs);
 
     } catch (e) {
-      console.error('[SideDashboard] Refresh failed:', e);
+      AppLog.error('Native', '[SideDashboard] Refresh failed:', e);
     } finally {
       this.isRefreshing = false;
     }

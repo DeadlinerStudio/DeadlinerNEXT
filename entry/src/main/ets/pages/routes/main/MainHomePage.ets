@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import { SegmentButtonV2Items, Theme } from '@kit.ArkUI'
 import auth from "@hw-agconnect/auth";
 import { Context } from "@kit.AbilityKit";
@@ -129,7 +130,7 @@ export struct MainHomePage {
   onQuickAddTaskChange() {
     // 只有当值为 true 时才执行，防止重置为 false 时再次触发
     if (this.quickAddTrigger === true) {
-      console.info('[MainHomePage] Widget trigger received, opening AddTask...');
+      AppLog.info('Native', '[MainHomePage] Widget trigger received, opening AddTask...');
 
       if (this.usesWideSplitLayout()) {
         if (!LocalValues.getInstance().getFullScreenAdd()) this.isAddTaskShow = true;
@@ -187,7 +188,7 @@ export struct MainHomePage {
   @StorageProp(C.KEY_STARTUP_PAGE) @Watch('onStartupSettingLoaded') startupPageSetting: number = -1;
 
   onStartupSettingLoaded() {
-    console.info(`[Startup] Detect change: ${this.startupPageSetting}`);
+    AppLog.info('Native', `[Startup] Detect change: ${this.startupPageSetting}`);
 
     if (this.startupPageSetting === -1) {
       return;
@@ -250,7 +251,7 @@ export struct MainHomePage {
   scrollToTopSignal: number = 0;
 
   onScrollToTopEvent() {
-    console.debug('MainHomePage received scroll to top signal');
+    AppLog.debug('Native', 'MainHomePage received scroll to top signal');
     // 只有当前页面显示时才滚动
     if (this.currentIndex === MainTabIndex.TASKS) { // 假设你想让任务列表回滚
       this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: { duration: 300 } });

@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import dataPreferences from '@ohos.data.preferences';
 import { ActiveReminder, ActiveReminderType, buildActiveReminderScopeKey } from '../../model/ActiveReminder';
 import common from '@ohos.app.ability.common';
@@ -28,7 +29,7 @@ export class ReminderDataManager {
       this.preferences = await dataPreferences.getPreferences(context, PREF_NAME);
       await this.loadFromDisk();
     } catch (err) {
-      console.error(`[ReminderData] Init failed: ${JSON.stringify(err)}`);
+      AppLog.error('Native', `[ReminderData] Init failed: ${JSON.stringify(err)}`);
     }
   }
 
@@ -40,9 +41,9 @@ export class ReminderDataManager {
     try {
       const jsonStr = await this.preferences.get(KEY_ACTIVE_REMINDERS, '[]') as string;
       this.memoryCache = JSON.parse(jsonStr) as ActiveReminder[];
-      console.info(`[ReminderData] Loaded ${this.memoryCache.length} records.`);
+      AppLog.info('Native', `[ReminderData] Loaded ${this.memoryCache.length} records.`);
     } catch (e) {
-      console.error('[ReminderData] Load parse failed, resetting.');
+      AppLog.error('Native', '[ReminderData] Load parse failed, resetting.');
       this.memoryCache = [];
     }
   }
@@ -57,7 +58,7 @@ export class ReminderDataManager {
       await this.preferences.put(KEY_ACTIVE_REMINDERS, jsonStr);
       await this.preferences.flush();
     } catch (e) {
-      console.error(`[ReminderData] Save failed: ${JSON.stringify(e)}`);
+      AppLog.error('Native', `[ReminderData] Save failed: ${JSON.stringify(e)}`);
     }
   }
 
@@ -96,9 +97,9 @@ export class ReminderDataManager {
     const recordKey = buildActiveReminderScopeKey(record.type, record.targetId);
     const existing = this.memoryCache.find(r => buildActiveReminderScopeKey(r.type, r.targetId) === recordKey);
     if (existing) {
-      console.info(`[ReminderData] Updating existing record: ${recordKey}. Old SystemID:${existing.reminderId} New SystemID:${record.reminderId}`);
+      AppLog.info('Native', `[ReminderData] Updating existing record: ${recordKey}. Old SystemID:${existing.reminderId} New SystemID:${record.reminderId}`);
     } else {
-      console.info(`[ReminderData] Adding new record: ${recordKey} -> SystemID:${record.reminderId}`);
+      AppLog.info('Native', `[ReminderData] Adding new record: ${recordKey} -> SystemID:${record.reminderId}`);
     }
     this.memoryCache = this.memoryCache.filter(r => buildActiveReminderScopeKey(r.type, r.targetId) !== recordKey);
     this.memoryCache.push(record);
@@ -113,10 +114,10 @@ export class ReminderDataManager {
     const before = this.memoryCache.length;
     this.memoryCache = this.memoryCache.filter(r => r.targetId !== targetId);
     if (this.memoryCache.length !== before) {
-      console.info(`[ReminderData] Removed record for: ${targetId}`);
+      AppLog.info('Native', `[ReminderData] Removed record for: ${targetId}`);
       await this.saveToDisk();
     } else {
-      console.warn(`[ReminderData] Attempted to remove non-existent record: ${targetId}`);
+      AppLog.warn('Native', `[ReminderData] Attempted to remove non-existent record: ${targetId}`);
     }
   }
 
@@ -125,10 +126,10 @@ export class ReminderDataManager {
     const before = this.memoryCache.length;
     this.memoryCache = this.memoryCache.filter(r => buildActiveReminderScopeKey(r.type, r.targetId) !== scopeKey);
     if (this.memoryCache.length !== before) {
-      console.info(`[ReminderData] Removed record for: ${scopeKey}`);
+      AppLog.info('Native', `[ReminderData] Removed record for: ${scopeKey}`);
       await this.saveToDisk();
     } else {
-      console.warn(`[ReminderData] Attempted to remove non-existent record: ${scopeKey}`);
+      AppLog.warn('Native', `[ReminderData] Attempted to remove non-existent record: ${scopeKey}`);
     }
   }
 

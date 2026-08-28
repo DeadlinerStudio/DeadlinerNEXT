@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import {
   HdsVisualComponent,
   HdsSceneController,
@@ -40,7 +41,7 @@ export struct AiFlowBackground {
           HdsSceneType.DUAL_EDGE_FLOW_LIGHT_WITH_BACKGROUND_MASK,
           this.sceneController,
           () => {
-            console.info('AI Flow Light initialized');
+            AppLog.info('Native', 'AI Flow Light initialized');
           }
         )
         // 确保光效铺满整个背景

@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { common } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 
@@ -121,7 +122,7 @@ export struct FriendshipLinksPage {
   private openAppLink(link: string) {
     const context = getContext(this) as common.UIAbilityContext;
     context.openLink(link).catch((err: BusinessError) => {
-      console.error('Failed to open link:', err);
+      AppLog.error('Native', 'Failed to open link:', err);
     });
   }
 

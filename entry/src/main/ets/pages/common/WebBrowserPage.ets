@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { webview } from '@kit.ArkWeb';
 import { LengthMetrics, router } from '@kit.ArkUI';
 import { HdsNavDestination, HdsNavDestinationTitleMode, HdsNavDestinationAttribute,
@@ -66,7 +67,7 @@ struct WebBrowserPage {
       }
 
       if (this.onCloseCallback) {
-        console.info('[WebBrowserPage] Closing, trigger callback.');
+        AppLog.info('Native', '[WebBrowserPage] Closing, trigger callback.');
         this.onCloseCallback();
       }
 

@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { AccountController, AccountUtils } from "./AccountUtils";
 import auth, { AuthUser, SignInResult } from '@hw-agconnect/auth'
 import { hilog } from "@kit.PerformanceAnalysisKit";
@@ -37,12 +38,12 @@ export class HuaweiAccountUtils implements AccountUtils {
         "kind": 'hwid'
       }
     }).then(signInResult => {
-      hilog.info(0x0000, 'testTag', '%{public}s',  `signInHwid success. result: ${signInResult.getUser().getUid()}`);
+      AppLog.info('HiLog', 0x0000, 'testTag', '%{public}s',  `signInHwid success. result: ${signInResult.getUser().getUid()}`);
 
       this.controller.onSignInSucc(signInResult);
     })
       .catch((error: BusinessError) => {
-        hilog.error(0x0000, 'testTag', '%{public}s', `signInHwid error, Code: ${error.code}, message: ${error.message}`);
+        AppLog.error('HiLog', 0x0000, 'testTag', '%{public}s', `signInHwid error, Code: ${error.code}, message: ${error.message}`);
         this.controller.onSignInFail(error);
         return false;
       })
@@ -83,7 +84,7 @@ export class HuaweiAccountUtils implements AccountUtils {
       const state = authorizationWithHuaweiIDResponse.state;
 
       if (state && authRequest.state !== state) {
-        console.error('State check failed');
+        AppLog.error('Native', 'State check failed');
         return { avatar: undefined, nickname: undefined, authorization: undefined };
       }
 
@@ -92,11 +93,11 @@ export class HuaweiAccountUtils implements AccountUtils {
       nickName = authorizationWithHuaweiIDCredential?.nickName;
       authorizationCode = authorizationWithHuaweiIDCredential?.authorizationCode;
 
-      console.log(`[User] Profile nickName: ${nickName} | avatarUri: ${avatarUri}`);
+      AppLog.debug('Native', `[User] Profile nickName: ${nickName} | avatarUri: ${avatarUri}`);
 
     } catch (error) {
       const err = error as BusinessError;
-      console.error(`Get profile failed: ${err.code}, ${err.message}`);
+      AppLog.error('Native', `Get profile failed: ${err.code}, ${err.message}`);
     }
 
     // 3. 此时 await 已经结束，变量已被赋值，可以正确返回

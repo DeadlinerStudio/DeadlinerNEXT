@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import auth, { AuthUser } from "@hw-agconnect/auth";
 import { LengthMetrics, promptAction } from "@kit.ArkUI";
 import { LoginPanelView } from "../common/LoginPanelView";
@@ -365,18 +366,18 @@ export struct SettingsUserProfile {
         try {
           const sysProfile = await HuaweiAccountUtils.getHuaweiAccountProfile(ctx, isInteractive);
           if (sysProfile.nickname) {
-            console.info(`[Fix] Overwriting AGC nickname with System nickname: ${sysProfile.nickname}`);
+            AppLog.info('Native', `[Fix] Overwriting AGC nickname with System nickname: ${sysProfile.nickname}`);
             this.displayNickname = sysProfile.nickname;
           }
           if (sysProfile.avatar) {
             this.displayAvatar = sysProfile.avatar;
           }
         } catch (sysErr) {
-          console.warn('System profile check failed, using AGC cache.');
+          AppLog.warn('Native', 'System profile check failed, using AGC cache.');
         }
       }
     } catch (e) {
-      console.error(`User profile refresh failed: ${e.message}`);
+      AppLog.error('Native', `User profile refresh failed: ${e.message}`);
       this.currentUser = null;
     }
   }

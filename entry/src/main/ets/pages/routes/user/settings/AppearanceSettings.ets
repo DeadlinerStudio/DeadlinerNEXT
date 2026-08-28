@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { LocalValues } from '../../../../common/local/LocalValues';
 import { SettingsConstants as C } from '../../../../common/local/SettingsConstants';
 import { SettingsDivider, SettingsSection, SettingsItem, SubSettingsSwitch,
@@ -99,7 +100,7 @@ struct AppearanceSettings {
         this.isBackgroundSheetShow = true;
       }
     } catch (err) {
-      console.error('[AppearanceSettings] Pick image failed:', err);
+      AppLog.error('Native', '[AppearanceSettings] Pick image failed:', err);
     }
   }
 
@@ -173,11 +174,11 @@ struct AppearanceSettings {
     context.startAbility(want)
       .then(() => {
         context.terminateSelf().catch((err: BusinessError) => {
-          console.error('[AppearanceSettings] terminateSelf failed:', JSON.stringify(err));
+          AppLog.error('Native', '[AppearanceSettings] terminateSelf failed:', JSON.stringify(err));
         });
       })
       .catch((err: BusinessError) => {
-        console.error('[AppearanceSettings] restart startAbility failed:', JSON.stringify(err));
+        AppLog.error('Native', '[AppearanceSettings] restart startAbility failed:', JSON.stringify(err));
       });
   }
 
@@ -272,7 +273,7 @@ struct AppearanceSettings {
                 options: this.menuOptions,
                 selectedIndex: $currentSelectIndex,
                 onChange: (index, value) => {
-                  console.info(`用户选中了第 ${index} 项，值为: ${value}`);
+                  AppLog.info('Native', `用户选中了第 ${index} 项，值为: ${value}`);
                   const level = this.MATERIAL_LEVELS[index];
                   LocalValues.getInstance().setMaterialLevel(level)
                 }

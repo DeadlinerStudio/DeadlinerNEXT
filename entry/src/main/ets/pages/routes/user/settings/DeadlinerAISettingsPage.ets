@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { SettingsConstants } from "../../../../common/local/SettingsConstants";
 import { LocalValues } from "../../../../common/local/LocalValues";
 import { promptAction, SymbolGlyphModifier } from '@kit.ArkUI';
@@ -203,7 +204,7 @@ export struct LifiAISettingsPage {
 
             } catch (e) {
               this.isVerified = false;
-              console.error(`AI Connection Error: ${JSON.stringify(e)}`);
+              AppLog.error('Native', `AI Connection Error: ${JSON.stringify(e)}`);
               let msg = '验证失败';
               if (e instanceof Error) {
                 msg = e.message;

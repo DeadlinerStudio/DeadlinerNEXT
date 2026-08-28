@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AIHabit, AITask, AIToolCall, AIToolResult, MixedResult, MonthlyAnalysisResult } from '../model/AIModels';
@@ -530,12 +531,12 @@ export class DeadlinerCoreService {
   }
 
   private logInfo(message: string): void {
-    hilog.info(DeadlinerCoreService.LOG_DOMAIN, DeadlinerCoreService.LOG_TAG, '%{public}s', message);
-    console.info(`[LifiCore] ${message}`);
+    AppLog.info('HiLog', DeadlinerCoreService.LOG_DOMAIN, DeadlinerCoreService.LOG_TAG, '%{public}s', message);
+    AppLog.info('Native', `[LifiCore] ${message}`);
   }
 
   private logError(message: string): void {
-    hilog.error(DeadlinerCoreService.LOG_DOMAIN, DeadlinerCoreService.LOG_TAG, '%{public}s', message);
-    console.error(`[LifiCore] ${message}`);
+    AppLog.error('HiLog', DeadlinerCoreService.LOG_DOMAIN, DeadlinerCoreService.LOG_TAG, '%{public}s', message);
+    AppLog.error('Native', `[LifiCore] ${message}`);
   }
 }

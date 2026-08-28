@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import {
   BottomBuilderShowType,
   HdsNavDestination,
@@ -80,7 +81,7 @@ export struct OverviewPage {
 
   onTabSwitch() {
     if (this.currentTabIndex === this.TARGET_INDEX) {
-      console.debug('[OverviewPage] Tab switched to Overview. Reloading data...');
+      AppLog.debug('Native', '[OverviewPage] Tab switched to Overview. Reloading data...');
       this.isLoading = true;
       this.viewModel.loadData().then(() => {
         this.isLoading = false;
@@ -340,7 +341,7 @@ export struct OverviewPage {
       this.viewModel.metrics
     );
     PaperTalkUtils.openPrintOrStore(this.context, payload).catch((error: Error) => {
-      console.error(`[OverviewPage] Share monthly summary failed: ${error}`);
+      AppLog.error('Native', `[OverviewPage] Share monthly summary failed: ${error}`);
       Toast.show({ message: '暂时无法打开纸语或应用商店' });
     });
   }

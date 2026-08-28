@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { WidgetData, WidgetTaskItem } from '../model/WidgetData';
 
 @Entry
@@ -160,7 +161,7 @@ struct TaskWidgetCardSmall {
   }
 
   aboutToAppear() {
-    console.info(`[TaskWidgetCardSmall] Initialized.`);
+    AppLog.info('Native', `[TaskWidgetCardSmall] Initialized.`);
   }
 
   build() {

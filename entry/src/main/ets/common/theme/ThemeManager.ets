@@ -1,3 +1,4 @@
+import { AppLog } from '../logging/AppLog';
 import { UIThemePalette, IndicatorSet, createUITheme, INDICATORS_IOS, ITheme, TabBrandPalette, ThemeMap, IndicatorMap,
   THEME_DEFAULT_INDICATOR_MAP,
   INDICATORS_VIBRANT} from "./ThemeModel";
@@ -80,7 +81,7 @@ export class ThemeManager {
       await ThemeManager.combineAndApplyTheme(uiKey, indicatorKey);
 
     } catch (err) {
-      console.error('[ThemeManager] Init failed:', err);
+      AppLog.error('Native', '[ThemeManager] Init failed:', err);
       // 兜底：Vibrant + iOS
       ThemeManager.updateAppState(ThemeManager.mergeTheme(ThemeMap['vibrant'], INDICATORS_VIBRANT));
     }
@@ -97,13 +98,13 @@ export class ThemeManager {
 
       return uiKey || 'vibrant';
     } catch (err) {
-      console.error('[ThemeManager] Failed to read persisted UI theme key', err);
+      AppLog.error('Native', '[ThemeManager] Failed to read persisted UI theme key', err);
       return AppStorage.get<string>('currentThemeKey') || 'vibrant';
     }
   }
 
   static async setCustomBackground(uri: string, isBlur: boolean) {
-    console.info('[ThemeManager] Setting custom background:', uri);
+    AppLog.info('Native', '[ThemeManager] Setting custom background:', uri);
     // 立即更新内存，触发 UI 刷新
     AppStorage.setOrCreate('customBackgroundImage', uri);
     AppStorage.setOrCreate('customBackgroundBlur', isBlur);
@@ -115,7 +116,7 @@ export class ThemeManager {
         await ThemeManager.pref.put(ThemeManager.KEY_CUSTOM_BACKGROUND_BLUR, isBlur);
         await ThemeManager.pref.flush();
       } catch (e) {
-        console.error('[ThemeManager] Failed to save custom background', e);
+        AppLog.error('Native', '[ThemeManager] Failed to save custom background', e);
       }
     }
   }
@@ -230,7 +231,7 @@ export class ThemeManager {
 
         await ThemeManager.pref.flush();
       } catch (e) {
-        console.error('[ThemeManager] Failed to save custom UI', e);
+        AppLog.error('Native', '[ThemeManager] Failed to save custom UI', e);
       }
     }
   }
@@ -333,7 +334,7 @@ export class ThemeManager {
     try {
       ThemeControl.setDefaultTheme(new DeadlinerTheme(theme));
     } catch (error) {
-      console.error('[ThemeManager]', 'Failed to apply system theme', error);
+      AppLog.error('Native', '[ThemeManager]', 'Failed to apply system theme', error);
     }
   }
 
@@ -342,7 +343,7 @@ export class ThemeManager {
   // =================================================================
 
   static async switchUITheme(uiKey: string) {
-    console.info('[ThemeManager]', `Switching UI to: ${uiKey}`);
+    AppLog.info('Native', '[ThemeManager]', `Switching UI to: ${uiKey}`);
 
     const defaultIndicatorKey = THEME_DEFAULT_INDICATOR_MAP[uiKey] || 'vibrant';
 
@@ -357,7 +358,7 @@ export class ThemeManager {
         await ThemeManager.pref.put(ThemeManager.KEY_THEME_INDICATOR, defaultIndicatorKey);
         await ThemeManager.pref.flush();
       } catch (e) {
-        console.error('[ThemeManager] Switch UI save failed', e);
+        AppLog.error('Native', '[ThemeManager] Switch UI save failed', e);
       }
     }
   }
@@ -367,7 +368,7 @@ export class ThemeManager {
    * 行为：保持当前 UI 皮肤不变，只换图表
    */
   static async switchIndicatorStyle(indicatorKey: string) {
-    console.info('[ThemeManager]', `Switching Indicators to: ${indicatorKey}`);
+    AppLog.info('Native', '[ThemeManager]', `Switching Indicators to: ${indicatorKey}`);
     AppStorage.set('currentIndicatorKey', indicatorKey);
 
     const currentUIKey = AppStorage.get<string>('currentThemeKey') || 'vibrant';

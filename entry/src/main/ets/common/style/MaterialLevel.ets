@@ -1,3 +1,4 @@
+import { AppLog } from '../logging/AppLog';
 import { LocalValues } from '../local/LocalValues'
 import { hdsMaterial } from '@kit.UIDesignKit'
 import { Available } from '@kit.BasicServicesKit'
@@ -8,7 +9,7 @@ export function getHdsMaterialLevel(level?: string): hdsMaterial.MaterialLevel {
     level = LocalValues.getInstance().getMaterialLevel()
   }
 
-  console.log(`Material Level ${level}`)
+  AppLog.debug('Native', `Material Level ${level}`)
 
   switch (level) {
     case 'ADAPTIVE':
@@ -29,7 +30,7 @@ export function getHdsMaterialLevelRaw(level?: string): number {
     level = LocalValues.getInstance().getMaterialLevel()
   }
 
-  console.log(`Material Level ${level}`)
+  AppLog.debug('Native', `Material Level ${level}`)
 
   switch (level) {
     case 'ADAPTIVE':

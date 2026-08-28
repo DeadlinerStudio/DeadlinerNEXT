@@ -1,3 +1,4 @@
+import { AppLog } from '../../../common/logging/AppLog';
 import { DividerShowType, HdsNavigation, HdsNavigationAttribute, HdsNavigationTitleMode, ScrollEffectType } from "@kit.UIDesignKit";
 import { LengthMetrics, promptAction } from "@kit.ArkUI";
 import { SettingsDivider,
@@ -128,7 +129,7 @@ export struct UserPage {
   private readonly categoryRepository: CategoryRepository = CategoryRepository.getInstance();
 
   onScreenModeChange() {
-    console.info(`[UserPage] Screen Mode Change Detected. Wide: ${this.isWideScreen}, breakpoint: ${this.currentBreakpoint}`);
+    AppLog.info('Native', `[UserPage] Screen Mode Change Detected. Wide: ${this.isWideScreen}, breakpoint: ${this.currentBreakpoint}`);
 
     setTimeout(() => {
       if (this.usesSplitLayout()) {
@@ -156,7 +157,7 @@ export struct UserPage {
         const pathInfo = this.appPathStack.pop();
 
         if (pathInfo) {
-          console.info(`[Router] Migrating ${name} from Global to Local`);
+          AppLog.info('Native', `[Router] Migrating ${name} from Global to Local`);
           this.userLocalPathStack.pushPath(pathInfo, false);
         }
       } else {
@@ -165,7 +166,7 @@ export struct UserPage {
     }
 
     if (this.userLocalPathStack.size() === 0) {
-      console.info('[Router] Local stack empty, pushing placeholder.');
+      AppLog.info('Native', '[Router] Local stack empty, pushing placeholder.');
       this.userLocalPathStack.pushPath({ name: PLACEHOLDER_ROUTE_NAME }, false);
     }
   }
@@ -189,10 +190,10 @@ export struct UserPage {
     for (let i = stackBackup.length - 1; i >= 0; i--) {
       const item = stackBackup[i];
       if (item.name === PLACEHOLDER_ROUTE_NAME) {
-        console.info('[Router] Dropping placeholder page during migration.');
+        AppLog.info('Native', '[Router] Dropping placeholder page during migration.');
         continue;
       }
-      console.info(`[Router] Migrating ${item.name} from Local to Global`);
+      AppLog.info('Native', `[Router] Migrating ${item.name} from Local to Global`);
       this.appPathStack.pushPath(item, false); // false = 无动画
     }
   }
@@ -203,7 +204,7 @@ export struct UserPage {
       let bundleInfo = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION);
       this.versionName = bundleInfo.versionName;
     } catch (error) {
-      console.error('获取版本号失败:', JSON.stringify(error));
+      AppLog.error('Native', '获取版本号失败:', JSON.stringify(error));
       this.versionName = '1.0.0'; // 失败时的默认值
     }
 
@@ -269,7 +270,7 @@ export struct UserPage {
       await this.categoryRepository.restorePresets();
       promptAction.showToast({ message: '预设分类已恢复' });
     } catch (error) {
-      console.error('[UserPage] Restore preset categories failed:', JSON.stringify(error));
+      AppLog.error('Native', '[UserPage] Restore preset categories failed:', JSON.stringify(error));
       promptAction.showToast({ message: '恢复预设分类失败' });
     }
   }

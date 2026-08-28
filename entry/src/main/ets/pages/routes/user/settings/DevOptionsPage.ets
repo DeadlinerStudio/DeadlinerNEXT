@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { HdsNavDestination, HdsNavDestinationAttribute } from "@hms.hds.hdsBaseComponent"; // 根据你的实际 HDS 路径调整
 import { notificationManager } from "@kit.NotificationKit";
 import { promptAction } from "@kit.ArkUI";
@@ -46,7 +47,7 @@ export struct DevOptionsPage {
               try {
                 await reminderAgentManager.cancelAllReminders();
                 this.toast('已清空所有后台提醒');
-                console.info('[Dev] All reminders canceled.');
+                AppLog.info('Native', '[Dev] All reminders canceled.');
               } catch (e) {
                 this.toast(`清空失败: ${JSON.stringify(e)}`);
               }
@@ -74,7 +75,7 @@ export struct DevOptionsPage {
                 targetDate.setSeconds(targetDate.getSeconds() + 10);
 
                 // 2. 调用 API
-                console.info(`[Dev] Testing Calendar DDL. Target: ${targetDate.toLocaleTimeString()}`);
+                AppLog.info('Native', `[Dev] Testing Calendar DDL. Target: ${targetDate.toLocaleTimeString()}`);
                 const id = await ReminderUtils.publishCalendar(
                   "DDL 测试",
                   `单次提醒，应该在 ${targetDate.toLocaleTimeString()} 触发`,
@@ -85,7 +86,7 @@ export struct DevOptionsPage {
               } catch (e) {
                 const err = e as BusinessError;
                 this.toast(`❌ 失败: ${err.code} - ${err.message}`);
-                console.error(`[Dev] Calendar failed: ${JSON.stringify(err)}`);
+                AppLog.error('Native', `[Dev] Calendar failed: ${JSON.stringify(err)}`);
               }
             })
 
@@ -114,7 +115,7 @@ export struct DevOptionsPage {
                 // 2. 设定重复：每天
                 const days = [1, 2, 3, 4, 5, 6, 7];
 
-                console.info(`[Dev] Testing Alarm Habit. Target: ${hour}:${minute}`);
+                AppLog.info('Native', `[Dev] Testing Alarm Habit. Target: ${hour}:${minute}`);
 
                 // 3. 调用 API
                 const id = await ReminderUtils.publishAlarm(
@@ -126,7 +127,7 @@ export struct DevOptionsPage {
                 );
 
                 this.toast(`✅ Alarm 发布成功 ID:${id}`);
-                console.info(`[Dev] Alarm published. ID: ${id}`);
+                AppLog.info('Native', `[Dev] Alarm published. ID: ${id}`);
 
               } catch (e) {
                 const err = e as BusinessError;
@@ -145,30 +146,30 @@ export struct DevOptionsPage {
             .height(50)
             .onClick(async () => {
               try {
-                console.info("============== DIAGNOSIS START ==============");
+                AppLog.info('Native', "============== DIAGNOSIS START ==============");
 
                 // 1. 查权限
                 const isEnable = await notificationManager.isNotificationEnabled();
-                console.info(`[Status] Notification Perm: ${isEnable}`);
+                AppLog.info('Native', `[Status] Notification Perm: ${isEnable}`);
 
                 // 2. 查数量
                 const reminders = await reminderAgentManager.getValidReminders();
-                console.info(`[Status] Valid Reminders Count: ${reminders.length}`);
+                AppLog.info('Native', `[Status] Valid Reminders Count: ${reminders.length}`);
                 this.toast(`当前生效提醒数: ${reminders.length}`);
 
                 // 3. 打印详细信息 (方便在 Logcat 看类型)
                 reminders.forEach((r, index) => {
                   // 这里我们需要把 r 强转一下或者用 JSON 查看，因为类型定义可能不全
                   // type: 1=TIMER, 2=CALENDAR, 3=ALARM
-                  console.info(`[Reminder #${index}] ID:${r.notificationId} Type:${r.reminderType} Title:${r.title}`);
+                  AppLog.info('Native', `[Reminder #${index}] ID:${r.notificationId} Type:${r.reminderType} Title:${r.title}`);
                   if (r.reminderType === reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM) {
                     // 验证 Alarm 的重复属性
                     const alarm = r as reminderAgentManager.ReminderRequestAlarm;
-                    console.info(`   -> Alarm Days: ${JSON.stringify(alarm.daysOfWeek)} Hour:${alarm.hour}:${alarm.minute}`);
+                    AppLog.info('Native', `   -> Alarm Days: ${JSON.stringify(alarm.daysOfWeek)} Hour:${alarm.hour}:${alarm.minute}`);
                   }
                 });
 
-                console.info("============== DIAGNOSIS END ==============");
+                AppLog.info('Native', "============== DIAGNOSIS END ==============");
               } catch (err) {
                 this.toast(`诊断失败: ${JSON.stringify(err)}`);
               }

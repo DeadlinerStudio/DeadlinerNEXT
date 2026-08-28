@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { MarkdownParser, MdNode, MdType } from '../../utils/markdown/MarkdownParser';
 import { ManualDataManager, ManualItem } from '../../common/manual/ManualModel';
 import { LinkParser, LinkSegment, LinkType } from '../../utils/markdown/LinkParser';
@@ -55,7 +56,7 @@ export struct MarkdownView {
                     param: realItem
                   });
                 } else {
-                  console.warn(`ManualItem with id '${targetId}' not found in menu.json`);
+                  AppLog.warn('Native', `ManualItem with id '${targetId}' not found in menu.json`);
 
                   const tempItem: ManualItem = {
                     id: targetId,

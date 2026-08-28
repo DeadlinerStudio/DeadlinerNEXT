@@ -1,3 +1,4 @@
+import { AppLog } from '../common/logging/AppLog';
 import { FormExtensionAbility, formInfo, formBindingData, formProvider } from '@kit.FormKit';
 import { Want } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
@@ -17,7 +18,7 @@ export default class EntryFormAbility extends FormExtensionAbility {
     const formId = want.parameters![formInfo.FormParam.IDENTITY_KEY] as string;
     const formName = want.parameters![formInfo.FormParam.NAME_KEY] as string;
 
-    console.info(`[EntryFormAbility] onAddForm: id=${formId}, name=${formName}`);
+    AppLog.info('Native', `[EntryFormAbility] onAddForm: id=${formId}, name=${formName}`);
 
     this.saveFormInfo(formId, formName);
 
@@ -56,18 +57,18 @@ export default class EntryFormAbility extends FormExtensionAbility {
   }
 
   onRemoveForm(formId: string) {
-    console.info(`[EntryFormAbility] onRemoveForm: ${formId}`);
+    AppLog.info('Native', `[EntryFormAbility] onRemoveForm: ${formId}`);
     this.deleteFormInfo(formId);
   }
 
   onUpdateForm(formId: string, wantParams?: Record<string, Object>) {
-    console.info(`[EntryFormAbility] onUpdateForm: ${formId}`);
+    AppLog.info('Native', `[EntryFormAbility] onUpdateForm: ${formId}`);
 
     if (wantParams) {
       const textColor = this.extractTextColor(wantParams);
       const formData = formBindingData.createFormBindingData({ 'textColor': textColor });
       formProvider.updateForm(formId, formData).catch((err: Error) => {
-        console.error(`[EntryFormAbility] updateColor failed: ${JSON.stringify(err)}`);
+        AppLog.error('Native', `[EntryFormAbility] updateColor failed: ${JSON.stringify(err)}`);
       });
     }
 
@@ -82,11 +83,11 @@ export default class EntryFormAbility extends FormExtensionAbility {
         const colorObj = params[colorKey] as TextColor;
         if (colorObj && colorObj.mTextColor) {
           textColor = colorObj.mTextColor;
-          console.info(`[EntryFormAbility] Color extracted: ${textColor}`);
+          AppLog.info('Native', `[EntryFormAbility] Color extracted: ${textColor}`);
         }
       }
     } catch (e) {
-      console.error(`[EntryFormAbility] extractTextColor error: ${e}`);
+      AppLog.error('Native', `[EntryFormAbility] extractTextColor error: ${e}`);
     }
     return textColor;
   }
@@ -110,7 +111,7 @@ export default class EntryFormAbility extends FormExtensionAbility {
 
       await pref.flush();
     } catch (e) {
-      console.error(`[EntryFormAbility] Save Form Info failed: ${e}`);
+      AppLog.error('Native', `[EntryFormAbility] Save Form Info failed: ${e}`);
     }
   }
 
@@ -130,7 +131,7 @@ export default class EntryFormAbility extends FormExtensionAbility {
 
       await pref.flush();
     } catch (e) {
-      console.error(`[EntryFormAbility] Delete Form Info failed: ${e}`);
+      AppLog.error('Native', `[EntryFormAbility] Delete Form Info failed: ${e}`);
     }
   }
 };

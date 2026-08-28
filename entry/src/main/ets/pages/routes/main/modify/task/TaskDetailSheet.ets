@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../../common/logging/AppLog';
 import { promptAction } from '@kit.ArkUI';
 import { ITheme } from '../../../../../common/theme/ThemeModel';
 import { DDLItem, SubTask } from '../../../../../model/DDLModels';
@@ -154,7 +155,7 @@ export struct TaskDetailSheet {
       await this.loadSubTasks(nextTask.id);
       this.animateProgressIn();
     } catch (e) {
-      console.error(`[TaskDetailSheet] loadDetail failed: ${e}`);
+      AppLog.error('Native', `[TaskDetailSheet] loadDetail failed: ${e}`);
       Toast.show({ message: '加载任务详情失败' });
     }
   }
@@ -166,7 +167,7 @@ export struct TaskDetailSheet {
       this.subTasks = this.normalizeSubTasks(loaded);
       this.bumpSubTaskRenderVersion();
     } catch (e) {
-      console.error(`[TaskDetailSheet] loadSubTasks failed: ${e}`);
+      AppLog.error('Native', `[TaskDetailSheet] loadSubTasks failed: ${e}`);
       this.subTasks = [];
       this.bumpSubTaskRenderVersion();
       Toast.show({ message: '加载子任务失败' });
@@ -190,7 +191,7 @@ export struct TaskDetailSheet {
       });
       return copied;
     } catch (e) {
-      console.error(`[TaskDetailSheet] getDisplayedSubTasksSafe failed: ${e}`);
+      AppLog.error('Native', `[TaskDetailSheet] getDisplayedSubTasksSafe failed: ${e}`);
       return [];
     }
   }
@@ -272,7 +273,7 @@ export struct TaskDetailSheet {
       await this.repo.updateDDL(this.currentTask);
       await this.onTaskChanged();
     } catch (e) {
-      console.error(`[TaskDetailSheet] toggleStar failed: ${e}`);
+      AppLog.error('Native', `[TaskDetailSheet] toggleStar failed: ${e}`);
       if (this.currentTask) {
         const rollbackTask = this.cloneTask(this.currentTask);
         rollbackTask.isStared = oldStar;
@@ -376,7 +377,7 @@ export struct TaskDetailSheet {
         this.editingSubTaskId = -1;
       }
     } catch (e) {
-      console.error(`[TaskDetailSheet] submitInlineEdit failed: ${e}`);
+      AppLog.error('Native', `[TaskDetailSheet] submitInlineEdit failed: ${e}`);
       this.subTasks[index] = source;
       this.subTasks = this.subTasks.slice();
       this.bumpSubTaskRenderVersion();
@@ -416,7 +417,7 @@ export struct TaskDetailSheet {
         this.showPlanComposer = false;
       }
     } catch (e) {
-      console.error(`[TaskDetailSheet] submitSubTask failed: ${e}`);
+      AppLog.error('Native', `[TaskDetailSheet] submitSubTask failed: ${e}`);
       Toast.show({ message: '新增子任务失败' });
     } finally {
       this.isMutatingPlan = false;
@@ -456,7 +457,7 @@ export struct TaskDetailSheet {
       await this.repo.toggleSubTask(source);
       await this.onTaskChanged();
     } catch (e) {
-      console.error(`[TaskDetailSheet] toggleSubTask failed: ${e}`);
+      AppLog.error('Native', `[TaskDetailSheet] toggleSubTask failed: ${e}`);
       // 失败回滚
       this.subTasks[index] = source;
       this.subTasks = this.subTasks.slice();
@@ -477,7 +478,7 @@ export struct TaskDetailSheet {
       this.bumpSubTaskRenderVersion();
       await this.onTaskChanged();
     } catch (e) {
-      console.error(`[TaskDetailSheet] deleteSubTask failed: ${e}`);
+      AppLog.error('Native', `[TaskDetailSheet] deleteSubTask failed: ${e}`);
       Toast.show({ message: '删除子任务失败' });
     } finally {
       this.isMutatingPlan = false;

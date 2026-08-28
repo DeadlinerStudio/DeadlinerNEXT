@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../../common/logging/AppLog';
 import { SettingsCheckItem, SettingsDivider, SettingsSection } from "../../../../components/SettingsComponents"
 import { SeasonUtils } from "../../../../../utils/SeasonUtils";
 import { DynamicIconUtils } from "../../../../../utils/DynamicIconUtils";
@@ -86,7 +87,7 @@ export struct IconSelectSheet {
         this.seasonPreviewOpacity = 1;
         this.seasonPreviewScale = 1;
 
-        console.info(`[DynamicIcon] season preview changed: index=${nextIndex}, season=${this.seasons[nextIndex]}`);
+        AppLog.info('Native', `[DynamicIcon] season preview changed: index=${nextIndex}, season=${this.seasons[nextIndex]}`);
       }, 180);
     }, 1600);
   }
@@ -169,7 +170,7 @@ export struct IconSelectSheet {
       dynamicId = DynamicIconUtils.getCurrentSeasonDynamicIconId(this.dynamicIconInfos);
 
       if (!dynamicId) {
-        console.error('[DynamicIcon]', `No matched dynamic icon for season mode`);
+        AppLog.error('Native', '[DynamicIcon]', `No matched dynamic icon for season mode`);
         return;
       }
 

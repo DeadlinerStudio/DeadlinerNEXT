@@ -1,3 +1,4 @@
+import { AppLog } from '../common/logging/AppLog';
 import { Context } from '@kit.AbilityKit';
 import { ThemeManager } from '../common/theme/ThemeManager';
 
@@ -38,7 +39,7 @@ export class ColorUtils {
    */
   static applyAlpha(context: Context, color: ResourceColor, alpha: number): string {
     const config = context.resourceManager.getConfigurationSync();
-    console.debug(`ColorUtils: Current ColorMode is ${config.colorMode}`);
+    AppLog.debug('Native', 'ColorUtils: Current ColorMode is ' + config.colorMode);
 
     let colorValue: number;
 
@@ -70,7 +71,7 @@ export class ColorUtils {
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 
     } catch (e) {
-      console.error('ColorUtils parse error:', e);
+      AppLog.error('Native', 'ColorUtils parse error:', e);
       return '#000000'; // 失败回退
     }
   }
@@ -147,7 +148,7 @@ export function getHexColorSync(context: Context, color: ResourceColor): string 
       }
       return "#" + hex;
     } catch (e) {
-      console.error(`Color conversion failed: ${e}`);
+      AppLog.error('Native', `Color conversion failed: ${e}`);
       return "#000000";
     }
   }

@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../../common/logging/AppLog';
 import { promptAction } from '@kit.ArkUI';
 import { ITheme } from '../../../../../common/theme/ThemeModel';
 import { Habit, HabitGoalType, HabitPeriod, HabitStatus } from '../../../../../model/DDLModels';
@@ -133,7 +134,7 @@ export struct HabitEditSheet {
       this.isShow = false;
 
     } catch (e) {
-      console.error(`Update habit failed: ${e}`);
+      AppLog.error('Native', `Update habit failed: ${e}`);
       Toast.show({ message: '修改失败' });
     }
   }

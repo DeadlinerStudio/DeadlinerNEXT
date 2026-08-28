@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { CategoryEditorSheet } from './CategoryEditorSheet';
 import { CategorySelectionItem } from './CategorySelectionItem';
 import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
@@ -44,7 +45,7 @@ export struct CategorySelectionPanel {
     try {
       this.categories = await this.categoryRepository.listCategories();
     } catch (error) {
-      console.error('[CategorySelectionPanel] Load categories failed: ' + String(error));
+      AppLog.error('Native', '[CategorySelectionPanel] Load categories failed: ' + String(error));
       Toast.show({ message: '分类目录暂不可用' });
     } finally {
       this.isLoading = false;
@@ -142,7 +143,7 @@ export struct CategorySelectionPanel {
       }
       this.onCatalogChanged();
     } catch (error) {
-      console.error('[CategorySelectionPanel] Delete category failed: ' + String(error));
+      AppLog.error('Native', '[CategorySelectionPanel] Delete category failed: ' + String(error));
       Toast.show({ message: '删除分类失败' });
     }
   }

@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
 import { CategoryColorOption, CategoryColorPalette } from '../../common/category/CategoryColorPalette';
 import { CategoryDisplayModel, CategoryMutationInput } from '../../common/kmp/KmpCategoryRepositoryAdapter';
@@ -61,7 +62,7 @@ export struct CategoryEditorSheet {
       this.onSaved(category);
       this.isShown = false;
     } catch (error) {
-      console.error('[CategoryEditor] Save failed: ' + String(error));
+      AppLog.error('Native', '[CategoryEditor] Save failed: ' + String(error));
       Toast.show({ message: '保存分类失败' });
     } finally {
       this.isSaving = false;

@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../common/logging/AppLog';
 import { LocalValues } from '../../../../common/local/LocalValues';
 import { SettingsConstants as C } from '../../../../common/local/SettingsConstants';
 import { SettingsDivider, SettingsSection, SubSettingsSwitch,
@@ -60,7 +61,7 @@ struct InteractionSettings {
   handleSelect(value: number) {
     this.startupPageType = value;
 
-    console.log(`[Startup] set ${value}`);
+    AppLog.debug('Native', `[Startup] set ${value}`);
 
     LocalValues.getInstance().setStartupPage(value);
   }

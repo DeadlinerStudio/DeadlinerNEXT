@@ -1,3 +1,4 @@
+import { AppLog } from '../../../../../common/logging/AppLog';
 import { promptAction } from '@kit.ArkUI';
 import { TaskRepository } from '../../../../../common/repository/TaskRepository';
 import { DeadlineType } from '../../../../../model/DDLModels';
@@ -44,7 +45,7 @@ export class TaskFormHelper {
       Toast.show({ message: '创建成功' });
       return true;
     } catch (e) {
-      console.error(`Add task failed: ${e}`);
+      AppLog.error('Native', `Add task failed: ${e}`);
       Toast.show({ message: '创建失败: ' + (e.message || e) });
       return false;
     }

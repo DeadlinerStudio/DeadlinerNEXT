@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { SettingsDivider, SettingsItem, SettingsSection } from '../components/SettingsComponents';
 import { WebParams } from '../common/WebBrowserPage'; // 调整引用路径
 import { common, Want } from '@kit.AbilityKit';
@@ -21,7 +22,7 @@ export struct SupportPanelView {
     };
 
     this.context.startAbility(want).catch((err: object) => {
-      console.error("Open System Browser failed", JSON.stringify(err));
+      AppLog.error('Native', "Open System Browser failed", JSON.stringify(err));
     });
   }
 
@@ -30,11 +31,11 @@ export struct SupportPanelView {
       // 调用 showCommentDialog 拉起评论弹窗
       commentManager.showCommentDialog(this.context)
         .then(() => {
-          console.info('Deadliner', "succeeded in showing commentDialog.");
+          AppLog.info('Native', 'Deadliner', "succeeded in showing commentDialog.");
           // this.closeAction?.();
         })
         .catch((error: BusinessError<Object>) => {
-          console.error('Deadliner', `showCommentDialog failed, Code: ${error.code}, message: ${error.message}`);
+          AppLog.error('Native', 'Deadliner', `showCommentDialog failed, Code: ${error.code}, message: ${error.message}`);
 
           if (error.code == 1021500009) Toast.show({
             message: '您已评分'
@@ -43,7 +44,7 @@ export struct SupportPanelView {
           this.openAppStore();
         });
     } catch (error) {
-      console.error('Deadliner', `showCommentDialog failed, Code: ${error.code}, message: ${error.message}`);
+      AppLog.error('Native', 'Deadliner', `showCommentDialog failed, Code: ${error.code}, message: ${error.message}`);
     }
   }
 
@@ -54,12 +55,37 @@ export struct SupportPanelView {
       uri: 'store://appgallery.huawei.com/app/detail?id=com.aritxonly.deadliner'
     };
     this.context.startAbility(want).catch((err: object) => {
-      console.error("Open AppGallery failed", JSON.stringify(err));
+      AppLog.error('Native', "Open AppGallery failed", JSON.stringify(err));
     });
     this.closeAction?.();
   }
 
   build() {
+  private async exportDiagnostics(): Promise<void> {
+    try {
+      AppLog.event('diagnostics.export.started', 'app');
+      const paths: Array<string> = AppLog.exportPaths();
+      if (paths.length !== 2) {
+        throw new Error('Diagnostics are not initialized');
+      }
+      const options: picker.DocumentSaveOptions = new picker.DocumentSaveOptions();
+      options.newFileNames = ['deadliner-diagnostics.log', 'deadliner-diagnostics.jsonl'];
+      options.fileSuffixChoices = ['Log|.log', 'JSON Lines|.jsonl'];
+      const documentPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(this.context);
+      const destinations: Array<string> = await documentPicker.save(options);
+      if (destinations.length !== paths.length) {
+        throw new Error('Diagnostic export was cancelled');
+      }
+      await fileIo.copyFile(paths[0], destinations[0]);
+      await fileIo.copyFile(paths[1], destinations[1]);
+      AppLog.event('diagnostics.export.finished', 'app');
+      Toast.show({ message: '诊断日志已导出' });
+    } catch (error) {
+      AppLog.error('app', 'Diagnostic export failed', String(error));
+      Toast.show({ message: '导出诊断日志失败' });
+    }
+  }
+
     Column() {
       Column({ space: 16 }) {
         SettingsSection({ title: '用户反馈' }) {

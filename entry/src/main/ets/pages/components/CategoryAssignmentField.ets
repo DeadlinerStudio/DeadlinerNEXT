@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { CategoryPickerSheet } from './CategoryPickerSheet';
 import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
 import { CategoryDisplayModel } from '../../common/kmp/KmpCategoryRepositoryAdapter';
@@ -36,7 +37,7 @@ export struct CategoryAssignmentField {
         }
       }
     } catch (error) {
-      console.error('[CategoryAssignment] Resolve category failed: ' + String(error));
+      AppLog.error('Native', '[CategoryAssignment] Resolve category failed: ' + String(error));
     }
   }
 

@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import {
   ColorMetrics,
   LengthMetrics,
@@ -99,7 +100,7 @@ export struct ArchivePanelView {
       }
 
     } catch (e) {
-      console.error(`[ArchivePanel] Load failed: ${e}`);
+      AppLog.error('Native', `[ArchivePanel] Load failed: ${e}`);
     } finally {
       this.isLoading = false;
     }
@@ -119,7 +120,7 @@ export struct ArchivePanelView {
       await this.refreshData();
       Toast.show({ message: '已恢复到主列表' });
     } catch (e) {
-      console.error(`Restore task failed: ${e}`);
+      AppLog.error('Native', `Restore task failed: ${e}`);
       Toast.show({ message: '恢复失败' });
     }
   }
@@ -139,7 +140,7 @@ export struct ArchivePanelView {
       await this.refreshData();
       Toast.show({ message: '习惯已恢复到主列表' });
     } catch (e) {
-      console.error(`Restore habit failed: ${e}`);
+      AppLog.error('Native', `Restore habit failed: ${e}`);
       Toast.show({ message: '恢复失败' });
     }
   }
@@ -166,7 +167,7 @@ export struct ArchivePanelView {
             await deleteAction();
             Toast.show({ message: '已删除' });
           } catch (e) {
-            console.error(`Delete failed: ${e}`);
+            AppLog.error('Native', `Delete failed: ${e}`);
             Toast.show({ message: '删除失败' });
           }
         }

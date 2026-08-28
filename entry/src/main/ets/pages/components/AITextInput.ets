@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { Animator, AnimatorResult } from '@kit.ArkUI';
 import { SettingsConstants as C } from '../../common/local/SettingsConstants';
 import { MaterialPresets, canUseSystemMaterial } from '../../common/style/SystemMaterialCompat';
@@ -101,7 +102,7 @@ export struct AITextInput {
     try {
       await this.onAITriggered();
     } catch (e) {
-      console.error(`[AITextInput] AI trigger failed: ${e}`);
+      AppLog.error('Native', `[AITextInput] AI trigger failed: ${e}`);
       Toast.show({ message: 'AI 识别失败，请稍后重试' });
     } finally {
       this.isAiLoading = false;

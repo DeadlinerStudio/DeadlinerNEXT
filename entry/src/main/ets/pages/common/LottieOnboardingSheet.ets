@@ -1,3 +1,4 @@
+import { AppLog } from '../../common/logging/AppLog';
 import { DividerShowType, HdsNavigation, HdsNavigationMenuItemOptions, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { promptAction } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
@@ -32,7 +33,7 @@ export struct LottieOnboardingSheet {
 
   private logLifecycle(stage: string, extra?: string): void {
     const pageIds: GuidePageId[] = this.pageIds();
-    console.info(
+    AppLog.info('Native',
       `[GuideDebug][Sheet] ${stage} | privacyRequired=${this.privacyRequired} ` +
       `privacyAccepted=${this.privacyAccepted} currentIndex=${this.currentIndex} ` +
       `pageCount=${pageIds.length}${extra ? ` | ${extra}` : ''}`
