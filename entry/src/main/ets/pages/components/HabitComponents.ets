@@ -1,7 +1,7 @@
 import { AppLog } from '../../common/logging/AppLog';
 import { SettingsConstants as C } from '../../common/local/SettingsConstants';
 import { ITheme } from '../../common/theme/ThemeModel';
-import { Habit, HabitGoalType, HabitPeriod, HabitRecordStatus } from '../../model/DDLModels';
+import { Habit } from '../../model/DDLModels';
 import { DDLStatus } from '../../model/DDLStatus';
 import { ColorUtils } from '../../utils/ColorUtils';
 import { CategoryIconResolver } from '../../common/category/CategoryIconResolver';
@@ -20,7 +20,12 @@ export interface HabitWithDailyStatus {
   habit: Habit;
   doneCount: number;
   targetCount: number;
+  progressText: string;
+  scheduleLabel: string;
   isCompleted: boolean;
+  canApplyPrimaryAction: boolean;
+  primaryActionKind: string;
+  primaryActionAmount: number;
   isDueToday?: boolean;
   dueStateText?: string;
 }
@@ -512,23 +517,24 @@ export struct HabitRow {
   }
 
   private getBottomLine(): string {
-    let bottomLine = `${this.data.doneCount}/${this.data.targetCount}`;
-    if (this.data.habit.goalType === HabitGoalType.TOTAL) {
-      const total = this.data.habit.totalTarget ? this.data.habit.totalTarget : "∞";
-      bottomLine = `${this.data.doneCount}/${total}`;
-    }
+    let bottomLine: string = this.data.progressText;
     if (this.remainingText) {
-      bottomLine = `${this.remainingText} · ${bottomLine}`;
+      bottomLine = this.remainingText + ' · ' + bottomLine;
     }
     return bottomLine;
   }
 
   private getRightLabel(): string {
-    if (this.data.habit.goalType === HabitGoalType.PER_PERIOD) {
-      return this.data.habit.period.toString();
-    } else {
-      return "Total";
-    }
+    return this.data.scheduleLabel;
+  }
+
+  private getAccessibilityText(): string {
+    const state: string = this.data.isCompleted ? '已完成' : (this.canToggle ? '未完成' : '当前日期不可打卡');
+    return this.data.habit.name + '，' + this.getBottomLine() + '，' + this.getRightLabel() + '，' + state;
+  }
+
+  private getAccessibilityDescription(): string {
+    return this.canToggle ? '双击打卡，长按打开更多操作' : '长按打开更多操作';
   }
 
   private getProgress(): number {
@@ -579,6 +585,7 @@ export struct HabitRow {
             .select(this.data.isCompleted)
             .selectedColor(this.getIndicatorColor()) // 选中色保持使用纯色
             .enabled(this.canToggle)
+            .accessibilityLevel('no')
             .margin({ right: 12 })
 
           Column() {
@@ -632,6 +639,10 @@ export struct HabitRow {
     .height(68)
     .borderRadius(24)
     .clip(true)
+    .accessibilityGroup(true)
+    .accessibilityText(this.getAccessibilityText())
+    .accessibilityDescription(this.getAccessibilityDescription())
+    .accessibilityLevel('yes')
     .onClick(() => {
       if (this.canToggle) this.onToggle();
     })

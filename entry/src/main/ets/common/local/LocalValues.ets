@@ -75,6 +75,8 @@ export class LocalValues {
       const confetti = await this.pref.get(C.KEY_CONFETTI_AFTER_FINISHED, true);
       AppStorage.setOrCreate(C.KEY_CONFETTI_AFTER_FINISHED, confetti);
 
+      const quickAddEnabled = await this.pref.get(C.KEY_QUICK_ADD_ENABLED, false);
+      AppStorage.setOrCreate(C.KEY_QUICK_ADD_ENABLED, quickAddEnabled);
       const fullScreenAdd = await this.pref.get(C.KEY_FULL_SCREEN_ADD, false);
       AppStorage.setOrCreate(C.KEY_FULL_SCREEN_ADD, fullScreenAdd);
 
@@ -222,6 +224,9 @@ export class LocalValues {
       const trendOrder = await this.pref.get(C.KEY_TREND_CARD_ORDER, []) as string[];
       AppStorage.setOrCreate(C.KEY_TREND_CARD_ORDER, trendOrder);
 
+      const showOverviewOverdue = await this.pref.get(C.KEY_OVERVIEW_SHOW_OVERDUE, true);
+      AppStorage.setOrCreate(C.KEY_OVERVIEW_SHOW_OVERDUE, showOverviewOverdue);
+
       const monthlyAnalysis = await this.pref.get(C.KEY_MONTHLY_ANALYSIS, '');
       AppStorage.setOrCreate(C.KEY_MONTHLY_ANALYSIS, monthlyAnalysis);
 
@@ -325,6 +330,14 @@ export class LocalValues {
 
   async setConfettiAfterFinished(value: boolean) {
     await this.setValue(C.KEY_CONFETTI_AFTER_FINISHED, value);
+  }
+
+  getQuickAddEnabled(): boolean {
+    return AppStorage.get<boolean>(C.KEY_QUICK_ADD_ENABLED) ?? false;
+  }
+
+  async setQuickAddEnabled(value: boolean): Promise<void> {
+    await this.setValue(C.KEY_QUICK_ADD_ENABLED, value);
   }
 
   getFullScreenAdd(): boolean {
@@ -626,6 +639,10 @@ export class LocalValues {
    */
   async setTrendCardOrder(order: string[]) {
     await this.setValue(C.KEY_TREND_CARD_ORDER, order);
+  }
+
+  async setOverviewShowOverdue(enabled: boolean): Promise<void> {
+    await this.setValue(C.KEY_OVERVIEW_SHOW_OVERDUE, enabled);
   }
 
   getMonthlyAnalysis(): string {

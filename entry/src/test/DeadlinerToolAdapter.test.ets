@@ -31,10 +31,18 @@ function buildTaskRepoMock(startId: number = 100): Object {
   };
 }
 
+function buildRejectingTaskRepoMock(): Object {
+  return {
+    async insertDDL(): Promise<number> {
+      throw new Error('create_habit must not create a task carrier');
+    }
+  };
+}
+
 function buildHabitRepoMock(startId: number = 500): Object {
   let nextId = startId;
   return {
-    async createHabitForDdl(): Promise<number> {
+    async createHabit(): Promise<number> {
       const id = nextId;
       nextId += 1;
       return id;
@@ -89,7 +97,7 @@ export default function deadlinerToolAdapterTests() {
     });
 
     it('create_habit 单条旧格式成功', 0, async (done: Function) => {
-      const guard = new StaticRepoGuard(buildTaskRepoMock(), buildHabitRepoMock());
+      const guard = new StaticRepoGuard(buildRejectingTaskRepoMock(), buildHabitRepoMock());
       try {
         const result = await DeadlinerToolAdapter.getInstance().execute({
           id: 'h1',
@@ -113,7 +121,7 @@ export default function deadlinerToolAdapterTests() {
     });
 
     it('create_habit 批量新格式成功(>=2)', 0, async (done: Function) => {
-      const guard = new StaticRepoGuard(buildTaskRepoMock(), buildHabitRepoMock());
+      const guard = new StaticRepoGuard(buildRejectingTaskRepoMock(), buildHabitRepoMock());
       try {
         const result = await DeadlinerToolAdapter.getInstance().execute({
           id: 'h2',

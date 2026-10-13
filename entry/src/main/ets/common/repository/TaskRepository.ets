@@ -3,11 +3,11 @@ import { LocalValues } from '../local/LocalValues';
 import { DDLItem, DeadlineType, SubTask } from '../../model/DDLModels';
 import { TaskState, TaskStateAction } from '../../model/TaskStateMachine';
 import { common } from '@kit.AbilityKit';
-import { WidgetUpdater } from '../../utils/WidgetUpdater';
 import { ReminderScheduler } from '../../utils/notification/ReminderScheduler';
 import { KmpTaskRepositoryAdapter, TaskCreateParams } from '../kmp/KmpTaskRepositoryAdapter';
 import { KmpPersistenceService } from '../kmp/KmpPersistenceService';
 import { KmpMigrationService } from '../migration/KmpMigrationService';
+import { KmpAutomaticSyncConfigurator } from '../kmp/KmpAutomaticSyncConfigurator';
 
 interface KmpWebDavSyncOutcome {
   succeeded: boolean;
@@ -23,14 +23,9 @@ export class TaskRepository {
   private readonly kmpTasks: KmpTaskRepositoryAdapter = new KmpTaskRepositoryAdapter();
   private taskCache: DDLItem[] | null = null;
   private pendingTaskRead: Promise<DDLItem[]> | null = null;
-  private syncTimer: number = -1;
-  private readonly syncDelayMs: number = 400;
-  private widgetUpdateTimer: number = -1;
-  private readonly widgetUpdateDelayMs: number = 500;
   private reminderUpdateTimer: number = -1;
   private readonly reminderUpdateDelayMs: number = 800;
   private isSyncing: boolean = false;
-  private hasPendingSync: boolean = false;
 
   private constructor() {}
 
@@ -47,10 +42,7 @@ export class TaskRepository {
     if (this.context === null) throw new Error('TaskRepository context is required for KMP persistence');
     await KmpMigrationService.getInstance().awaitReady();
     await this.kmpTasks.initialize(this.context);
-  }
-
-  private inBasicMode(): boolean {
-    return LocalValues.getInstance().getBasicMode();
+    KmpAutomaticSyncConfigurator.getInstance().configure();
   }
 
   private notifyDataChange(): void {
@@ -61,8 +53,6 @@ export class TaskRepository {
 
   private triggerUpdates(): void {
     this.notifyDataChange();
-    this.scheduleSync();
-    this.scheduleWidgetUpdate();
     this.scheduleReminderRefresh();
   }
 
@@ -180,10 +170,6 @@ export class TaskRepository {
   }
 
   public async syncNow(): Promise<boolean> {
-    if (this.syncTimer !== -1) {
-      clearTimeout(this.syncTimer);
-      this.syncTimer = -1;
-    }
     if (this.isSyncing) return false;
     this.isSyncing = true;
     try {
@@ -191,7 +177,6 @@ export class TaskRepository {
       await this.syncKmpWebDav();
       this.invalidateTaskCache();
       this.notifyDataChange();
-      this.performWidgetUpdate();
       this.scheduleReminderRefresh();
       return true;
     } catch (error) {
@@ -199,7 +184,6 @@ export class TaskRepository {
       return false;
     } finally {
       this.isSyncing = false;
-      if (this.hasPendingSync) this.performSync();
     }
   }
 
@@ -240,18 +224,6 @@ export class TaskRepository {
 
   private invalidateTaskCache(): void {
     this.taskCache = null;
-  }
-
-  private scheduleWidgetUpdate(): void {
-    if (this.widgetUpdateTimer !== -1) clearTimeout(this.widgetUpdateTimer);
-    this.widgetUpdateTimer = setTimeout(() => {
-      this.performWidgetUpdate();
-    }, this.widgetUpdateDelayMs);
-  }
-
-  private performWidgetUpdate(): void {
-    if (this.context !== null) WidgetUpdater.updateAllWidgets(this.context);
-    this.widgetUpdateTimer = -1;
   }
 
   private scheduleReminderRefresh(): void {

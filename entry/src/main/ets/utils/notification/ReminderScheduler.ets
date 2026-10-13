@@ -2,16 +2,24 @@ import { AppLog } from '../../common/logging/AppLog';
 import { ReminderDataManager } from './ReminderDataManager';
 import { ActiveReminder } from '../../model/ActiveReminder';
 import { DateTimeUtils } from '../../utils/DateTimeUtils';
-import { DDLItem, Habit, HabitStatus } from '../../model/DDLModels';
+import { DDLItem, Habit } from '../../model/DDLModels';
+import { HabitReminderPlan } from '../../common/kmp/KmpHabitRepositoryAdapter';
 import { ReminderUtils } from './ReminderUtils';
 import { reminderAgentManager } from '@kit.BackgroundTasksKit';
 import { LocalValues } from '../../common/local/LocalValues';
 import { TaskState } from '../../model/TaskStateMachine';
 
 const MAX_DDL_SLOTS = 20;
+const MAX_HABIT_SLOTS = 20;
 
 interface DDLReminderCandidate {
   item: DDLItem;
+}
+
+interface HabitReminderCandidate {
+  habit: Habit;
+  targetId: string;
+  fireAt: Date;
 }
 
 export function collectDDLReminderCancelIds(taskId: number, reminderId?: number): number[] {
@@ -130,7 +138,7 @@ export class ReminderScheduler {
   }
 
   // =========================================================
-  // 2. 习惯打卡 (循环 - 使用 Alarm)
+  // 2. 习惯打卡（KMP 权威具体日期，平台发布单次 Timer）
   // =========================================================
   static async refreshHabits(plans: HabitReminderPlan[]): Promise<void> {
     AppLog.info('Native', '[Scheduler] Start refreshing HABIT reminders...');
@@ -138,8 +146,8 @@ export class ReminderScheduler {
     const isEnabled = LocalValues.getInstance().getHabitReminder();
     const manager = ReminderDataManager.getInstance();
 
-    let activeReminders = manager.getAllByType('HABIT');
-    const zombieIds = await ReminderScheduler.syncWithSystem(activeReminders);
+    const activeReminders: ActiveReminder[] = manager.getAllByType('HABIT');
+    const zombieIds: string[] = await ReminderScheduler.syncWithSystem(activeReminders);
 
     const activeMap = new Map<string, ActiveReminder>();
     for (const record of activeReminders) {
@@ -160,43 +168,55 @@ export class ReminderScheduler {
       return;
     }
 
-    // 筛选有效习惯 (Active 且 设置了 alarmTime)
-    const candidates = allHabits.filter(h =>
-    h.status === HabitStatus.ACTIVE &&
-    h.alarmTime && h.alarmTime.length > 0
+    const now: number = Date.now();
+    const candidates: HabitReminderCandidate[] = [];
+    for (let planIndex: number = 0; planIndex < plans.length; planIndex += 1) {
+      const plan: HabitReminderPlan = plans[planIndex];
+      for (let dateIndex: number = 0; dateIndex < plan.scheduledLocalDateTimes.length; dateIndex += 1) {
+        const rawDate: string = plan.scheduledLocalDateTimes[dateIndex];
+        const fireAt: Date = new Date(rawDate);
+        if (isNaN(fireAt.getTime()) || fireAt.getTime() <= now) continue;
+        candidates.push({
+          habit: plan.habit,
+          targetId: plan.habit.id.toString() + '|' + rawDate,
+          fireAt: fireAt
+        });
+      }
+    }
+    candidates.sort((left: HabitReminderCandidate, right: HabitReminderCandidate) =>
+      left.fireAt.getTime() - right.fireAt.getTime()
     );
-
-    const candidateIds = new Set(candidates.map(c => c.id.toString()));
+    const boundedCandidates: HabitReminderCandidate[] = candidates.slice(0, MAX_HABIT_SLOTS);
+    const candidateIds: Set<string> = new Set<string>();
+    for (let index: number = 0; index < boundedCandidates.length; index += 1) {
+      candidateIds.add(boundedCandidates[index].targetId);
+    }
 
     // --- 阶段 A: 清理 ---
     for (const record of activeReminders) {
-      // 习惯已删除 或 已归档 或 删除了提醒时间
       if (!candidateIds.has(record.targetId)) {
-        await ReminderScheduler.cancelAndRemove(record.type, record.targetId, record.reminderId, "Habit deleted/archived/alarm removed");
+        await ReminderScheduler.cancelAndRemove(record.type, record.targetId, record.reminderId, 'Habit plan removed');
+        activeMap.delete(record.targetId);
         continue;
       }
-
-      // 检查时间 (HH:mm) 是否变化
-      const habit = candidates.find(c => c.id.toString() === record.targetId);
-      if (habit && habit.alarmTime) {
-        const parts = habit.alarmTime.split(':');
-        const targetHour = parseInt(parts[0]);
-        const targetMinute = parseInt(parts[1]);
-
-        // 获取记录中的时间
-        const recordDate = new Date(record.triggerTime);
-
-        if (recordDate.getHours() !== targetHour || recordDate.getMinutes() !== targetMinute) {
-          await ReminderScheduler.cancelAndRemove(record.type, record.targetId, record.reminderId, "Time(HH:mm) changed");
-          activeMap.delete(record.targetId);
+      let expectedTime: number = 0;
+      for (let index: number = 0; index < boundedCandidates.length; index += 1) {
+        if (boundedCandidates[index].targetId === record.targetId) {
+          expectedTime = boundedCandidates[index].fireAt.getTime();
+          break;
         }
+      }
+      if (expectedTime !== record.triggerTime) {
+        await ReminderScheduler.cancelAndRemove(record.type, record.targetId, record.reminderId, 'Habit plan time changed');
+        activeMap.delete(record.targetId);
       }
     }
 
     // --- 阶段 B: 发布 ---
-    for (const habit of candidates) {
-      if (activeMap.has(habit.id.toString())) continue;
-      await ReminderScheduler.publishHabit(habit);
+    for (let index: number = 0; index < boundedCandidates.length; index += 1) {
+      const candidate: HabitReminderCandidate = boundedCandidates[index];
+      if (activeMap.has(candidate.targetId)) continue;
+      await ReminderScheduler.publishHabit(candidate);
     }
   }
 
@@ -342,8 +362,7 @@ export class ReminderScheduler {
     }
   }
 
-  private static async publishHabit(habit: Habit) {
-    if (!habit.alarmTime) return;
+  private static async publishHabit(candidate: HabitReminderCandidate): Promise<void> {
     try {
       AppLog.info('Native', '[Scheduler] Publishing Habit:' + candidate.habit.name + ' at ' + candidate.fireAt.toString());
       const reminderId: number = await ReminderUtils.publishCalendar(
@@ -351,15 +370,11 @@ export class ReminderScheduler {
         '坚持就是胜利！该完成“' + candidate.habit.name + '”了。',
         candidate.fireAt
       );
-
-      const recordTime = new Date();
-      recordTime.setHours(hour, minute, 0, 0);
-
       const newRecord: ActiveReminder = {
-        targetId: habit.id.toString(),
+        targetId: candidate.targetId,
         type: 'HABIT',
         reminderId: reminderId,
-        triggerTime: recordTime.getTime()
+        triggerTime: candidate.fireAt.getTime()
       };
       await ReminderDataManager.getInstance().addOrUpdate(newRecord);
 

@@ -1,7 +1,15 @@
+import { HabitSwipeActions } from './HabitSwipeActions';
+import { KmpFocusTimerRepository } from '../../../common/kmp/KmpFocusTimerRepository';
+import { FocusTimerSheet } from '../focus/FocusTimerSheet';
 import { AppLog } from '../../../common/logging/AppLog';
 import { TopSafeContainer } from "../../components/TopSafeContainer"
 import { HabitRepository } from '../../../common/repository/HabitRepository';
-import { Habit, HabitGoalType, HabitPeriod, HabitRecordStatus, HabitStatus } from '../../../model/DDLModels';
+import { Habit, HabitStatus } from '../../../model/DDLModels';
+import {
+  HabitPresentationDay,
+  HabitPresentationItem,
+  HabitPresentationState
+} from '../../../common/kmp/KmpHabitRepositoryAdapter';
 import { WeekRow, HabitRow, HabitWithDailyStatus, DayOverview, HabitProgress } from '../../components/HabitComponents'
 import { HabitListController } from "./HabitListController";
 import { ChipGroup, ChipGroupItemOptions, ChipSize, curves, promptAction } from '@kit.ArkUI'
@@ -10,7 +18,6 @@ import { ConfettiController } from "../../components/confetti/ConfettiController
 import { FloatUpModifier } from "../../../utils/animation/FloatUpModifier";
 import { HabitEditSheet } from "./modify/habit/HabitEditSheet";
 import { HabitReminderDialog } from "../../components/HabitReminderDialog";
-import { ReminderScheduler } from "../../../utils/notification/ReminderScheduler";
 import { PressEffectModifier } from "../../../utils/animation/PressModifier";
 import { ITheme } from "../../../common/theme/ThemeModel";
 import { DDLStatus } from "../../../model/DDLStatus"
@@ -26,11 +33,7 @@ import {
   SemanticPageKind,
   SemanticSnapshot
 } from '../../../common/semantic/SemanticContract';
-
-interface EbbinState {
-  isDue: boolean;
-  text: string;
-}
+import { WidgetRefreshBridge, WidgetUpdateReason } from '../../../utils/WidgetRefreshBridge';
 
 @Component
 export struct HabitListSection {
@@ -39,9 +42,16 @@ export struct HabitListSection {
   @Prop topAvoidHeight: number = 0;
   @Prop @Watch('onCategoryFilterChange') categoryFilter: CategoryFilter = CategoryFilter.all();
 
-  scroller: Scroller = new Scroller();
+  scroller: ListScroller = new ListScroller();
+  private openSwipeHabitId: number = -1;
   confetti: ConfettiController = new ConfettiController();
   controller: HabitListController = new HabitListController();
+
+  @State private isFocusTimerShow: boolean = false;
+  @State private focusedHabit: Habit | null = null;
+  @StorageLink('FocusTimerRevision') @Watch('onFocusChanged') focusRevision: number = 0;
+  private onFocusChanged(): void { this.refreshAll(this.selectedDate); }
+  @Builder private focusSheet() { FocusTimerSheet({ isShow: $isFocusTimerShow, initialHabit: this.focusedHabit }) }
 
   @State selectedDate: Date = new Date();
   @State searchQuery: string = "";
@@ -55,7 +65,7 @@ export struct HabitListSection {
   private togglingHabitIds: Set<number> = new Set();
 
   // 交互模式状态（对应 selectionMode）
-  @Link isSelectionMode: boolean;
+  @Link @Watch('closeSwipeActions') isSelectionMode: boolean;
   @State selectedDdlIds: Set<number> = new Set();
 
   private repo = HabitRepository.getInstance();
@@ -157,9 +167,6 @@ export struct HabitListSection {
 
       await this.repo.updateHabit(updatedHabit);
 
-      const allHabits = await this.repo.getAllHabits();
-      await ReminderScheduler.refreshHabits(allHabits);
-
       Toast.show({ message: enabled ? `已设置提醒: ${timeStr}` : '提醒已关闭' });
 
       await this.refreshAll(this.selectedDate);
@@ -174,19 +181,39 @@ export struct HabitListSection {
   @State isFirstLoad: boolean = true;
 
   async refreshAll(date: Date) {
-    const allHabitsRaw = await this.repo.getAllHabits();
+    const presentation: HabitPresentationState = await this.repo.getPresentationForDate(date);
     const categories: CategoryDisplayModel[] = await this.categoryRepository.listCategories();
-    const allHabits = allHabitsRaw.filter((habit: Habit) =>
-      habit.status !== HabitStatus.ARCHIVED &&
-      CategoryFilterResolver.matches(this.categoryFilter, habit.categoryUid, categories)
-    );
-
-    const statusListNullable = await Promise.all(allHabits.map(h => this.buildStatusForDate(h, date)));
-    const statusList = statusListNullable.filter((item) => item !== null) as HabitWithDailyStatus[];
+    const statusList: HabitWithDailyStatus[] = [];
+    for (let index: number = 0; index < presentation.visibleHabits.length; index += 1) {
+      const item: HabitPresentationItem = presentation.visibleHabits[index];
+      if (!CategoryFilterResolver.matches(this.categoryFilter, item.habit.categoryUid, categories)) continue;
+      statusList.push({
+        habit: item.habit,
+        doneCount: item.doneCount,
+        targetCount: item.targetCount,
+        progressText: item.progressText,
+        scheduleLabel: item.scheduleLabel,
+        isCompleted: item.isCompleted,
+        canApplyPrimaryAction: item.canApplyPrimaryAction,
+        primaryActionKind: item.primaryActionKind,
+        primaryActionAmount: item.primaryActionAmount,
+        isDueToday: item.isDue,
+        dueStateText: this.scheduleStateText(item)
+      });
+    }
     this.allHabitsCache = statusList;
     this.applyFilter();
-
-    this.calculateWeekOverview(date, allHabits);
+    const week: DayOverview[] = [];
+    for (let index: number = 0; index < presentation.weekOverview.length; index += 1) {
+      const day: HabitPresentationDay = presentation.weekOverview[index];
+      week.push({
+        date: new Date(day.date + 'T00:00:00'),
+        completedCount: day.completedCount,
+        totalCount: day.totalCount,
+        completionRatio: day.completionRatio
+      });
+    }
+    this.weekOverview = week;
 
     if (this.isFirstLoad) {
       setTimeout(() => {
@@ -195,77 +222,17 @@ export struct HabitListSection {
     }
   }
 
-  private async buildStatusForDate(habit: Habit, date: Date): Promise<HabitWithDailyStatus | null> {
-    if (!this.shouldShowHabitOnDate(habit, date)) {
-      return null;
+  private scheduleStateText(item: HabitPresentationItem): string {
+    if (item.isDue) return '';
+    if (item.scheduleHintKind === 'STARTS_IN' && item.daysUntil !== null) {
+      return item.daysUntil.toString() + ' 天后开始';
     }
-
-    const bounds = this.getPeriodBounds(habit.period, date);
-    const start = bounds[0];
-    const end = bounds[1];
-
-    const queryStart = habit.goalType === HabitGoalType.TOTAL ? new Date(0) : start;
-    const queryEnd = habit.goalType === HabitGoalType.TOTAL ? date : end;
-
-    const records = await this.repo.getRecordsForHabitInRange(habit.id, queryStart, queryEnd);
-
-    const done = records
-      .filter(r => r.status === HabitRecordStatus.COMPLETED)
-      .reduce((sum, r) => sum + r.count, 0);
-
-    let target = Math.max(1, habit.timesPerPeriod);
-    if (habit.goalType === HabitGoalType.TOTAL) {
-      target = habit.totalTarget ? Math.max(1, habit.totalTarget) : Math.max(1, done);
+    if (item.scheduleHintKind === 'NEXT_REVIEW_IN' && item.daysUntil !== null) {
+      return item.daysUntil.toString() + ' 天后复习';
     }
-
-    return {
-      habit: habit,
-      doneCount: done,
-      targetCount: target,
-      isCompleted: habit.totalTarget ? done >= habit.totalTarget : done >= target
-    };
-  }
-
-  private shouldShowHabitOnDate(habit: Habit, date: Date): boolean {
-    // 移除 ONCE，现有的 DAILY, WEEKLY, MONTHLY, EBBINGHAUS 均始终在列表中占位显示
-    return true;
-  }
-
-  /**
-   * 获取艾宾浩斯习惯在指定日期的状态
-   * 返回 isDue: 是否是复习日, text: UI 提示文本
-   */
-  private getEbbinghausState(habit: Habit, targetDate: Date): EbbinState {
-    if (habit.period !== HabitPeriod.EBBINGHAUS) {
-      return { isDue: true, text: "" };
-    }
-
-    const tDate = new Date(targetDate);
-    tDate.setHours(0, 0, 0, 0);
-
-    const sDate = new Date(habit.createdAt);
-    sDate.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.floor((tDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    // 艾宾浩斯标准曲线
-    const curve = [0, 1, 2, 4, 7, 15, 30, 60];
-
-    if (diffDays < 0) {
-      return { isDue: false, text: `${-diffDays} 天后开始` };
-    }
-
-    if (curve.includes(diffDays)) {
-      return { isDue: true, text: "" }; // 今天是复习日
-    }
-
-    // 寻找下一个复习日
-    const nextDay = curve.find(c => c > diffDays);
-    if (nextDay !== undefined) {
-      return { isDue: false, text: `${nextDay - diffDays} 天后复习` };
-    } else {
-      return { isDue: false, text: "已完成记忆周期" };
-    }
+    if (item.scheduleHintKind === 'COMPLETED_CYCLE') return '已完成记忆周期';
+    if (item.scheduleReason === 'WEEKDAY_NOT_SELECTED') return '非计划日';
+    return '当前日期不可打卡';
   }
 
   private applyFilter() {
@@ -291,68 +258,16 @@ export struct HabitListSection {
     this.onSemanticSnapshotChanged(snapshot);
   }
 
-  private getPeriodBounds(period: HabitPeriod, date: Date): [Date, Date] {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-
-    if (period === HabitPeriod.DAILY) {
-      return [d, d];
-    } else if (period === HabitPeriod.WEEKLY) {
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      return [monday, sunday];
-    } else if (period === HabitPeriod.MONTHLY) {
-      const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
-      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-      return [firstDay, lastDay];
-    }
-    // 艾宾浩斯的周期就限定在当天
-    return [d, d];
-  }
-
-  private async calculateWeekOverview(centerDate: Date, allHabits: Habit[]) {
-    const d = new Date(centerDate);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-
-    const week: DayOverview[] = [];
-    for (let i = 0; i < 7; i++) {
-      const current = new Date(monday);
-      current.setDate(monday.getDate() + i);
-
-      const statusesNullable = await Promise.all(allHabits.map(h => this.buildStatusForDate(h, current)));
-      const activeStatuses = statusesNullable.filter((s) => s !== null) as HabitWithDailyStatus[];
-
-      // 计算当天真实的分子和分母
-      // 对于艾宾浩斯，只有当 isDue 为 true 时，才计入当天的完成率统计
-      const validStatuses = activeStatuses.filter(s => {
-        const ebState = this.getEbbinghausState(s.habit, current);
-        return ebState.isDue;
-      });
-
-      const completedCount = validStatuses.filter(s => s.isCompleted).length;
-      const totalCount = validStatuses.length;
-
-      week.push({
-        date: current,
-        completedCount: completedCount,
-        totalCount: totalCount,
-        completionRatio: totalCount > 0 ? (completedCount / totalCount) : 0
-      });
-    }
-    this.weekOverview = week;
-  }
-
   onDateSelected(date: Date) {
+    this.closeSwipeActions();
     this.selectedDate = date;
     this.refreshAll(date);
   }
 
   async onToggleHabit(item: HabitWithDailyStatus) {
+    if (this.openSwipeHabitId === item.habit.id && !this.isSelectionMode) {
+      this.closeSwipeActions(); return;
+    }
     if (this.togglingHabitIds.has(item.habit.id)) {
       return;
     }
@@ -360,24 +275,13 @@ export struct HabitListSection {
     this.togglingHabitIds.add(item.habit.id);
 
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const currentSel = new Date(this.selectedDate);
-      currentSel.setHours(0, 0, 0, 0);
-
-      if (currentSel.getTime() > today.getTime()) {
-        return;
-      }
-
-      // 艾宾浩斯非复习日阻断打卡
-      const ebState = this.getEbbinghausState(item.habit, this.selectedDate);
-      if (!ebState.isDue) {
-        Toast.show({ message: '今天不是该记忆周期的复习日' });
-        return;
-      }
-
       if (this.isSelectionMode) {
         this.toggleSelection(item.habit.ddlId);
+        return;
+      }
+
+      if (!item.canApplyPrimaryAction) {
+        Toast.show({ message: item.dueStateText || '当前日期不可打卡' });
         return;
       }
 
@@ -385,12 +289,7 @@ export struct HabitListSection {
 
       const beforeRate = item.doneCount / item.targetCount;
 
-      // 如果已经打满了，循环回到 0 (删除选中日期的记录)
-      if (item.doneCount >= item.targetCount) {
-        await this.repo.deleteRecordsForHabitOnDate(item.habit.id, this.selectedDate);
-      } else {
-        await this.repo.toggleRecord(item.habit.id, this.selectedDate);
-      }
+      await this.repo.toggleRecord(item.habit.id, this.selectedDate);
 
       await this.refreshAll(this.selectedDate);
 
@@ -417,11 +316,9 @@ export struct HabitListSection {
 
     VibrationUtils.vibrateShort();
 
-    // 过滤出未完成 且 属于今天可打卡范围的待办（排除未到复习日的艾宾浩斯）
-    const targets = this.allHabitsCache.filter(item => {
-      const ebState = this.getEbbinghausState(item.habit, this.selectedDate);
-      return this.selectedDdlIds.has(item.habit.ddlId) && !item.isCompleted && ebState.isDue;
-    });
+    const targets = this.allHabitsCache.filter(item =>
+      this.selectedDdlIds.has(item.habit.ddlId) && item.canApplyPrimaryAction
+    );
 
     if (targets.length === 0) {
       Toast.show({ message: '没有可打卡的待办' });
@@ -430,9 +327,7 @@ export struct HabitListSection {
     }
 
     try {
-      await Promise.all(targets.map(item => {
-        return this.repo.insertRecord(item.habit.id, this.selectedDate, 1);
-      }));
+      await Promise.all(targets.map(item => this.repo.toggleRecord(item.habit.id, this.selectedDate)));
 
       Toast.show({ message: `已打卡 ${targets.length} 个待办` });
       this.refreshAll(this.selectedDate);
@@ -441,6 +336,19 @@ export struct HabitListSection {
       AppLog.error('Native', 'Batch complete failed:', e);
       Toast.show({ message: '操作失败' });
     }
+  }
+
+  private async hasSelectedActiveFocus(): Promise<boolean> {
+    const state = await KmpFocusTimerRepository.getInstance().state();
+    if (state.timer?.target?.kind !== 'HABIT') return false;
+    const uid: string = state.timer.target.uid;
+    const found: boolean = this.allHabitsCache.some((item: HabitWithDailyStatus) =>
+      this.selectedDdlIds.has(item.habit.ddlId) && item.habit.uid === uid);
+    if (found) {
+      AppStorage.setOrCreate('FocusResolutionMessage', '选中的习惯正在专注，请先结束计时，再进行批量操作。');
+      AppStorage.setOrCreate('FocusTimerOpen', true);
+    }
+    return found;
   }
 
   async handleBatchDelete() {
@@ -466,13 +374,14 @@ export struct HabitListSection {
         action: async () => {
           try {
             const idsToDelete = Array.from(this.selectedDdlIds);
-            await Promise.all(idsToDelete.map(ddlId => this.repo.deleteHabitByDdlId(ddlId)));
+            for (const ddlId of idsToDelete) await this.repo.deleteHabitByDdlId(ddlId);
 
             Toast.show({ message: '删除成功' });
             this.refreshAll(this.selectedDate);
             this.exitSelectionMode();
             getContext(this).eventHub.emit('sync_done');
           } catch (e) {
+            if (String(e).includes('操作已取消')) { this.refreshAll(this.selectedDate); return; }
             AppLog.error('Native', 'Batch delete failed:', e);
             Toast.show({ message: '删除失败' });
           }
@@ -487,16 +396,13 @@ export struct HabitListSection {
     try {
       const targets = this.allHabitsCache.filter(item => this.selectedDdlIds.has(item.habit.ddlId));
 
-      await Promise.all(targets.map(item => {
-        const updatedHabit = item.habit;
-        updatedHabit.status = HabitStatus.ARCHIVED;
-        return this.repo.updateHabit(updatedHabit);
-      }));
+      for (const item of targets) await this.repo.archiveHabit(item.habit.id);
 
       Toast.show({ message: `已归档 ${targets.length} 个待办` });
       this.refreshAll(this.selectedDate);
       this.exitSelectionMode();
     } catch (e) {
+      if (String(e).includes('操作已取消')) { this.refreshAll(this.selectedDate); return; }
       AppLog.error('Native', 'Batch archive failed:', e);
       Toast.show({ message: '归档失败' });
     }
@@ -596,11 +502,41 @@ export struct HabitListSection {
   }
 
   changeWeek(offset: number) {
+    this.closeSwipeActions();
     const newDate = new Date(this.selectedDate);
     newDate.setDate(newDate.getDate() + (offset * 7));
     this.selectedDate = newDate;
     this.refreshAll(newDate);
     VibrationUtils.vibrateSoft();
+  }
+
+  private closeSwipeActions(): void {
+    this.scroller.closeAllSwipeActions();
+    this.openSwipeHabitId = -1;
+  }
+
+  private async archiveHabit(habit: Habit): Promise<void> {
+    this.closeSwipeActions();
+    try { await this.repo.archiveHabit(habit.id); await this.refreshAll(this.selectedDate); }
+    catch (error) { if (!String(error).includes('操作已取消')) Toast.show({ message: '归档未完成，请重试' }); }
+  }
+
+  private deleteHabit(habit: Habit): void {
+    this.closeSwipeActions();
+    this.getUIContext().showAlertDialog({ title: '删除习惯？', message: '删除习惯不会撤销已有的专注记录。',
+      primaryButton: { value: '取消', action: (): void => {} },
+      secondaryButton: { value: '删除', action: (): void => {
+        this.repo.deleteHabitByDdlId(habit.ddlId).then(() => { this.refreshAll(this.selectedDate); })
+          .catch((error: Error): void => { if (!error.message.includes('操作已取消')) Toast.show({ message: '删除未完成，请重试' }); });
+      } }
+    });
+  }
+
+  @Builder private habitSwipeActions(habit: Habit, leading: boolean) {
+    HabitSwipeActions({ leading: leading, onArchive: (): void => { this.archiveHabit(habit); },
+      onFocusAction: (): void => { this.closeSwipeActions(); this.focusedHabit = habit; this.isFocusTimerShow = true; },
+      onEdit: (): void => { this.closeSwipeActions(); this.currentEditingHabit = habit; this.isEditSheetShow = true; },
+      onDelete: (): void => { this.deleteHabit(habit); } })
   }
 
   build() {
@@ -635,13 +571,18 @@ export struct HabitListSection {
                     data: item,
                     status: item.isCompleted ? DDLStatus.COMPLETED : DDLStatus.UNDERGO,
                     isSelected: this.isSelected(item.habit.ddlId),
-                    canToggle: (new Date(this.selectedDate).setHours(0, 0, 0, 0) <= new Date().setHours(0, 0, 0, 0))
-                      && this.getEbbinghausState(item.habit, this.selectedDate).isDue,
-                    remainingText: this.getEbbinghausState(item.habit, this.selectedDate).text,
+                    canToggle: this.isSelectionMode || item.canApplyPrimaryAction,
+                    remainingText: item.dueStateText || '',
                     onToggle: (): Promise<void> => this.onToggleHabit(item),
                     onLongPress: (): void => this.onLongPress(item.habit.ddlId)
                   })
                 }
+                .swipeAction(this.isSelectionMode ? undefined : {
+                  start: { builder: () => { this.habitSwipeActions(item.habit, true); } },
+                  end: { builder: () => { this.habitSwipeActions(item.habit, false); } },
+                  edgeEffect: SwipeEdgeEffect.None,
+                  onOffsetChange: (offset: number): void => { this.openSwipeHabitId = offset === 0 ? -1 : item.habit.id; }
+                })
                 .attributeModifier(new FloatUpModifier(index + 1, 15, this.isFirstLoad))
                 .attributeModifier(new PressEffectModifier(0.98))
                 .animation({
@@ -674,11 +615,15 @@ export struct HabitListSection {
           .onScroll((_scrollOffset: number, _scrollState: ScrollState) => {
             this.controller.onScroll(this.scroller.currentOffset().yOffset);
           })
+          .onScrollStop(() => {
+            this.controller.onScroll(this.scroller.currentOffset().yOffset);
+          })
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
         }
         .onRefreshing(async () => {
           this.isRefreshing = true
           await this.refreshAll(this.selectedDate);
+          WidgetRefreshBridge.requestKmpUpdate(WidgetUpdateReason.USER_REFRESH);
           this.isRefreshing = false;
         })
         .layoutWeight(1)
@@ -692,6 +637,11 @@ export struct HabitListSection {
     }
     .width('100%')
     .height('100%')
+    .bindSheet($$this.isFocusTimerShow, this.focusSheet(), SheetCompat.immersive({
+      height: SheetSize.LARGE,
+      enableOutsideInteractive: false, showClose: true, dragBar: true,
+      onDisappear: () => { this.isFocusTimerShow = false; this.refreshAll(this.selectedDate); }
+    }))
     .bindSheet($$this.isEditSheetShow, this.habitEditSheet(), SheetCompat.immersive({
       height: SheetSize.FIT_CONTENT,
       dragBar: true,

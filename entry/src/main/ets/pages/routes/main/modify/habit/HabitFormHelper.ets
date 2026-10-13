@@ -2,10 +2,8 @@ import { AppLog } from '../../../../../common/logging/AppLog';
 import { promptAction } from '@kit.ArkUI';
 import { i18n } from '@kit.LocalizationKit';
 import { HabitRepository } from '../../../../../common/repository/HabitRepository';
-import { TaskRepository } from '../../../../../common/repository/TaskRepository';
-import { DeadlineType, HabitGoalType, HabitPeriod } from '../../../../../model/DDLModels';
+import { HabitGoalType, HabitPeriod } from '../../../../../model/DDLModels';
 import { AIService } from '../../../../../ai/AIServcice';
-import { DateTimeUtils } from '../../../../../utils/DateTimeUtils';
 import { Toast } from '../../../../../common/ui/Toast';
 
 export interface AIParseResult {
@@ -39,7 +37,9 @@ export class HabitFormHelper {
     gIndex: number,
     timesPerPeriod: string,
     totalTarget: string,
-    categoryUid: string | null = null
+    categoryUid: string | null = null,
+    weekdaysMask: number = 127,
+    reminderTime: string | null = null
   ): Promise<boolean> { // 返回 true 代表保存成功
     if (!name.trim()) {
       Toast.show({ message: '请输入习惯名称' });
@@ -52,6 +52,10 @@ export class HabitFormHelper {
     let total: number | null = null;
 
     if (!HabitFormHelper.isSimpleMode(pIndex)) {
+      if ((weekdaysMask & 127) === 0) {
+        Toast.show({ message: '请至少选择一个执行日' });
+        return false;
+      }
       times = parseInt(timesPerPeriod);
       if (isNaN(times) || times <= 0) {
         Toast.show({ message: '请输入有效的单次目标' });
@@ -70,25 +74,8 @@ export class HabitFormHelper {
     }
 
     try {
-      const now = new Date();
-      const ddlId = await TaskRepository.getInstance().insertDDL({
-        name: name,
-        startTime: DateTimeUtils.toLocalISOString(now),
-        endTime: DateTimeUtils.toLocalISOString(new Date(now.getFullYear() + 100, 0, 1)),
-        isCompleted: false,
-        completeTime: "",
-        note: "",
-        isArchived: false,
-        isStared: false,
-        type: DeadlineType.HABIT,
-        calendarEventId: null,
-        categoryUid: categoryUid
-      });
-
-      if (ddlId <= 0) throw new Error("Insert DDL failed");
-
-      await HabitRepository.getInstance().createHabitForDdl(
-        ddlId, name, currentPeriod, times, currentGoalType, total, '', null, null, 0, null, categoryUid
+      await HabitRepository.getInstance().createHabit(
+        name, currentPeriod, times, currentGoalType, total, '', null, null, 0, reminderTime, categoryUid, weekdaysMask
       );
 
       Toast.show({ message: '创建成功' });

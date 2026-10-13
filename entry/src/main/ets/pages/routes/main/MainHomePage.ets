@@ -133,10 +133,10 @@ export struct MainHomePage {
       AppLog.info('Native', '[MainHomePage] Widget trigger received, opening AddTask...');
 
       if (this.usesWideSplitLayout()) {
-        if (!LocalValues.getInstance().getFullScreenAdd()) this.isAddTaskShow = true;
+        if ((LocalValues.getInstance().getQuickAddEnabled() || !LocalValues.getInstance().getFullScreenAdd())) this.isAddTaskShow = true;
         else this.appPathStack.pushPathByName('addTask', null);
       } else {
-        if (!LocalValues.getInstance().getFullScreenAdd()) this.isAddShow = true;
+        if ((LocalValues.getInstance().getQuickAddEnabled() || !LocalValues.getInstance().getFullScreenAdd())) this.isAddShow = true;
         else this.appPathStack.pushPathByName('addTask', null);
       }
 
@@ -244,7 +244,7 @@ export struct MainHomePage {
   }
 
   private scroller: Scroller = new Scroller();
-  private dummyScroller: Scroller = new Scroller();
+  private dummyScroller: ListScroller = new ListScroller();
 
   @StorageProp('Event_ScrollToTop_0')
   @Watch('onScrollToTopEvent')
@@ -570,7 +570,7 @@ export struct MainHomePage {
           if (this.isTaskSelectionMode) {
             this.taskController.requestExitSelection();
           } else {
-            if (!LocalValues.getInstance().getFullScreenAdd()) this.isAddShow = true;
+            if ((LocalValues.getInstance().getQuickAddEnabled() || !LocalValues.getInstance().getFullScreenAdd())) this.isAddShow = true;
             else this.appPathStack.pushPathByName('addTask', null);
           }
         },
@@ -595,7 +595,7 @@ export struct MainHomePage {
           if (this.isHabitSelectionMode) {
             this.habitController.requestExitSelection();
           } else {
-            if (!LocalValues.getInstance().getFullScreenAdd()) this.isAddShow = true;
+            if ((LocalValues.getInstance().getQuickAddEnabled() || !LocalValues.getInstance().getFullScreenAdd())) this.isAddShow = true;
             else this.appPathStack.pushPathByName('addHabit', null);
           }
         },
@@ -763,11 +763,11 @@ export struct MainHomePage {
   addDialogController: CustomDialogController = new CustomDialogController({
     builder: AddDialogTablet({
       onAddTask: () => {
-        if (!LocalValues.getInstance().getFullScreenAdd()) this.isAddTaskShow = true;
+        if ((LocalValues.getInstance().getQuickAddEnabled() || !LocalValues.getInstance().getFullScreenAdd())) this.isAddTaskShow = true;
         else this.appPathStack.pushPathByName('addTask', null);
       },
       onAddHabit: () => {
-        if (!LocalValues.getInstance().getFullScreenAdd()) this.isAddHabitShow = true;
+        if ((LocalValues.getInstance().getQuickAddEnabled() || !LocalValues.getInstance().getFullScreenAdd())) this.isAddHabitShow = true;
         else this.appPathStack.pushPathByName('addHabit', null);
       }
     }),
@@ -917,6 +917,8 @@ export struct MainHomePage {
         .align(Alignment.Bottom)
         .margin({ bottom: 32 })
         .hitTestBehavior(HitTestMode.Transparent)
+
+
     }
     .bindSheet($$this.isArchiveSheetShow, this.archiveSheet(), SheetCompat.immersive({
       height: SheetSize.FIT_CONTENT,
@@ -992,6 +994,8 @@ export struct MainHomePage {
         .zIndex(1)
 
       this.currentPhoneFabBuilder()
+
+
 
       Column()
         .bindSheet($$this.isAddShow, this.addSheet(), SheetCompat.immersive({

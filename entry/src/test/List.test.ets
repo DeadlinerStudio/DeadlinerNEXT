@@ -1,3 +1,4 @@
+import focusPresentationTests from './FocusPresentation.test';
 import localUnitTest from './LocalUnit.test';
 import deadlinerToolAdapterTests from './DeadlinerToolAdapter.test';
 import reminderSchedulerTests from './ReminderScheduler.test';
@@ -6,6 +7,7 @@ import semanticResolverTests from './SemanticResolver.test';
 
 export default function testsuite() {
   localUnitTest();
+  focusPresentationTests();
   deadlinerToolAdapterTests();
   reminderSchedulerTests();
   taskStateMachineTests();

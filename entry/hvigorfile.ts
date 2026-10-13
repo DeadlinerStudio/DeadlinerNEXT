@@ -17,10 +17,12 @@ const syncDeadlinerCoreKmpTask: HvigorTask = {
           '. Set DEADLINER_CORE_DIR to its checkout.',
       );
     }
+    const gradleJavaHome: string = process.env.DEADLINER_GRADLE_JAVA_HOME ||
+      execFileSync('/usr/libexec/java_home', ['-v', '21'], { encoding: 'utf8' }).trim();
     execFileSync(
       deployScript,
       ['--skip-ios', '--skip-android', '--harmony-repo', resolve(__dirname, '..')],
-      { stdio: 'inherit', env: process.env },
+      { stdio: 'inherit', env: { ...process.env, JAVA_HOME: gradleJavaHome } },
     );
   },
 };

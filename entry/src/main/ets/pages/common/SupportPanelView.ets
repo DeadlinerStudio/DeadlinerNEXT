@@ -2,6 +2,7 @@ import { AppLog } from '../../common/logging/AppLog';
 import { SettingsDivider, SettingsItem, SettingsSection } from '../components/SettingsComponents';
 import { WebParams } from '../common/WebBrowserPage'; // 调整引用路径
 import { common, Want } from '@kit.AbilityKit';
+import { fileIo, picker } from '@kit.CoreFileKit';
 import { commentManager } from '@kit.AppGalleryKit';
 import { promptAction } from '@kit.ArkUI';
 import { Toast } from '../../common/ui/Toast';
@@ -60,7 +61,6 @@ export struct SupportPanelView {
     this.closeAction?.();
   }
 
-  build() {
   private async exportDiagnostics(): Promise<void> {
     try {
       AppLog.event('diagnostics.export.started', 'app');
@@ -86,6 +86,7 @@ export struct SupportPanelView {
     }
   }
 
+  build() {
     Column() {
       Column({ space: 16 }) {
         SettingsSection({ title: '用户反馈' }) {
@@ -95,6 +96,17 @@ export struct SupportPanelView {
             icon: $r('sys.symbol.person_3'),
             onItemClick: () => {
               this.openWeb('QQ 群', 'https://qun.qq.com/universal-share/share?ac=1&authKey=35oQsBRrsd6COfRTm27CapeJl3174VURlC3QLmbs%2B33vQpv/EjOy43hEZoMW%2BBqg&busi_data=eyJncm91cENvZGUiOiI5ODIyNDc5MTAiLCJ0b2tlbiI6IkVBNndKRDd3OU4vcFBIdDZvRTllQVlYRmpwazljQmg3djVwRk12UzkyeW5mU0RIeit5NjBPUWVkQmxLYzRvSFkiLCJ1aW4iOiIxNzI5ODIwNzQ5In0=&data=zUxcoMgCie2fv9XB9NgQgAnYzMz7uRp82lt0uUKhK6oqux0X7Aog--e7DEANDZAIfPfmOiGLD7Oqx7d77ps1xhorG_4KEup7V_rj4BWPKBA&svctype=5&tempid=h5_group_info');
+            }
+          })
+
+          SettingsDivider()
+
+          SettingsItem({
+            title: '导出诊断日志',
+            subtitle: '保存 .log 和 .jsonl 文件用于反馈问题',
+            icon: $r('sys.symbol.doc_text'),
+            onItemClick: () => {
+              void this.exportDiagnostics();
             }
           })
         }

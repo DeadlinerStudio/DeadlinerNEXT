@@ -1,9 +1,10 @@
 import { AppLog } from '../common/logging/AppLog';
 import { LocalValues } from "../common/local/LocalValues";
+import { HabitPresentationItem, HabitPresentationState } from "../common/kmp/KmpHabitRepositoryAdapter";
 import { HabitRepository } from "../common/repository/HabitRepository";
 import { InspirationRepository } from "../common/repository/InspirationRepository";
 import { TaskRepository } from "../common/repository/TaskRepository";
-import { DDLItem, DeadlineType, Habit, HabitGoalType, HabitRecordStatus, HabitStatus, HabitPeriod } from "../model/DDLModels";
+import { DDLItem, DeadlineType, Habit, HabitStatus, HabitPeriod } from "../model/DDLModels";
 import { InspirationItem } from "../model/InspirationModels";
 import { DDLStatus } from "../model/DDLStatus";
 import { HabitWithDailyStatus } from "../pages/components/HabitComponents";
@@ -45,11 +46,6 @@ export enum SearchBrowseCategory {
   ARCHIVED = 'archived',
   TASKS = 'tasks',
   HABITS = 'habits'
-}
-
-export interface EbbinghausState {
-  isDue: boolean;
-  text: string;
 }
 
 export interface SearchResult {
@@ -123,9 +119,9 @@ export class SearchUtils {
       ? []
       : await this.buildActiveHabitMatches(tokens);
 
-    const activeHabits = await Promise.all(
-      activeHabitsRaw.map((item) => this.buildHabitStatusForDate(item.habit, new Date()))
-    );
+    const matchedHabits: Habit[] = activeHabitsRaw.map((item) => item.habit);
+    const habitPresentation: HabitPresentationState = await this.habitRepo.getPresentationForDate(new Date());
+    const activeHabits: HabitWithDailyStatus[] = this.buildHabitStatuses(matchedHabits, habitPresentation);
     await this.yieldToUiThread();
 
     const inspirations = scope === SearchScope.ARCHIVE
@@ -278,6 +274,8 @@ export class SearchUtils {
     const archivedTasks = this.allTasksCache.filter((item) => TaskStateMachine.isVisibleInArchiveList(item.state));
     const archivedHabits = this.allHabitsCache.filter((habit) => habit.status === HabitStatus.ARCHIVED);
     const today = new Date();
+    const habitPresentation: HabitPresentationState = await this.habitRepo.getPresentationForDate(today);
+    const habitStatuses: HabitWithDailyStatus[] = this.buildHabitStatuses(activeHabits, habitPresentation);
 
     switch (category) {
       case SearchBrowseCategory.TODAY:
@@ -285,11 +283,7 @@ export class SearchUtils {
           tasks: activeTasks
             .filter((item) => this.isSameDay(this.taskRelevantTime(item), today))
             .map((item) => this.mapTaskToUI(item)),
-          habits: await Promise.all(
-            activeHabits
-              .filter((habit) => this.getEbbinghausState(habit, today).isDue)
-              .map((habit) => this.buildHabitStatusForDate(habit, today))
-          ),
+          habits: habitStatuses.filter((habit) => habit.isDueToday),
           inspirations: [],
           archivedTasks: [],
           archivedHabits: []
@@ -336,7 +330,7 @@ export class SearchUtils {
       case SearchBrowseCategory.HABITS:
         return {
           tasks: [],
-          habits: await Promise.all(activeHabits.map((habit) => this.buildHabitStatusForDate(habit, today))),
+          habits: habitStatuses,
           inspirations: [],
           archivedTasks: [],
           archivedHabits: []
@@ -579,38 +573,6 @@ export class SearchUtils {
     };
   }
 
-  public getEbbinghausState(habit: Habit, targetDate: Date): EbbinghausState {
-    if (habit.period !== HabitPeriod.EBBINGHAUS) {
-      return { isDue: true, text: '' };
-    }
-
-    const targetDay = new Date(targetDate);
-    targetDay.setHours(0, 0, 0, 0);
-
-    const createdAt = new Date(habit.createdAt);
-    if (isNaN(createdAt.getTime())) {
-      return { isDue: true, text: '' };
-    }
-
-    createdAt.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((targetDay.getTime() - createdAt.getTime()) / (24 * 60 * 60 * 1000));
-    const curve = [0, 1, 2, 4, 7, 15, 30, 60];
-
-    if (diffDays < 0) {
-      return { isDue: false, text: `${-diffDays} 天后开始` };
-    }
-    if (curve.includes(diffDays)) {
-      return { isDue: true, text: '' };
-    }
-
-    const nextDay = curve.find((value) => value > diffDays);
-    if (typeof nextDay === 'number') {
-      return { isDue: false, text: `${nextDay - diffDays} 天后复习` };
-    }
-
-    return { isDue: false, text: '已完成记忆周期' };
-  }
-
   private taskRelevantTime(item: DDLItem): number {
     const endTime = this.parseDate(item.endTime);
     if (endTime > 0) {
@@ -666,24 +628,49 @@ export class SearchUtils {
     return isNaN(time) ? 0 : time;
   }
 
-  private async buildHabitStatusForDate(habit: Habit, date: Date): Promise<HabitWithDailyStatus> {
-    const periodBounds = this.habitRepo.periodBounds(habit.period, date);
-    const start = periodBounds[0];
-    const end = periodBounds[1];
-    const queryStart = habit.goalType === HabitGoalType.TOTAL ? new Date(0) : start;
-    const queryEnd = habit.goalType === HabitGoalType.TOTAL ? date : end;
-    const records = await this.habitRepo.getRecordsForHabitInRange(habit.id, queryStart, queryEnd);
-    const done = records.filter(r => r.status === HabitRecordStatus.COMPLETED).reduce((sum, r) => sum + r.count, 0);
-    let target = Math.max(1, habit.timesPerPeriod);
-    if (habit.goalType === HabitGoalType.TOTAL) target = habit.totalTarget ? Math.max(1, habit.totalTarget) : Math.max(1, done);
-    const dueState = this.getEbbinghausState(habit, date);
+  private buildHabitStatuses(
+    habits: Habit[],
+    presentation: HabitPresentationState
+  ): HabitWithDailyStatus[] {
+    const statuses: HabitWithDailyStatus[] = [];
+    for (let habitIndex: number = 0; habitIndex < habits.length; habitIndex += 1) {
+      const habit: Habit = habits[habitIndex];
+      for (let itemIndex: number = 0; itemIndex < presentation.visibleHabits.length; itemIndex += 1) {
+        const item: HabitPresentationItem = presentation.visibleHabits[itemIndex];
+        if (item.habit.id !== habit.id) continue;
+        statuses.push(this.toHabitStatus(item));
+        break;
+      }
+    }
+    return statuses;
+  }
+
+  private toHabitStatus(item: HabitPresentationItem): HabitWithDailyStatus {
     return {
-      habit: habit,
-      doneCount: done,
-      targetCount: target,
-      isCompleted: done >= target,
-      isDueToday: dueState.isDue,
-      dueStateText: dueState.text
+      habit: item.habit,
+      doneCount: item.doneCount,
+      targetCount: item.targetCount,
+      progressText: item.progressText,
+      scheduleLabel: item.scheduleLabel,
+      isCompleted: item.isCompleted,
+      canApplyPrimaryAction: item.canApplyPrimaryAction,
+      primaryActionKind: item.primaryActionKind,
+      primaryActionAmount: item.primaryActionAmount,
+      isDueToday: item.isDue,
+      dueStateText: this.habitScheduleText(item)
     };
+  }
+
+  private habitScheduleText(item: HabitPresentationItem): string {
+    if (item.isDue) return '';
+    if (item.scheduleHintKind === 'STARTS_IN' && item.daysUntil !== null) {
+      return item.daysUntil.toString() + ' 天后开始';
+    }
+    if (item.scheduleHintKind === 'NEXT_REVIEW_IN' && item.daysUntil !== null) {
+      return item.daysUntil.toString() + ' 天后复习';
+    }
+    if (item.scheduleHintKind === 'COMPLETED_CYCLE') return '已完成记忆周期';
+    if (item.scheduleReason === 'WEEKDAY_NOT_SELECTED') return '非计划日';
+    return '当前日期不可打卡';
   }
 }

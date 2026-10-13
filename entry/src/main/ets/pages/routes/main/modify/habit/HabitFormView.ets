@@ -22,6 +22,7 @@ export struct HabitFormView {
   @Link selectedGoalTypeIndex: number[];
   @Link timesPerPeriod: string;
   @Link totalTarget: string;
+  @Link weekdaysMask: number;
 
   // —— AI 相关配置 ——
   @Prop showAIInput: boolean = true;
@@ -44,6 +45,8 @@ export struct HabitFormView {
     { label: { text: "定量" } }
   ];
 
+  private weekdayLabels: string[] = ['一', '二', '三', '四', '五', '六', '日'];
+
   private getPeriodFromIndex(index: number): HabitPeriod {
     const map = [HabitPeriod.DAILY, HabitPeriod.WEEKLY, HabitPeriod.MONTHLY, HabitPeriod.EBBINGHAUS];
     return map[index] || HabitPeriod.DAILY;
@@ -57,6 +60,16 @@ export struct HabitFormView {
   private isSimpleMode(): boolean {
     const pIndex = this.selectedPeriodIndex.length > 0 ? this.selectedPeriodIndex[0] : 0;
     return this.getPeriodFromIndex(pIndex) === HabitPeriod.EBBINGHAUS;
+  }
+
+  private isWeekdaySelected(index: number): boolean {
+    return (this.weekdaysMask & (1 << index)) !== 0;
+  }
+
+  private toggleWeekday(index: number): void {
+    const bit: number = 1 << index;
+    const nextMask: number = this.weekdaysMask ^ bit;
+    if (nextMask !== 0) this.weekdaysMask = nextMask;
   }
 
   build() {
@@ -130,7 +143,77 @@ export struct HabitFormView {
         .width('100%')
         .alignItems(HorizontalAlign.Start)
 
-        // 4. 目标设置区
+        // 4. 执行日：KMP 使用 Monday-first weekday mask 计算展示、进度与提醒。
+        if (!this.isSimpleMode()) {
+          Column({ space: 10 }) {
+            Row() {
+              Text('执行日')
+                .fontSize(14)
+                .fontColor($r('app.color.font_secondary'))
+                .padding({ left: 4 })
+
+              Blank()
+
+              Button('每天')
+                .type(ButtonType.Normal)
+                .fontSize(12)
+                .fontColor(this.weekdaysMask === 127 ? this.theme.accent : $r('app.color.font_secondary'))
+                .backgroundColor(Color.Transparent)
+                .accessibilityDescription(this.weekdaysMask === 127 ? '已选择' : '双击选择每天')
+                .onClick(() => {
+                  this.weekdaysMask = 127;
+                })
+
+              Button('工作日')
+                .type(ButtonType.Normal)
+                .fontSize(12)
+                .fontColor(this.weekdaysMask === 31 ? this.theme.accent : $r('app.color.font_secondary'))
+                .backgroundColor(Color.Transparent)
+                .accessibilityDescription(this.weekdaysMask === 31 ? '已选择' : '双击选择工作日')
+                .onClick(() => {
+                  this.weekdaysMask = 31;
+                })
+
+              Button('周末')
+                .type(ButtonType.Normal)
+                .fontSize(12)
+                .fontColor(this.weekdaysMask === 96 ? this.theme.accent : $r('app.color.font_secondary'))
+                .backgroundColor(Color.Transparent)
+                .accessibilityDescription(this.weekdaysMask === 96 ? '已选择' : '双击选择周末')
+                .onClick(() => {
+                  this.weekdaysMask = 96;
+                })
+            }
+            .width('100%')
+
+            Row({ space: 8 }) {
+              ForEach(this.weekdayLabels, (label: string, index: number) => {
+                Button(label)
+                  .type(ButtonType.Normal)
+                  .width(36)
+                  .height(36)
+                  .padding(0)
+                  .borderRadius(18)
+                  .fontSize(14)
+                  .fontColor(this.isWeekdaySelected(index) ? Color.White : $r('app.color.font_secondary'))
+                  .backgroundColor(this.isWeekdaySelected(index) ? this.theme.accent : this.inputBgColor)
+                  .accessibilityText('星期' + label)
+                  .accessibilityDescription(this.isWeekdaySelected(index) ? '已选择，双击取消' : '未选择，双击选择')
+                  .accessibilityLevel('yes')
+                  .onClick(() => {
+                    this.toggleWeekday(index);
+                  })
+              })
+            }
+            .width('100%')
+            .justifyContent(FlexAlign.SpaceBetween)
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Start)
+          .transition(TransitionEffect.OPACITY.animation({ duration: 300 }))
+        }
+
+        // 5. 目标设置区
         if (!this.isSimpleMode()) {
           Row({ space: 12 }) {
             // 左侧：频率
@@ -197,7 +280,7 @@ export struct HabitFormView {
           .alignItems(VerticalAlign.Top)
           .transition(TransitionEffect.OPACITY.animation({ duration: 300 }))
 
-          // 5. 总目标输入框
+          // 6. 总目标输入框
           if (this.selectedGoalTypeIndex.length > 0 &&
             this.getGoalTypeFromIndex(this.selectedGoalTypeIndex[0]) === HabitGoalType.TOTAL) {
             Column({ space: 8 }) {

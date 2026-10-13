@@ -1,6 +1,5 @@
 import { AppLog } from '../../common/logging/AppLog';
 import { common } from '@kit.AbilityKit';
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AIHabit, AITask, AIToolCall, AIToolResult, MixedResult, MonthlyAnalysisResult } from '../model/AIModels';
 import { LocalValues } from '../../common/local/LocalValues';
 import { MemoryBank } from '../model/MemoryModels';
@@ -64,6 +63,10 @@ interface KmpLifiConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+  timezone: string;
+}
+
+interface KmpQuickAddContext {
   timezone: string;
 }
 
@@ -187,6 +190,13 @@ export class DeadlinerCoreService {
     };
     this.logInfo(`runToolCall done tool=${call.tool} result=${execution.resultJson}`);
     return result;
+  }
+
+  public async extractQuickAddJson(request: string): Promise<string> {
+    const config: KmpLifiConfig = JSON.parse(this.ensureConfigPayload());
+    const context: KmpQuickAddContext = JSON.parse(request);
+    config.timezone = context.timezone;
+    return KmpPersistenceService.getInstance().quickAddExtractJson(JSON.stringify(config), request);
   }
 
   public async extractTasks(text: string, preferredLang: string): Promise<AITask[]> {

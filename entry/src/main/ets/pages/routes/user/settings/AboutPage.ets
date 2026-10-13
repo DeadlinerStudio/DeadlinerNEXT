@@ -15,6 +15,7 @@ import { ITheme } from "../../../../common/theme/ThemeModel";
 import { DialogCompat } from "../../../../common/ui/DialogCompat";
 import { APP_BREAKPOINT_DEFAULT, APP_BREAKPOINT_STORAGE_KEY, AppBreakpointUtils } from "../../../../common/layout/AppBreakpoints";
 import { SheetCompat } from '../../../../common/ui/SheetCompat';
+import { KmpPersistenceService } from '../../../../common/kmp/KmpPersistenceService';
 
 @Builder
 export function AboutPageBuilder() {
@@ -47,6 +48,8 @@ export struct AboutPage {
 
   @State versionName: string = '';
   @State versionCode: string = '';
+  @State kmpVersion: string = 'KMP 内核版本不可用';
+
   aboutToAppear(): void {
     try {
       let bundleInfo = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION);
@@ -56,6 +59,9 @@ export struct AboutPage {
       AppLog.error('Native', '获取版本号失败:', JSON.stringify(error));
       this.versionName = '1.0.0';
     }
+
+    const coreVersion: string = KmpPersistenceService.getInstance().coreVersion();
+    this.kmpVersion = coreVersion.length > 0 ? coreVersion : 'KMP 内核版本不可用';
   }
 
   private showRevokeDialog() {
@@ -148,6 +154,17 @@ export struct AboutPage {
           .width('100%')
           .alignItems(HorizontalAlign.Center)
           .padding({ top: 32, bottom: 16 })
+
+          SettingsSection({
+            title: "版本信息"
+          }) {
+            SettingsItem({
+              title: "内核版本",
+              subtitle: this.kmpVersion,
+              icon: $r('sys.symbol.circle_on_square'),
+              onItemClick: () => {  }
+            })
+          }
 
           SettingsSection({
             title: "开发者的碎碎念"

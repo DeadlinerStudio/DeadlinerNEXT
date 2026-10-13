@@ -4,9 +4,11 @@ export declare function bridgeLoadError(): string
 export declare function importLegacyV2(taskPayload: string, habitPayload: string): number
 export declare function importCapturesJson(capturePayload: string): number
 export declare function diagnosticsJson(): string
+export declare function coreVersion(): string
 export declare function mergeLegacyV2PayloadsJson(taskPayload: string, habitPayload: string): string
 export declare function syncWebDavChangeLogJson(baseUrl: string, username: string, password: string): string
 export declare function syncWebDavChangeLogJsonAsync(baseUrl: string, username: string, password: string): Promise<string>
+export declare function configureAutomaticWebDavSync(baseUrl: string, username: string, password: string): number
 export declare function taskListViewModelJson(): string
 export declare function categoryCatalogJson(): string
 export declare function categoryCreateJson(payload: string): string
@@ -19,7 +21,10 @@ export declare function taskCreateJson(taskPayload: string): string
 export declare function taskUpdateJson(taskPayload: string): string
 export declare function taskActionJson(uid: string, actionPayload: string): string
 export declare function taskDeleteJson(uid: string, updatedAt: string): string
+export declare function focusStateJson(selectedTaskUid: string): string
+export declare function focusCommandJson(payload: string): string
 export declare function habitStateJson(): string
+export declare function habitStateForDateJson(selectedDate: string): string
 export declare function habitCreateJson(habitPayload: string): string
 export declare function habitUpdateJson(habitPayload: string): string
 export declare function habitCategoryUpdateJson(payload: string): string
@@ -48,6 +53,24 @@ export declare function lifiGenerateMonthlyAnalysisJsonAsync(configPayload: stri
 export declare function lifiDrainEventsJson(): string
 export declare function lifiPendingEventCount(): number
 export declare function lifiReset(): number
+export declare function registerWidgetUpdateCallback(callback: (reason: number) => void): number
+export declare function unregisterWidgetUpdateCallback(): number
+export declare function requestWidgetUpdate(reason: number): number
 export declare function close(): number
 export declare function health(): number
 export declare function bridgeVersion(): number
+
+export declare function quickAddParseJson(request: string): string
+export declare function quickAddExtractJsonAsync(config: string, request: string): Promise<string>
+
+export declare function quickAddModelPrepareAsync(directory: string, manifest: string): Promise<string>
+export declare function quickAddModelRecognizeAsync(request: string): Promise<string>
+
+export declare function quickAddModelStatusAsync(): Promise<string>
+
+export declare function focusTargetStateJson(payload: string): string
+export declare function focusOverviewJson(): string
+
+export declare function overviewMonthJson(monthStart: string): string
+export declare function overviewFocusQueryJson(query: string): string
+export declare function overviewFocusSessionsJson(): string

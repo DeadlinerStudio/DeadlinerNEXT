@@ -8,6 +8,7 @@ import {
   MaterialPresets
 } from '../../common/style/SystemMaterialCompat'
 import { IMMERSIVE_FLOATING_TOOLBAR_DEFAULT } from '../../common/local/ExperimentalComponentsPolicy'
+import { ImmersiveMaterialScope } from './ImmersiveMaterialScope';
 
 @Component
 export struct HomeFloatingToolbar {
@@ -54,9 +55,12 @@ export struct HomeFloatingToolbar {
   }
 
   private getCollapsedCapsuleScale(): number {
-    const expandedLength: number = this.SECONDARY_BUTTON_SIZE * 4 + this.PRIMARY_BUTTON_SIZE +
+    return this.PRIMARY_BUTTON_SIZE / this.getExpandedCapsuleLength();
+  }
+
+  private getExpandedCapsuleLength(): number {
+    return this.SECONDARY_BUTTON_SIZE * 4 + this.PRIMARY_BUTTON_SIZE +
       this.ACTION_GAP * 4 + this.CAPSULE_MAIN_AXIS_PADDING * 2;
-    return this.PRIMARY_BUTTON_SIZE / expandedLength;
   }
 
   private getLegacyLeftButton(): ActionBarButton {
@@ -173,7 +177,6 @@ export struct HomeFloatingToolbar {
         this.horizontalExpandedContent()
         this.primaryButton()
       }
-      .translate({ y: this.TOOLBAR_RAISE_OFFSET })
       .animation({ duration: this.TOOLBAR_ANIMATION_DURATION, curve: Curve.Friction })
     } else {
       Stack({ alignContent: Alignment.Center }) {
@@ -182,7 +185,6 @@ export struct HomeFloatingToolbar {
         }
         this.primaryButton()
       }
-      .translate({ y: this.TOOLBAR_RAISE_OFFSET })
       .animation({ duration: this.TOOLBAR_ANIMATION_DURATION, curve: Curve.Friction })
     }
   }
@@ -259,7 +261,17 @@ export struct HomeFloatingToolbar {
 
   build() {
     if (this.immersiveFloatingToolbar) {
-      this.immersiveToolbar()
+      Stack({ alignContent: Alignment.Center }) {
+        ImmersiveMaterialScope({
+          scopeWidth: this.isHorizontal ? this.getExpandedCapsuleLength() : this.PRIMARY_BUTTON_SIZE,
+          scopeHeight: this.isHorizontal || !this.isSelectionMode ? this.PRIMARY_BUTTON_SIZE :
+            this.getExpandedCapsuleLength()
+        }) {
+          this.immersiveToolbar()
+        }
+      }
+      .translate({ y: this.TOOLBAR_RAISE_OFFSET })
+      .hitTestBehavior(HitTestMode.Transparent)
     } else {
       this.legacyToolbar()
     }

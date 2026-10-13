@@ -1,4 +1,8 @@
 #include "napi/native_api.h"
+#include "widget_update_bridge.h"
+#include "focus_bridge.h"
+#include "overview_bridge.h"
+#include "quick_add_bridge.h"
 
 #include <dlfcn.h>
 #include <string>
@@ -12,12 +16,14 @@ using ImportJsonFunction = int (*)(const char*);
 using DiagnosticsJsonFunction = int (*)(char*, int);
 using MergeLegacyV2JsonFunction = int (*)(const char*, const char*, char*, int);
 using SyncWebDavChangeLogJsonFunction = int (*)(const char*, const char*, const char*, char*, int);
+using ConfigureAutomaticWebDavSyncFunction = int (*)(const char*, const char*, const char*);
 using TaskListViewModelJsonFunction = int (*)(char*, int);
 using TaskMutationJsonFunction = int (*)(const char*, char*, int);
 using TaskKeyMutationJsonFunction = int (*)(const char*, const char*, char*, int);
 using LifiProcessInputFunction = int (*)(const char*, const char*);
 using LifiSubmitToolResultFunction = int (*)(const char*, const char*, const char*);
 using ZeroArgumentFunction = int (*)();
+using RequestWidgetUpdateFunction = int (*)(int);
 
 struct PersistenceApi {
     void* handle = nullptr;
@@ -27,8 +33,10 @@ struct PersistenceApi {
     ImportLegacyV2Function importLegacyV2 = nullptr;
     ImportJsonFunction importCapturesJson = nullptr;
     DiagnosticsJsonFunction diagnosticsJson = nullptr;
+    DiagnosticsJsonFunction coreVersion = nullptr;
     MergeLegacyV2JsonFunction mergeLegacyV2Json = nullptr;
     SyncWebDavChangeLogJsonFunction syncWebDavChangeLogJson = nullptr;
+    ConfigureAutomaticWebDavSyncFunction configureAutomaticWebDavSync = nullptr;
     TaskListViewModelJsonFunction taskListViewModelJson = nullptr;
     TaskListViewModelJsonFunction categoryCatalogJson = nullptr;
     TaskMutationJsonFunction categoryCreateJson = nullptr;
@@ -40,7 +48,10 @@ struct PersistenceApi {
     TaskMutationJsonFunction taskUpdateJson = nullptr;
     TaskKeyMutationJsonFunction taskActionJson = nullptr;
     TaskKeyMutationJsonFunction taskDeleteJson = nullptr;
+    TaskMutationJsonFunction focusStateJson = nullptr;
+    TaskMutationJsonFunction focusCommandJson = nullptr;
     TaskListViewModelJsonFunction habitStateJson = nullptr;
+    TaskMutationJsonFunction habitStateForDateJson = nullptr;
     TaskMutationJsonFunction habitCreateJson = nullptr;
     TaskMutationJsonFunction habitUpdateJson = nullptr;
     TaskMutationJsonFunction habitCategoryUpdateJson = nullptr;
@@ -69,6 +80,8 @@ struct PersistenceApi {
     ZeroArgumentFunction close = nullptr;
     ZeroArgumentFunction health = nullptr;
     ZeroArgumentFunction bridgeVersion = nullptr;
+    SetNativeWidgetUpdateCallbackFunction setWidgetUpdateCallback = nullptr;
+    RequestWidgetUpdateFunction requestWidgetUpdate = nullptr;
 };
 
 PersistenceApi& GetPersistenceApi()
@@ -90,8 +103,10 @@ PersistenceApi& GetPersistenceApi()
     api.importLegacyV2 = reinterpret_cast<ImportLegacyV2Function>(dlsym(api.handle, "deadliner_persistence_import_legacy_v2"));
     api.importCapturesJson = reinterpret_cast<ImportJsonFunction>(dlsym(api.handle, "deadliner_persistence_import_captures_json"));
     api.diagnosticsJson = reinterpret_cast<DiagnosticsJsonFunction>(dlsym(api.handle, "deadliner_persistence_diagnostics_json"));
+    api.coreVersion = reinterpret_cast<DiagnosticsJsonFunction>(dlsym(api.handle, "deadliner_persistence_core_version"));
     api.mergeLegacyV2Json = reinterpret_cast<MergeLegacyV2JsonFunction>(dlsym(api.handle, "deadliner_persistence_merge_legacy_v2_json"));
     api.syncWebDavChangeLogJson = reinterpret_cast<SyncWebDavChangeLogJsonFunction>(dlsym(api.handle, "deadliner_persistence_sync_webdav_changelog_json"));
+    api.configureAutomaticWebDavSync = reinterpret_cast<ConfigureAutomaticWebDavSyncFunction>(dlsym(api.handle, "deadliner_persistence_configure_automatic_webdav_sync"));
     api.taskListViewModelJson = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_task_list_view_model_json"));
     api.categoryCatalogJson = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_category_catalog_json"));
     api.categoryCreateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_category_create_json"));
@@ -103,7 +118,10 @@ PersistenceApi& GetPersistenceApi()
     api.taskUpdateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_task_update_json"));
     api.taskActionJson = reinterpret_cast<TaskKeyMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_task_action_json"));
     api.taskDeleteJson = reinterpret_cast<TaskKeyMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_task_delete_json"));
+    api.focusStateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_focus_state_json"));
+    api.focusCommandJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_focus_command_json"));
     api.habitStateJson = reinterpret_cast<TaskListViewModelJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_state_json"));
+    api.habitStateForDateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_state_for_date_json"));
     api.habitCreateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_create_json"));
     api.habitUpdateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_update_json"));
     api.habitCategoryUpdateJson = reinterpret_cast<TaskMutationJsonFunction>(dlsym(api.handle, "deadliner_persistence_habit_category_update_json"));
@@ -132,8 +150,10 @@ PersistenceApi& GetPersistenceApi()
     api.close = reinterpret_cast<ZeroArgumentFunction>(dlsym(api.handle, "deadliner_persistence_close"));
     api.health = reinterpret_cast<ZeroArgumentFunction>(dlsym(api.handle, "deadliner_persistence_health"));
     api.bridgeVersion = reinterpret_cast<ZeroArgumentFunction>(dlsym(api.handle, "deadliner_persistence_bridge_version"));
+    api.setWidgetUpdateCallback = reinterpret_cast<SetNativeWidgetUpdateCallbackFunction>(dlsym(api.handle, "deadliner_widget_set_update_callback"));
+    api.requestWidgetUpdate = reinterpret_cast<RequestWidgetUpdateFunction>(dlsym(api.handle, "deadliner_widget_request_update"));
 
-    if (api.initialize == nullptr || api.importLegacyV2 == nullptr || api.importCapturesJson == nullptr || api.diagnosticsJson == nullptr || api.mergeLegacyV2Json == nullptr || api.syncWebDavChangeLogJson == nullptr || api.taskListViewModelJson == nullptr || api.overviewViewModelJson == nullptr || api.taskCreateJson == nullptr || api.taskUpdateJson == nullptr || api.taskActionJson == nullptr || api.taskDeleteJson == nullptr || api.habitStateJson == nullptr || api.habitCreateJson == nullptr || api.habitUpdateJson == nullptr || api.habitStatusActionJson == nullptr || api.habitToggleRecordJson == nullptr || api.habitSaveRecordJson == nullptr || api.habitClearRecordsJson == nullptr || api.habitDeleteJson == nullptr || api.captureStateJson == nullptr || api.captureCreateJson == nullptr || api.captureUpdateJson == nullptr || api.captureDeleteJson == nullptr || api.memoryProfileStateJson == nullptr || api.importMemoryProfileJson == nullptr || api.memorySaveJson == nullptr || api.memoryDeleteJson == nullptr || api.profileSaveJson == nullptr || api.lifiProcessInput == nullptr || api.lifiSubmitToolResult == nullptr || api.lifiExtractTasksJson == nullptr || api.lifiExtractHabitsJson == nullptr || api.lifiGenerateMonthlyAnalysisJson == nullptr || api.lifiDrainEventsJson == nullptr || api.lifiPendingEventCount == nullptr || api.lifiReset == nullptr || api.close == nullptr || api.health == nullptr || api.bridgeVersion == nullptr) {
+    if (api.initialize == nullptr || api.importLegacyV2 == nullptr || api.importCapturesJson == nullptr || api.diagnosticsJson == nullptr || api.mergeLegacyV2Json == nullptr || api.syncWebDavChangeLogJson == nullptr || api.configureAutomaticWebDavSync == nullptr || api.taskListViewModelJson == nullptr || api.overviewViewModelJson == nullptr || api.taskCreateJson == nullptr || api.taskUpdateJson == nullptr || api.taskActionJson == nullptr || api.taskDeleteJson == nullptr || api.focusStateJson == nullptr || api.focusCommandJson == nullptr || api.habitStateJson == nullptr || api.habitStateForDateJson == nullptr || api.habitCreateJson == nullptr || api.habitUpdateJson == nullptr || api.habitStatusActionJson == nullptr || api.habitToggleRecordJson == nullptr || api.habitSaveRecordJson == nullptr || api.habitClearRecordsJson == nullptr || api.habitDeleteJson == nullptr || api.captureStateJson == nullptr || api.captureCreateJson == nullptr || api.captureUpdateJson == nullptr || api.captureDeleteJson == nullptr || api.memoryProfileStateJson == nullptr || api.importMemoryProfileJson == nullptr || api.memorySaveJson == nullptr || api.memoryDeleteJson == nullptr || api.profileSaveJson == nullptr || api.lifiProcessInput == nullptr || api.lifiSubmitToolResult == nullptr || api.lifiExtractTasksJson == nullptr || api.lifiExtractHabitsJson == nullptr || api.lifiGenerateMonthlyAnalysisJson == nullptr || api.lifiDrainEventsJson == nullptr || api.lifiPendingEventCount == nullptr || api.lifiReset == nullptr || api.close == nullptr || api.health == nullptr || api.bridgeVersion == nullptr || api.setWidgetUpdateCallback == nullptr || api.requestWidgetUpdate == nullptr) {
         dlclose(api.handle);
         PersistenceApi unavailable;
         unavailable.loadError = "libDeadlinerCore.so is missing a required persistence symbol";
@@ -206,6 +226,8 @@ napi_value ImportCapturesJson(napi_env env, napi_callback_info info)
     return CreateIntResult(env, api.importCapturesJson(payload.c_str()));
 }
 
+napi_value RunZeroArgumentJson(napi_env env, napi_callback_info info, TaskListViewModelJsonFunction function);
+
 napi_value DiagnosticsJson(napi_env env, napi_callback_info info)
 {
     size_t argc = 0;
@@ -240,6 +262,11 @@ napi_value DiagnosticsJson(napi_env env, napi_callback_info info)
     napi_value value = nullptr;
     napi_create_string_utf8(env, buffer.data(), NAPI_AUTO_LENGTH, &value);
     return value;
+}
+
+napi_value CoreVersion(napi_env env, napi_callback_info info)
+{
+    return RunZeroArgumentJson(env, info, GetPersistenceApi().coreVersion);
 }
 
 napi_value MergeLegacyV2Json(
@@ -323,6 +350,29 @@ napi_value SyncWebDavChangeLogJson(napi_env env, napi_callback_info info)
     napi_value value = nullptr;
     napi_create_string_utf8(env, buffer.data(), NAPI_AUTO_LENGTH, &value);
     return value;
+}
+
+napi_value ConfigureAutomaticWebDavSync(napi_env env, napi_callback_info info)
+{
+    size_t argc = 3;
+    napi_value arguments[3] = { nullptr, nullptr, nullptr };
+    PersistenceApi& api = GetPersistenceApi();
+    if (api.configureAutomaticWebDavSync == nullptr ||
+        napi_get_cb_info(env, info, &argc, arguments, nullptr, nullptr) != napi_ok || argc != 3) {
+        return CreateIntResult(env, 0);
+    }
+    std::string baseUrl;
+    std::string username;
+    std::string password;
+    if (!ReadUtf8Argument(env, arguments[0], baseUrl) ||
+        !ReadUtf8Argument(env, arguments[1], username) ||
+        !ReadUtf8Argument(env, arguments[2], password)) {
+        return CreateIntResult(env, 0);
+    }
+    return CreateIntResult(
+        env,
+        api.configureAutomaticWebDavSync(baseUrl.c_str(), username.c_str(), password.c_str())
+    );
 }
 
 struct SyncWebDavAsyncContext {
@@ -809,6 +859,8 @@ napi_value RunTaskMutation(napi_env env, napi_callback_info info, TaskMutationJs
 
 napi_value TaskCreateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().taskCreateJson); }
 napi_value TaskUpdateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().taskUpdateJson); }
+napi_value FocusStateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().focusStateJson); }
+napi_value FocusCommandJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().focusCommandJson); }
 napi_value CategoryCreateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().categoryCreateJson); }
 napi_value CategoryUpdateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().categoryUpdateJson); }
 
@@ -878,6 +930,7 @@ napi_value HabitStateJson(napi_env env, napi_callback_info info)
 }
 
 napi_value HabitCreateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().habitCreateJson); }
+napi_value HabitStateForDateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().habitStateForDateJson); }
 napi_value HabitUpdateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().habitUpdateJson); }
 napi_value HabitCategoryUpdateJson(napi_env env, napi_callback_info info) { return RunTaskMutation(env, info, GetPersistenceApi().habitCategoryUpdateJson); }
 napi_value HabitStatusActionJson(napi_env env, napi_callback_info info) { return RunTaskKeyMutation(env, info, GetPersistenceApi().habitStatusActionJson); }
@@ -933,7 +986,33 @@ napi_value ProfileSaveJson(napi_env env, napi_callback_info info) { return RunTa
 napi_value Close(napi_env env, napi_callback_info)
 {
     PersistenceApi& api = GetPersistenceApi();
+    ClearWidgetUpdateBridge();
     return CreateIntResult(env, api.close == nullptr ? 0 : api.close());
+}
+
+napi_value RegisterWidgetUpdateCallback(napi_env env, napi_callback_info info)
+{
+    return RegisterWidgetUpdateBridgeCallback(env, info, GetPersistenceApi().setWidgetUpdateCallback);
+}
+
+napi_value UnregisterWidgetUpdateCallback(napi_env env, napi_callback_info)
+{
+    return UnregisterWidgetUpdateBridgeCallback(env);
+}
+
+napi_value RequestWidgetUpdate(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value arguments[1] = { nullptr };
+    int32_t reason = 0;
+    PersistenceApi& api = GetPersistenceApi();
+    if (api.requestWidgetUpdate == nullptr ||
+        napi_get_cb_info(env, info, &argc, arguments, nullptr, nullptr) != napi_ok ||
+        argc != 1 ||
+        napi_get_value_int32(env, arguments[0], &reason) != napi_ok) {
+        return CreateIntResult(env, 0);
+    }
+    return CreateIntResult(env, api.requestWidgetUpdate(reason));
 }
 
 napi_value Health(napi_env env, napi_callback_info)
@@ -960,9 +1039,11 @@ static napi_value Init(napi_env env, napi_value exports)
         { "importLegacyV2", nullptr, ImportLegacyV2, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "importCapturesJson", nullptr, ImportCapturesJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "diagnosticsJson", nullptr, DiagnosticsJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "coreVersion", nullptr, CoreVersion, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "mergeLegacyV2PayloadsJson", nullptr, MergeLegacyV2PayloadsJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "syncWebDavChangeLogJson", nullptr, SyncWebDavChangeLogJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "syncWebDavChangeLogJsonAsync", nullptr, SyncWebDavChangeLogJsonAsync, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "configureAutomaticWebDavSync", nullptr, ConfigureAutomaticWebDavSync, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "taskListViewModelJson", nullptr, TaskListViewModelJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "categoryCatalogJson", nullptr, CategoryCatalogJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "categoryCreateJson", nullptr, CategoryCreateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
@@ -975,7 +1056,10 @@ static napi_value Init(napi_env env, napi_value exports)
         { "taskUpdateJson", nullptr, TaskUpdateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "taskActionJson", nullptr, TaskActionJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "taskDeleteJson", nullptr, TaskDeleteJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "focusStateJson", nullptr, FocusStateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "focusCommandJson", nullptr, FocusCommandJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitStateJson", nullptr, HabitStateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "habitStateForDateJson", nullptr, HabitStateForDateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitCreateJson", nullptr, HabitCreateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitUpdateJson", nullptr, HabitUpdateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "habitCategoryUpdateJson", nullptr, HabitCategoryUpdateJson, nullptr, nullptr, nullptr, napi_default, nullptr },
@@ -1004,11 +1088,17 @@ static napi_value Init(napi_env env, napi_value exports)
         { "lifiDrainEventsJson", nullptr, LifiDrainEventsJson, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "lifiPendingEventCount", nullptr, LifiPendingEventCount, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "lifiReset", nullptr, LifiReset, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "registerWidgetUpdateCallback", nullptr, RegisterWidgetUpdateCallback, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "unregisterWidgetUpdateCallback", nullptr, UnregisterWidgetUpdateCallback, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "requestWidgetUpdate", nullptr, RequestWidgetUpdate, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "health", nullptr, Health, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "bridgeVersion", nullptr, BridgeVersion, nullptr, nullptr, nullptr, napi_default, nullptr },
     };
     napi_define_properties(env, exports, sizeof(descriptors) / sizeof(descriptors[0]), descriptors);
+    RegisterQuickAddBridge(env, exports);
+    RegisterFocusBridge(env, exports);
+    RegisterOverviewBridge(env, exports);
     return exports;
 }
 EXTERN_C_END

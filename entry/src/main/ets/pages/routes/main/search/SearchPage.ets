@@ -616,6 +616,7 @@ export struct SearchPage {
   }
 
   private async onHabitToggle(item: HabitWithDailyStatus) {
+    if (!item.canApplyPrimaryAction) return;
     if (this.togglingHabitIds.has(item.habit.id)) {
       return;
     }
@@ -626,7 +627,7 @@ export struct SearchPage {
     try {
       const today = new Date();
       await this.habitRepo.toggleRecord(item.habit.id, today);
-      if (!item.isCompleted && (item.doneCount + 1 >= item.targetCount)) {
+      if (!item.isCompleted && (item.doneCount + item.primaryActionAmount >= item.targetCount)) {
         this.confetti.fire();
       }
       await this.refreshCurrentResults();
@@ -966,7 +967,7 @@ export struct SearchPage {
       data: item.habit,
       status: item.habit.isCompleted ? DDLStatus.COMPLETED : DDLStatus.UNDERGO,
       isSelected: false,
-      canToggle: item.habit.isDueToday ?? true,
+      canToggle: item.habit.canApplyPrimaryAction,
       remainingText: item.habit.dueStateText ?? '',
       disableProgressAnimation: true,
       onToggle: (): Promise<void> => this.onHabitToggle(item.habit),

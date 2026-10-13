@@ -1,3 +1,5 @@
+import { FocusOverviewStatistics } from './FocusStatisticsModels';
+import { FocusStatisticsSection } from './FocusStatisticsSection';
 import { DDLItem } from '../../../model/DDLModels';
 import { ChartOptions, UCharts, UChartsController } from '@ibestservices/ucharts';
 import { StatsCardContainer } from '../../components/OverviewComponents';
@@ -35,6 +37,7 @@ interface ChartSeriesItem {
 
 @Component
 export struct OverviewStatsSection {
+  @Prop focusStatistics: FocusOverviewStatistics | null = null;
   @Prop todayCompleted: number;
   @Prop todayTodo: number;
   @Prop todayOverdue: number;
@@ -107,6 +110,7 @@ export struct OverviewStatsSection {
           Blank().height(72)
         }
       }
+      Blank().height(100)
     }
     .justifyContent(FlexAlign.Start)
     .constraintSize({ minHeight: '100%' })

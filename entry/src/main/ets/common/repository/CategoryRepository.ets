@@ -4,6 +4,7 @@ import {
   CategoryMutationResult,
   KmpCategoryRepositoryAdapter
 } from '../kmp/KmpCategoryRepositoryAdapter';
+import { KmpAutomaticSyncConfigurator } from '../kmp/KmpAutomaticSyncConfigurator';
 
 /** HarmonyOS presentation gateway for the KMP-owned category catalog. */
 export class CategoryRepository {
@@ -31,6 +32,7 @@ export class CategoryRepository {
   }
 
   public async createCategory(input: CategoryMutationInput): Promise<CategoryDisplayModel> {
+    KmpAutomaticSyncConfigurator.getInstance().configure();
     const result: CategoryMutationResult = this.kmpCategories.createCategory(input);
     this.replaceCache(result.categories);
     if (result.category === null) throw new Error('KMP category creation did not return the category');
@@ -38,6 +40,7 @@ export class CategoryRepository {
   }
 
   public async updateCategory(input: CategoryMutationInput): Promise<CategoryDisplayModel> {
+    KmpAutomaticSyncConfigurator.getInstance().configure();
     const result: CategoryMutationResult = this.kmpCategories.updateCategory(input);
     this.replaceCache(result.categories);
     if (result.category === null) throw new Error('KMP category update did not return the category');
@@ -45,11 +48,13 @@ export class CategoryRepository {
   }
 
   public async deleteCategory(uid: string): Promise<void> {
+    KmpAutomaticSyncConfigurator.getInstance().configure();
     const result: CategoryMutationResult = this.kmpCategories.deleteCategory(uid, new Date().toISOString());
     this.replaceCache(result.categories);
   }
 
   public async restorePresets(): Promise<void> {
+    KmpAutomaticSyncConfigurator.getInstance().configure();
     const result: CategoryMutationResult = this.kmpCategories.restorePresets();
     this.replaceCache(result.categories);
   }

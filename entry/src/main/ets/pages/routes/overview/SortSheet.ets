@@ -120,7 +120,7 @@ export struct SortSheet {
 
   getTrendCardName(id: TrendCard): string {
     switch (id) {
-      case TrendCard.DAILY_TREND: return '本周完成情况';
+      case TrendCard.DAILY_TREND: return '最近 7 天';
       case TrendCard.MONTHLY_TREND: return '每月趋势';
       case TrendCard.WEEKLY_TREND: return '近4周完成';
       case TrendCard.CONTRIBUTION_HEATMAP: return '活跃热力图';

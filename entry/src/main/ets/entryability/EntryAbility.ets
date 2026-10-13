@@ -1,10 +1,8 @@
 import { AppLog } from '../common/logging/AppLog';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { display, ThemeControl, window } from '@kit.ArkUI';
 import { LocalValues } from '../common/local/LocalValues';
 import { TaskRepository } from '../common/repository/TaskRepository';
-import { WidgetUpdater } from '../utils/WidgetUpdater';
 import { buffer } from '@kit.ArkTS';
 import auth from '@hw-agconnect/auth'
 import { ReminderDataManager } from '../utils/notification/ReminderDataManager';
@@ -20,6 +18,8 @@ import { AIService } from '../ai/AIServcice';
 import { AppBreakpointUtils, APP_BREAKPOINT_STORAGE_KEY } from '../common/layout/AppBreakpoints';
 import { API23_UI_DEFAULT, EXPERIMENTAL_COMPONENTS_DEFAULT } from '../common/local/ExperimentalComponentsPolicy';
 import { KmpMigrationService, KmpMigrationState } from '../common/migration/KmpMigrationService';
+import { KmpAutomaticSyncConfigurator } from '../common/kmp/KmpAutomaticSyncConfigurator';
+import { WidgetRefreshBridge, WidgetUpdateReason } from '../utils/WidgetRefreshBridge';
 
 const DOMAIN = 0x0000;
 
@@ -29,11 +29,16 @@ export default class EntryAbility extends UIAbility {
 
   async onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): Promise<void> {
     AppLog.initialize(this.context);
+    AppStorage.setOrCreate('OverviewAbilityContext', this.context);
+    AppStorage.setOrCreate('OverviewAppForeground', true);
+    this.handleFocusWant(want);
+    WidgetRefreshBridge.start(this.context);
     try {
       this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
       AppStorage.setOrCreate(C.KEY_ENABLE_API23, API23_UI_DEFAULT);
       AppStorage.setOrCreate(C.KEY_EXPERIMENTAL_COMPONENTS, EXPERIMENTAL_COMPONENTS_DEFAULT);
       AppStorage.setOrCreate(C.KEY_API23_MATERIAL_LEVEL, 'EXQUISITE');
+      AppStorage.setOrCreate('FocusTimerRevision', 0);
       TaskRepository.getInstance().setContext(this.context);
       HabitRepository.getInstance().setContext(this.context);
       InspirationRepository.getInstance().setContext(this.context);
@@ -60,9 +65,11 @@ export default class EntryAbility extends UIAbility {
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.handleWidgetRoute(want)
+    this.handleFocusWant(want);
   }
 
   onDestroy(): void {
+    WidgetRefreshBridge.stop();
     AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
   }
 
@@ -98,18 +105,28 @@ export default class EntryAbility extends UIAbility {
     AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
   }
 
+
+  private handleFocusWant(want: Want): void {
+    if (want.uri !== undefined && want.uri.startsWith('deadliner://focus/')) {
+      AppStorage.setOrCreate('FocusNotificationSessionUid', want.uri.substring('deadliner://focus/'.length));
+      AppStorage.setOrCreate('FocusTimerOpen', true);
+    }
+  }
+
   onForeground(): void {
+    AppStorage.setOrCreate('OverviewAppForeground', true);
     // Ability has brought to foreground
     AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
     AppLog.info('Native', '[GuideDebug][EntryAbility] onForeground');
-    WidgetUpdater.updateAllWidgets(this.context)
+    WidgetRefreshBridge.requestKmpUpdate(WidgetUpdateReason.APP_FOREGROUND);
+    AppStorage.setOrCreate('FocusTimerRevision', (AppStorage.get<number>('FocusTimerRevision') ?? 0) + 1);
   }
 
   onBackground(): void {
+    AppStorage.setOrCreate('OverviewAppForeground', false);
     // Ability has back to background
     AppLog.info('HiLog', DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
     AppLog.info('Native', '[GuideDebug][EntryAbility] onBackground');
-    WidgetUpdater.updateAllWidgets(this.context)
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {
@@ -126,6 +143,8 @@ export default class EntryAbility extends UIAbility {
   private async initializeDeferredServices(migrationReady: Promise<KmpMigrationState>): Promise<void> {
     try {
       await migrationReady;
+      KmpAutomaticSyncConfigurator.getInstance().configure();
+      await HabitRepository.getInstance().repairLegacyTaskCarriers();
       await AIService.getInstance().init(this.context);
       AppLog.info('Native', '[EntryAbility] KMP-dependent services initialized after migration.');
     } catch (error) {

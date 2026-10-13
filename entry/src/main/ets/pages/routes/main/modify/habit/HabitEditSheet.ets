@@ -22,6 +22,7 @@ export struct HabitEditSheet {
   @State private selectedGoalTypeIndex: number[] = [0];
   @State private timesPerPeriod: string = '1';
   @State private totalTarget: string = '';
+  @State private weekdaysMask: number = 127;
   @State private categoryUid: string | null = null;
 
   // 占位状态，用于满足 HabitFormView 的 Link 约束 (即使不显示 AI)
@@ -59,6 +60,7 @@ export struct HabitEditSheet {
     // 数字转字符串
     this.timesPerPeriod = habit.timesPerPeriod.toString();
     this.totalTarget = habit.totalTarget ? habit.totalTarget.toString() : "";
+    this.weekdaysMask = habit.weekdaysMask === null || habit.weekdaysMask === undefined ? 127 : habit.weekdaysMask;
     this.categoryUid = habit.categoryUid;
   }
 
@@ -105,6 +107,10 @@ export struct HabitEditSheet {
       }
 
       const newPeriod = HabitFormHelper.getPeriodFromIndex(pIndex);
+      if (!isSimple && (this.weekdaysMask & 127) === 0) {
+        Toast.show({ message: '请至少选择一个执行日' });
+        return;
+      }
 
       // 3. 构建更新后的对象，保留原有关键字段不变
       const updatedHabit: Habit = {
@@ -116,6 +122,7 @@ export struct HabitEditSheet {
         iconKey: this.editingHabit.iconKey,
         categoryUid: this.categoryUid,
         period: newPeriod,
+        weekdaysMask: this.weekdaysMask,
         timesPerPeriod: times,
         goalType: newGoalType,
         totalTarget: total,
@@ -150,6 +157,7 @@ export struct HabitEditSheet {
           selectedGoalTypeIndex: $selectedGoalTypeIndex,
           timesPerPeriod: $timesPerPeriod,
           totalTarget: $totalTarget,
+          weekdaysMask: $weekdaysMask,
           aiInputText: $aiInputText, // 传入占位变量
           isAILoading: $isAILoading, // 传入占位变量
           showAIInput: false         // 明确隐藏 AI 区域

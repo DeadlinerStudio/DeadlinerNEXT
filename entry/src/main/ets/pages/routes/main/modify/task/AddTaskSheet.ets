@@ -1,3 +1,5 @@
+import { LocalValues } from '../../../../../common/local/LocalValues';
+import { QuickAddSheet } from '../quickadd/QuickAddSheet';
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { TaskFormView } from './TaskFormView';
 import { TaskFormHelper } from './TaskFormHelper';
@@ -14,10 +16,12 @@ export interface AddTaskParams {
 @Component
 export struct AddTaskSheet {
   onDone: () => void = () => {}
+  allowQuickAdd: boolean = true;
   initialAiInputText: string = '';
   autoTriggerAI: boolean = false;
   initialName: string = '';
   initialNote: string = '';
+  initialDueTime: string | null = null;
 
   @State name: string = '';
   @State note: string = '';
@@ -29,6 +33,10 @@ export struct AddTaskSheet {
   @State isAILoading: boolean = false;
 
   aboutToAppear(): void {
+    if (this.initialDueTime) {
+      const due: Date = new Date(this.initialDueTime);
+      if (!isNaN(due.getTime())) { this.endTime = due; if (this.startTime.getTime() > due.getTime()) this.startTime = due; }
+    }
     if (this.initialName) {
       this.name = this.initialName;
     }
@@ -70,6 +78,16 @@ export struct AddTaskSheet {
   }
 
   build() {
+    if (this.allowQuickAdd && LocalValues.getInstance().getQuickAddEnabled() &&
+      !this.initialName && !this.initialAiInputText) {
+      QuickAddSheet({ onDone: this.onDone, initialKind: 'TASK' })
+    } else {
+      this.fullEditor()
+    }
+  }
+
+  @Builder
+  fullEditor() {
     HdsNavigation() {
       Column() {
         Blank().height(56)

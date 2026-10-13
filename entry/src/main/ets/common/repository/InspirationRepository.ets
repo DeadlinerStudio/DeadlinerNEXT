@@ -2,6 +2,7 @@ import { InspirationItem } from '../../model/InspirationModels';
 import { common } from '@kit.AbilityKit';
 import { KmpCaptureRepositoryAdapter } from '../kmp/KmpCaptureRepositoryAdapter';
 import { KmpMigrationService } from '../migration/KmpMigrationService';
+import { KmpAutomaticSyncConfigurator } from '../kmp/KmpAutomaticSyncConfigurator';
 
 export class InspirationRepository {
   private static instance: InspirationRepository;
@@ -46,6 +47,7 @@ export class InspirationRepository {
     if (this.context === null) throw new Error('InspirationRepository context is required for KMP persistence');
     await KmpMigrationService.getInstance().awaitReady();
     await this.kmpCapture.initialize(this.context);
+    KmpAutomaticSyncConfigurator.getInstance().configure();
     return true;
   }
 }

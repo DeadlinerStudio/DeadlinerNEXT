@@ -69,7 +69,6 @@
       "pageSourceFile": "src/main/ets/pages/routes/user/settings/AppearanceSettings.ets",
       "buildFunction": "AppearanceSettingsBuilder",
       "data": {
-
         "description": "显示与个性化"
       }
     },
@@ -169,6 +168,26 @@
       "name": "placeholder",
       "pageSourceFile": "src/main/ets/pages/common/Placeholder.ets",
       "buildFunction": "PlaceholderBuilder"
+    },
+    {
+      "name": "overviewtasks",
+      "pageSourceFile": "src/main/ets/pages/routes/overview/OverviewDetailPage.ets",
+      "buildFunction": "OverviewTasksBuilder"
+    },
+    {
+      "name": "overviewtrends",
+      "pageSourceFile": "src/main/ets/pages/routes/overview/OverviewDetailPage.ets",
+      "buildFunction": "OverviewTrendsBuilder"
+    },
+    {
+      "name": "overviewreview",
+      "pageSourceFile": "src/main/ets/pages/routes/overview/OverviewDetailPage.ets",
+      "buildFunction": "OverviewReviewBuilder"
+    },
+    {
+      "name": "overviewfocus",
+      "pageSourceFile": "src/main/ets/pages/routes/overview/OverviewDetailPage.ets",
+      "buildFunction": "OverviewFocusBuilder"
     }
   ]
 }

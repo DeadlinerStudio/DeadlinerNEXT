@@ -50,6 +50,10 @@ export class AIService {
   // MARK: - KMP AI utilities
   // ==========================================
 
+  public async extractQuickAddJson(request: string): Promise<string> {
+    return this.coreService.extractQuickAddJson(request);
+  }
+
   public async extractTasks(text: string, preferredLang: string = 'zh-CN'): Promise<AITask[]> {
     return this.coreService.extractTasks(text, preferredLang);
   }

@@ -550,23 +550,7 @@ export class DeadlinerToolAdapter {
 
       const normalized = validation.normalized;
       try {
-        const ddlParams: TaskCreateParams = {
-          name: normalized.name,
-          startTime: DateTimeUtils.toLocalISOString(new Date()),
-          endTime: DateTimeUtils.toLocalISOString(new Date()),
-          state: TaskState.ACTIVE,
-          isCompleted: false,
-          completeTime: '',
-          note: '',
-          isArchived: false,
-          isStared: false,
-          type: DeadlineType.HABIT,
-          calendarEventId: null
-        };
-        const ddlId = await TaskRepository.getInstance().insertDDL(ddlParams);
-
-        const habitId = await HabitRepository.getInstance().createHabitForDdl(
-          ddlId,
+        const habitId = await HabitRepository.getInstance().createHabit(
           normalized.name,
           normalized.period,
           normalized.timesPerPeriod,

@@ -63,6 +63,7 @@ export interface DDLItem {
 
 // 对应 Kotlin: Habit
 export interface Habit {
+  uid?: string;
   id: number;
   ddlId: number;
   name: string;
@@ -71,6 +72,8 @@ export interface Habit {
   iconKey: string | null;
   categoryUid: string | null;
   period: HabitPeriod;
+  /** KMP HabitSchedule weekday bit mask, Monday at bit 0. */
+  weekdaysMask?: number | null;
   timesPerPeriod: number;
   goalType: HabitGoalType;
   totalTarget: number | null;

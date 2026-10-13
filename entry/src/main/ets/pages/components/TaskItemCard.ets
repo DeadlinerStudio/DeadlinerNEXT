@@ -1,3 +1,4 @@
+import { FocusSwipeAction } from '../routes/focus/FocusTimerControls';
 import { DDLStatus } from "../../model/DDLStatus";
 import { ColorUtils } from "../../utils/ColorUtils";
 import { common } from "@kit.AbilityKit";
@@ -403,6 +404,7 @@ export struct DDLItemCardSwipeable {
   onSecondaryAction?: () => void;
   onDeleteAction?: () => void;
   onEditAction?: () => void;
+  onFocusAction?: () => void;
   onLongPressSelect?: () => void;
   onToggleSelect?: () => void;
   @Prop primaryActionSymbol: Resource = $r('sys.symbol.checkmark_circle');
@@ -418,7 +420,8 @@ export struct DDLItemCardSwipeable {
 
   // 颜色状态
   @State completeColor: ResourceColor = $r('app.color.chart_green'); // R.color.chart_green
-  @State fontColor: ResourceColor = this.theme.bgPrimary
+  @State fontColor: ResourceColor = this.theme.bgPrimary;
+  @State reversedFontColor: ResourceColor = $r('app.color.font_secondary');
   @State editColor: ResourceColor = $r('app.color.chart_blue');
   @State deleteColor: ResourceColor = $r('app.color.chart_red');
 
@@ -427,7 +430,7 @@ export struct DDLItemCardSwipeable {
   private readonly ACTION_BASE_GAP: number = 8;
   private readonly ACTION_MAX_GAP: number = 24;
   private readonly ACTION_SIDE_PADDING: number = 0;
-  private readonly ACTION_REVEAL_WIDTH: number = 112;
+  private actionRevealWidth(): number { return this.offsetX > 0 && this.onFocusAction !== undefined ? 168 : 112; }
   private readonly ACTION_REVEAL_TRIGGER_DISTANCE: number = 84;
   private readonly ACTION_CLOSE_DISTANCE: number = 32;
 
@@ -440,41 +443,61 @@ export struct DDLItemCardSwipeable {
         Row() {
           if (this.offsetX > 0) {
             Row({ space: this.actionGap() }) {
-              Button({ type: ButtonType.Normal, stateEffect: true }) {
-                Column({ space: 2 }) {
+              Column() {
+                Button({ type: ButtonType.Normal, stateEffect: true }) {
                   SymbolGlyph(this.primaryActionSymbol)
                     .fontSize(19)
                     .fontColor([this.fontColor])
-                  Text(this.primaryActionLabel())
-                    .fontSize(10)
-                    .fontColor(this.fontColor)
-                    .maxLines(1)
                 }
+                .width(this.ACTION_BUTTON_SIZE)
+                .height(this.ACTION_BUTTON_SIZE)
+                .padding(0)
+                .borderRadius(this.ACTION_BUTTON_SIZE / 2)
+                .backgroundColor(this.primaryButtonColor())
+                .onClick((): void => this.runPrimaryAction())
+
+                Text(this.primaryActionLabel())
+                  .width(this.ACTION_BUTTON_SIZE)
+                  .fontSize(10)
+                  .fontColor(this.reversedFontColor)
+                  .textAlign(TextAlign.Center)
+                  .maxLines(1)
+                  .translate({ y: 2 })
               }
               .width(this.fullActionWidth())
-              .height(this.ACTION_BUTTON_SIZE)
-              .padding(0)
-              .borderRadius(this.ACTION_BUTTON_SIZE / 2)
-              .backgroundColor(this.primaryButtonColor())
-              .onClick((): void => this.runPrimaryAction())
+              .height(60)
+              .alignItems(HorizontalAlign.Start)
+              .justifyContent(FlexAlign.Center)
 
-              Button({ type: ButtonType.Normal, stateEffect: true }) {
-                Column({ space: 2 }) {
+              if (this.onFocusAction !== undefined) {
+                FocusSwipeAction({
+                  onAction: (): void => { this.resetSwipe(); if (this.onFocusAction) this.onFocusAction(); } })
+              }
+              Column() {
+                Button({ type: ButtonType.Normal, stateEffect: true }) {
                   SymbolGlyph(this.secondaryActionSymbol)
                     .fontSize(19)
                     .fontColor([this.fontColor])
-                  Text(this.secondaryActionLabel())
-                    .fontSize(10)
-                    .fontColor(this.fontColor)
-                    .maxLines(1)
                 }
+                .width(this.ACTION_BUTTON_SIZE)
+                .height(this.ACTION_BUTTON_SIZE)
+                .padding(0)
+                .borderRadius(this.ACTION_BUTTON_SIZE / 2)
+                .backgroundColor(this.secondaryButtonColor())
+                .onClick((): void => this.runSecondaryAction())
+
+                Text(this.secondaryActionLabel())
+                  .width(this.ACTION_BUTTON_SIZE)
+                  .fontSize(10)
+                  .fontColor(this.reversedFontColor)
+                  .textAlign(TextAlign.Center)
+                  .maxLines(1)
+                  .translate({ y: 2 })
               }
               .width(this.ACTION_BUTTON_SIZE)
-              .height(this.ACTION_BUTTON_SIZE)
-              .padding(0)
-              .borderRadius(this.ACTION_BUTTON_SIZE / 2)
-              .backgroundColor(this.secondaryButtonColor())
-              .onClick((): void => this.runSecondaryAction())
+              .height(60)
+              .alignItems(HorizontalAlign.Center)
+              .justifyContent(FlexAlign.Center)
             }
             .height('100%')
             .width(this.actionGroupWidth())
@@ -486,39 +509,57 @@ export struct DDLItemCardSwipeable {
             Blank()
 
             Row({ space: this.actionGap() }) {
-              Button({ type: ButtonType.Normal, stateEffect: true }) {
-                Column({ space: 2 }) {
+              Column() {
+                Button({ type: ButtonType.Normal, stateEffect: true }) {
                   SymbolGlyph(this.editActionSymbol)
                     .fontSize(19)
                     .fontColor([this.fontColor])
-                  Text('编辑')
-                    .fontSize(10)
-                    .fontColor(this.fontColor)
                 }
+                .width(this.ACTION_BUTTON_SIZE)
+                .height(this.ACTION_BUTTON_SIZE)
+                .padding(0)
+                .borderRadius(this.ACTION_BUTTON_SIZE / 2)
+                .backgroundColor(this.editButtonColor())
+                .onClick((): void => this.runEditAction())
+
+                Text('编辑')
+                  .width(this.ACTION_BUTTON_SIZE)
+                  .fontSize(10)
+                  .fontColor(this.reversedFontColor)
+                  .textAlign(TextAlign.Center)
+                  .maxLines(1)
+                  .translate({ y: 2 })
               }
               .width(this.ACTION_BUTTON_SIZE)
-              .height(this.ACTION_BUTTON_SIZE)
-              .padding(0)
-              .borderRadius(this.ACTION_BUTTON_SIZE / 2)
-              .backgroundColor(this.editButtonColor())
-              .onClick((): void => this.runEditAction())
+              .height(60)
+              .alignItems(HorizontalAlign.Center)
+              .justifyContent(FlexAlign.Center)
 
-              Button({ type: ButtonType.Normal, stateEffect: true }) {
-                Column({ space: 2 }) {
+              Column() {
+                Button({ type: ButtonType.Normal, stateEffect: true }) {
                   SymbolGlyph(this.deleteActionSymbol)
                     .fontSize(19)
                     .fontColor([this.fontColor])
-                  Text('删除')
-                    .fontSize(10)
-                    .fontColor(this.fontColor)
                 }
+                .width(this.ACTION_BUTTON_SIZE)
+                .height(this.ACTION_BUTTON_SIZE)
+                .padding(0)
+                .borderRadius(this.ACTION_BUTTON_SIZE / 2)
+                .backgroundColor(this.deleteButtonColor())
+                .onClick((): void => this.runDeleteAction())
+
+                Text('删除')
+                  .width(this.ACTION_BUTTON_SIZE)
+                  .fontSize(10)
+                  .fontColor(this.reversedFontColor)
+                  .textAlign(TextAlign.Center)
+                  .maxLines(1)
+                  .translate({ y: 2 })
               }
               .width(this.fullActionWidth())
-              .height(this.ACTION_BUTTON_SIZE)
-              .padding(0)
-              .borderRadius(this.ACTION_BUTTON_SIZE / 2)
-              .backgroundColor(this.deleteButtonColor())
-              .onClick((): void => this.runDeleteAction())
+              .height(60)
+              .alignItems(HorizontalAlign.End)
+              .justifyContent(FlexAlign.Center)
             }
             .height('100%')
             .width(this.actionGroupWidth())
@@ -664,11 +705,11 @@ export struct DDLItemCardSwipeable {
   }
 
   private actionGroupWidth(): number {
-    return Math.max(this.ACTION_REVEAL_WIDTH, this.revealedDistance());
+    return Math.max(this.actionRevealWidth(), this.revealedDistance());
   }
 
   private actionGap(): number {
-    const extraDistance = Math.max(0, this.revealedDistance() - this.ACTION_REVEAL_WIDTH);
+    const extraDistance = Math.max(0, this.revealedDistance() - this.actionRevealWidth());
     const gapGrowth = Math.min(this.ACTION_MAX_GAP - this.ACTION_BASE_GAP, extraDistance);
     return this.ACTION_BASE_GAP + gapGrowth;
   }
@@ -676,7 +717,7 @@ export struct DDLItemCardSwipeable {
   private fullActionWidth(): number {
     const separationDistance = this.ACTION_MAX_GAP - this.ACTION_BASE_GAP;
     const stretchDistance = Math.max(0,
-      this.revealedDistance() - this.ACTION_REVEAL_WIDTH - separationDistance);
+      this.revealedDistance() - this.actionRevealWidth() - separationDistance);
     return this.ACTION_BUTTON_SIZE + stretchDistance;
   }
 
@@ -695,30 +736,30 @@ export struct DDLItemCardSwipeable {
 
     if (this.panStartOffset <= -revealThreshold && gestureOffset > 0) {
       if (this.offsetX >= revealThreshold) {
-        this.revealActions(this.ACTION_REVEAL_WIDTH);
+        this.revealActions(this.actionRevealWidth());
       } else if (gestureOffset >= this.ACTION_CLOSE_DISTANCE) {
         this.resetSwipe();
       } else {
-        this.revealActions(-this.ACTION_REVEAL_WIDTH);
+        this.revealActions(-this.actionRevealWidth());
       }
       return;
     }
 
     if (this.panStartOffset >= revealThreshold && gestureOffset < 0) {
       if (this.offsetX <= -revealThreshold && this.hasTrailingActions()) {
-        this.revealActions(-this.ACTION_REVEAL_WIDTH);
+        this.revealActions(-this.actionRevealWidth());
       } else if (Math.abs(gestureOffset) >= this.ACTION_CLOSE_DISTANCE) {
         this.resetSwipe();
       } else {
-        this.revealActions(this.ACTION_REVEAL_WIDTH);
+        this.revealActions(this.actionRevealWidth());
       }
       return;
     }
 
     if (this.offsetX >= revealThreshold) {
-      this.revealActions(this.ACTION_REVEAL_WIDTH);
+      this.revealActions(this.actionRevealWidth());
     } else if (this.offsetX <= -revealThreshold) {
-      this.revealActions(-this.ACTION_REVEAL_WIDTH);
+      this.revealActions(-this.actionRevealWidth());
     } else {
       this.resetSwipe();
     }

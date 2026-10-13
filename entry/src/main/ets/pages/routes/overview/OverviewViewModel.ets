@@ -1,3 +1,5 @@
+import { MonthlyInsightRepository } from './MonthlyInsightRepository';
+import { FocusOverviewStatistics } from './FocusStatisticsModels';
 import { AppLog } from '../../../common/logging/AppLog';
 import { LocalValues } from '../../../common/local/LocalValues';
 import { DDLItem } from '../../../model/DDLModels';
@@ -37,6 +39,7 @@ export enum TrendCard {
 export class OverviewViewModel {
   // --- UI 状态 ---
   public isLoading: boolean = true;
+  public focusStatistics: FocusOverviewStatistics | null = null;
 
   // --- Snapshot 数据 ---
   public todayCompleted: number = 0;
@@ -57,9 +60,13 @@ export class OverviewViewModel {
   public lastMonthDailyStats: DailyStat[] = [];
   public metrics: Metric[] = [];
   public lastMonthName: string = '';
+  private lastMonthKey: string = '';
   public monthlyAnalysis: MonthlyAnalysisResult | null = null;
   public isAnalyzing: boolean = false;
   private analysisLoadToken: number = 0;
+  public loadError: string = '';
+  public focusError: string = '';
+  private completedTaskTitles: string[] = [];
 
   // --- 排序配置 (为拖拽做准备，目前存默认顺序) ---
   public overviewCardOrder: OverviewCard[] = [
@@ -69,10 +76,10 @@ export class OverviewViewModel {
   ];
 
   public trendCardOrder: TrendCard[] = [
+    TrendCard.CONTRIBUTION_HEATMAP,
     TrendCard.DAILY_TREND,
     TrendCard.MONTHLY_TREND,
-    TrendCard.WEEKLY_TREND,
-    TrendCard.CONTRIBUTION_HEATMAP
+    TrendCard.WEEKLY_TREND
   ];
 
   constructor() {
@@ -95,23 +102,23 @@ export class OverviewViewModel {
     // 读取趋势页顺序
     const savedTrend = localVals.getTrendCardOrder();
     if (savedTrend && savedTrend.length > 0) {
-      this.trendCardOrder = this.normalizeTrendCardOrder(savedTrend as TrendCard[]);
+      this.trendCardOrder = this.normalizeTrendCardOrder(savedTrend);
     }
   }
 
-  private normalizeTrendCardOrder(savedOrder: TrendCard[]): TrendCard[] {
+  private normalizeTrendCardOrder(savedOrder: string[]): TrendCard[] {
     const normalized: TrendCard[] = [];
     const defaults: TrendCard[] = [
+      TrendCard.CONTRIBUTION_HEATMAP,
       TrendCard.DAILY_TREND,
       TrendCard.MONTHLY_TREND,
-      TrendCard.WEEKLY_TREND,
-      TrendCard.CONTRIBUTION_HEATMAP
+      TrendCard.WEEKLY_TREND
     ];
 
     let index = 0;
     while (index < savedOrder.length) {
-      const card = savedOrder[index];
-      if (defaults.includes(card) && !normalized.includes(card)) {
+      const card: TrendCard | undefined = defaults.find((candidate: TrendCard) => candidate === savedOrder[index]);
+      if (card !== undefined && !normalized.includes(card)) {
         normalized.push(card);
       }
       index += 1;
@@ -132,6 +139,11 @@ export class OverviewViewModel {
   public async loadData() {
     this.isLoading = true;
     const loadToken = ++this.analysisLoadToken;
+    this.loadError = '';
+    try {
+      this.focusStatistics = JSON.parse(KmpPersistenceService.getInstance().focusOverviewJson());
+      this.focusError = '';
+    } catch (error) { this.focusStatistics = null; this.focusError = String(error); }
     let completedTaskTitles: string[] | null = null;
 
     try {
@@ -141,6 +153,7 @@ export class OverviewViewModel {
         throw new Error(state.error);
       }
 
+      if (loadToken !== this.analysisLoadToken) return;
       this.todayCompleted = state.summary.completedToday;
       this.todayTodo = state.summary.pendingDueFromNow;
       this.todayOverdue = state.summary.overdueToday;
@@ -161,12 +174,18 @@ export class OverviewViewModel {
       this.contributionStats = this.mapContributionStats(state.contribution);
       this.lastMonthDailyStats = this.mapLastMonthDailyStats(state.lastMonth.daily);
       this.metrics = this.mapMetrics(state.lastMonth.metrics);
+      const monthKey: string = state.lastMonth.monthStart?.substring(0, 7) ?? '';
+      if (monthKey !== this.lastMonthKey) this.monthlyAnalysis = null;
+      this.lastMonthKey = monthKey;
       this.lastMonthName = this.monthLabel(state.lastMonth.monthStart);
       completedTaskTitles = state.lastMonth.completedTaskTitles;
+      this.completedTaskTitles = state.lastMonth.completedTaskTitles;
     } catch (e) {
+      if (loadToken !== this.analysisLoadToken) return;
+      this.loadError = '统计加载失败，请重试';
       AppLog.error('Native', '[OverviewViewModel] Load KMP state error: ' + String(e));
     } finally {
-      this.isLoading = false;
+      if (loadToken === this.analysisLoadToken) this.isLoading = false;
     }
 
     if (completedTaskTitles !== null) {
@@ -228,8 +247,7 @@ export class OverviewViewModel {
   private mapWeeklyStats(items: KmpOverviewWeeklyStat[]): WeeklyStat[] {
     const result: WeeklyStat[] = [];
     for (let index: number = 0; index < items.length; index += 1) {
-      const distance: number = items.length - index - 1;
-      const label: string = distance === 0 ? '本周' : distance.toString() + '周前';
+      const label: string = items[index].weekStart.substring(5, 10);
       const stat: WeeklyStat = { weekLabel: label, completed: items[index].completedCount };
       result.push(stat);
     }
@@ -283,7 +301,7 @@ export class OverviewViewModel {
 
   private monthLabel(monthStart?: string | null): string {
     if (monthStart === undefined || monthStart === null || monthStart.length < 7) return '';
-    return Number(monthStart.substring(5, 7)).toString() + '月';
+    return monthStart.substring(0, 4) + '年' + Number(monthStart.substring(5, 7)).toString() + '月';
   }
 
   /**
@@ -344,81 +362,19 @@ export class OverviewViewModel {
     });
   }
 
-  public async loadMonthlyAnalysis(completedTaskTitles: string[], loadToken: number): Promise<void> {
-    const monthKey = this.buildPreviousMonthKey();
-    if (loadToken !== this.analysisLoadToken) {
-      return;
-    }
-    this.monthlyAnalysis = null;
-    this.isAnalyzing = false;
-    const cached = LocalValues.getInstance().getMonthlyAnalysis();
-    if (cached && cached.length > 0) {
-      try {
-        const parsed = JSON.parse(cached) as MonthlyAnalysisResult;
-        if (parsed.month === monthKey && loadToken === this.analysisLoadToken) {
-          this.monthlyAnalysis = parsed;
-          return;
-        }
-      } catch (e) {
-        AppLog.error('Native', '[OverviewViewModel] Decode monthly analysis error: ' + String(e));
-      }
-    }
-
-    await this.generateMonthlyAnalysis(completedTaskTitles, monthKey, this.lastMonthName, loadToken);
-  }
-
-  public async generateMonthlyAnalysis(
-    completedTaskTitles: string[],
-    monthKey: string,
-    monthLabel: string,
-    loadToken: number
-  ): Promise<void> {
-    if (this.isAnalyzing || loadToken !== this.analysisLoadToken) {
-      return;
-    }
-
-    const apiKey = LocalValues.getInstance().getDeepSeekApiKey();
-    if (!apiKey || apiKey.length === 0) {
-      return;
-    }
-
+  public async loadMonthlyAnalysis(completedTaskTitles: string[], loadToken: number, retry: boolean = false): Promise<void> {
+    const monthKey: string = this.lastMonthKey;
     this.isAnalyzing = true;
-    try {
-      const metricsSummary = this.metrics
-        .map((metric: Metric) => metric.label + ': ' + metric.value + ' (' + (metric.change || '无变化') + ')')
-        .join('\n');
-
-      const result = await AIService.getInstance().generateMonthlyAnalysis(
-        monthLabel,
-        metricsSummary,
-        completedTaskTitles
-      );
-      const finalResult: MonthlyAnalysisResult = {
-        month: monthKey,
-        summary: result.summary,
-        keywords: result.keywords,
-        generatedAt: result.generatedAt || new Date().toISOString()
-      };
-      if (loadToken !== this.analysisLoadToken) {
-        return;
-      }
-      this.monthlyAnalysis = finalResult;
-      await LocalValues.getInstance().setMonthlyAnalysis(JSON.stringify(finalResult));
-      await LocalValues.getInstance().setLastAnalyzedMonth(monthKey);
-    } catch (e) {
-      AppLog.error('Native', '[OverviewViewModel] Generate monthly analysis error: ' + String(e));
-    } finally {
+    const result: MonthlyAnalysisResult | null = await MonthlyInsightRepository.getInstance().load(
+      monthKey, this.lastMonthName, this.metrics, completedTaskTitles, retry);
+    if (loadToken === this.analysisLoadToken) {
+      this.monthlyAnalysis = result;
       this.isAnalyzing = false;
     }
   }
 
-  private buildPreviousMonthKey(): string {
-    const now = new Date();
-    const firstDayOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const firstDayOfLastMonth = new Date(firstDayOfThisMonth.getFullYear(), firstDayOfThisMonth.getMonth() - 1, 1);
-    const year = firstDayOfLastMonth.getFullYear();
-    const month = (firstDayOfLastMonth.getMonth() + 1).toString().padStart(2, '0');
-    return year.toString() + '-' + month;
+  public retryMonthlyAnalysis(): void {
+    this.loadMonthlyAnalysis(this.completedTaskTitles, this.analysisLoadToken, true);
   }
 
 }

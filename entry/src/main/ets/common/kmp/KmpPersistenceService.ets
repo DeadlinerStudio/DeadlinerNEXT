@@ -6,6 +6,7 @@ import {
   bridgeVersion,
   bridgeLoadError,
   close,
+  coreVersion,
   diagnosticsJson,
   health,
   initialize,
@@ -13,6 +14,7 @@ import {
   importLegacyV2,
   importCapturesJson,
   mergeLegacyV2PayloadsJson,
+  configureAutomaticWebDavSync as configureAutomaticWebDavSyncNative,
   syncWebDavChangeLogJson,
   syncWebDavChangeLogJsonAsync,
   taskListViewModelJson,
@@ -22,11 +24,19 @@ import {
   categoryDeleteJson,
   categoryRestorePresetsJson,
   overviewViewModelJsonAsync,
+  overviewMonthJson,
+  overviewFocusQueryJson,
+  overviewFocusSessionsJson,
   taskCreateJson,
   taskUpdateJson,
   taskActionJson,
   taskDeleteJson,
+  focusStateJson,
+  focusTargetStateJson,
+  focusOverviewJson,
+  focusCommandJson,
   habitStateJson,
+  habitStateForDateJson,
   habitCreateJson,
   habitUpdateJson,
   habitCategoryUpdateJson,
@@ -46,6 +56,7 @@ import {
   profileSaveJson,
   lifiProcessInputAsync,
   lifiSubmitToolResultAsync,
+  quickAddExtractJsonAsync,
   lifiExtractTasksJsonAsync,
   lifiExtractHabitsJsonAsync,
   lifiGenerateMonthlyAnalysisJsonAsync,
@@ -105,6 +116,18 @@ export class KmpPersistenceService {
 
   public bridgeVersion(): number {
     return bridgeVersion();
+  }
+
+  /** Returns the compile-time identifier embedded in the linked KMP core binary. */
+  public coreVersion(): string {
+    return coreVersion();
+  }
+
+  /** Installs credentials only; repository mutations are what schedule KMP sync work. */
+  public configureAutomaticWebDavSync(baseUrl: string, username: string, password: string): void {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const result: number = configureAutomaticWebDavSyncNative(baseUrl, username, password);
+    if (result !== 1) throw new Error('KMP automatic WebDAV sync configuration failed');
   }
 
   public importLegacyV2(taskPayload: string, habitPayload: string): number {
@@ -206,6 +229,34 @@ export class KmpPersistenceService {
     return statePayload;
   }
 
+  public focusTargetStateJson(payload: string): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const state: string = focusTargetStateJson(payload);
+    if (state.length === 0) throw new Error('KMP focus target state is unavailable');
+    return state;
+  }
+
+  public focusOverviewJson(): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const state: string = focusOverviewJson();
+    if (state.length === 0) throw new Error('KMP focus statistics are unavailable');
+    return state;
+  }
+
+  public focusStateJson(selectedTaskUid: string): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const statePayload: string = focusStateJson(selectedTaskUid);
+    if (statePayload.length === 0) throw new Error('KMP focus state is unavailable');
+    return statePayload;
+  }
+
+  public focusCommandJson(payload: string): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const statePayload: string = focusCommandJson(payload);
+    if (statePayload.length === 0) throw new Error('KMP focus command failed');
+    return statePayload;
+  }
+
   public categoryCatalogJson(): string {
     if (!this.isReady()) throw new Error('KMP persistence is not initialized');
     const statePayload: string = categoryCatalogJson();
@@ -235,6 +286,27 @@ export class KmpPersistenceService {
     return statePayload;
   }
 
+  public overviewMonthJson(monthStart: string): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const payload: string = overviewMonthJson(monthStart);
+    if (payload.length === 0) throw new Error('月度统计暂时不可用');
+    return payload;
+  }
+
+  public overviewFocusQueryJson(query: string): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const payload: string = overviewFocusQueryJson(query);
+    if (payload.length === 0) throw new Error('专注统计暂时不可用');
+    return payload;
+  }
+
+  public overviewFocusSessionsJson(): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const payload: string = overviewFocusSessionsJson();
+    if (payload.length === 0) throw new Error('专注记录暂时不可用');
+    return payload;
+  }
+
   public async overviewViewModelJson(): Promise<string> {
     if (!this.isReady()) throw new Error('KMP persistence is not initialized');
     const statePayload: string = await overviewViewModelJsonAsync();
@@ -252,6 +324,11 @@ export class KmpPersistenceService {
     if (await lifiSubmitToolResultAsync(toolCallId, tool, payload) !== 1) {
       throw new Error('KMP Lifi tool continuation failed');
     }
+  }
+
+  public async quickAddExtractJson(config: string, request: string): Promise<string> {
+    if (!this.isReady()) throw new Error("KMP persistence is not initialized");
+    return quickAddExtractJsonAsync(config, request);
   }
 
   public async lifiExtractTasksJson(configPayload: string, text: string): Promise<string> {
@@ -310,6 +387,13 @@ export class KmpPersistenceService {
     if (!this.isReady()) throw new Error('KMP persistence is not initialized');
     const statePayload: string = habitStateJson();
     if (statePayload.length === 0) throw new Error('KMP habit ViewModel did not return state');
+    return statePayload;
+  }
+
+  public habitStateForDateJson(selectedDate: string): string {
+    if (!this.isReady()) throw new Error('KMP persistence is not initialized');
+    const statePayload: string = habitStateForDateJson(selectedDate);
+    if (statePayload.length === 0) throw new Error('KMP habit ViewModel did not return dated state');
     return statePayload;
   }
 

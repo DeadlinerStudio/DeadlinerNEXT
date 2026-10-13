@@ -4,7 +4,7 @@ import { ITheme } from '../../../../../common/theme/ThemeModel';
 import { DDLItem, SubTask } from '../../../../../model/DDLModels';
 import { TaskRepository } from '../../../../../common/repository/TaskRepository';
 import { DateTimeUtils } from '../../../../../utils/DateTimeUtils';
-import { TaskStateMachine } from '../../../../../model/TaskStateMachine';
+import { TaskState, TaskStateMachine } from '../../../../../model/TaskStateMachine';
 import { TaskEditSheet } from './TaskEditSheet';
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { Toast } from '../../../../../common/ui/Toast';
@@ -798,5 +798,6 @@ export struct TaskDetailSheet {
         subtitle: '修改任务信息。'
       }
     }))
+
   }
 }

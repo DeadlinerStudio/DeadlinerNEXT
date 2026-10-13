@@ -1,7 +1,9 @@
-import { DividerMode, HdsBarStyle, hdsMaterial, HdsTabs,
+import { DividerMode, HdsBarStyle, HdsTabsFloatingStyle, hdsMaterial, HdsTabs,
   HdsTabsBarChangeMode,
   HdsTabsController } from '@kit.UIDesignKit';
-import { deviceInfo } from '@kit.BasicServicesKit';
+import { FocusTimerMiniBar } from '../routes/focus/FocusTimerMiniBar';
+import { FocusMiniBarPolicy } from '../routes/focus/FocusUiState';
+import { Available, deviceInfo } from '@kit.BasicServicesKit';
 import { ITheme } from '../../common/theme/ThemeModel';
 import { LocalValues } from '../../common/local/LocalValues';
 import { getHdsMaterialLevel } from '../../common/style/MaterialLevel';
@@ -30,6 +32,44 @@ export struct AdaptedHdsTabs {
   onTabChange?: (index: number) => void;
 
   onMiniBarClick?: () => void;
+
+  @StorageLink('FocusTimerActive') @Watch('onFocusAvailabilityChanged') hasFocus: boolean = false;
+  @StorageLink('FocusMiniBarExpanded') private miniBarExpanded: boolean = false;
+  private onFocusAvailabilityChanged(): void { if (!this.hasFocus) this.miniBarExpanded = false; }
+  @Available({ minApiVersion: '23' })
+  @Builder private focusMiniBar() {
+    FocusTimerMiniBar({ compact: true,
+      onExpand: (): void => { this.expandFocusMiniBar(); },
+      onOpen: (): void => { AppStorage.setOrCreate('FocusTimerOpen', true); } })
+  }
+  @Available({ minApiVersion: '23' })
+  private expandFocusMiniBar(): void {
+    if (!this.hasFocus || deviceInfo.distributionOSApiVersion < 60100) return;
+    this.miniBarExpanded = true;
+    this.controller.applyMiniBarStyle(HdsBarStyle.EXPAND);
+  }
+  @Available({ minApiVersion: '23' })
+  private floatingStyle(): HdsTabsFloatingStyle {
+    const style: HdsTabsFloatingStyle = {
+      barSideMargin: 24,
+      barBottomMargin: this.isWideScreen ? 24 : 0,
+      systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: getHdsMaterialLevel() },
+      gradientMask: { maskColor: $r('app.color.background_primary_50'), maskHeight: 42 },
+      lightColor: this.theme.useWhiteGlow ? Color.White : this.theme.brand50,
+      adaptToHandedness: this.isWideScreen
+    };
+    if (this.hasFocus) {
+      // Default horizontal layout works from API23; do not reset to EXPAND on Tab recomposition.
+      style.miniBar = { miniBarBuilder: (): void => { this.focusMiniBar(); },
+        miniBarStyle: this.miniBarExpanded ? HdsBarStyle.EXPAND : HdsBarStyle.COLLAPSE,
+        onBarStyleChange: (mini: HdsBarStyle, _tab: HdsBarStyle, _miniWidth: number,
+          _tabWidth: number, mode: HdsTabsBarChangeMode): void => {
+          this.miniBarExpanded = FocusMiniBarPolicy.nextExpanded(this.miniBarExpanded,
+            mini === HdsBarStyle.EXPAND, mode === HdsTabsBarChangeMode.USER_CLICK);
+        } };
+    }
+    return style;
+  }
 
   build() {
     if (deviceInfo.distributionOSApiVersion >= 60100 && LocalValues.getInstance().getApi23Enable()) {
@@ -61,20 +101,9 @@ export struct AdaptedHdsTabs {
           }
         })
         .clip(false)
-        .barFloatingStyle({
-          barSideMargin: 24,
-          barBottomMargin: this.isWideScreen ? 24 : 0,
-          systemMaterialEffect: {
-            materialType: hdsMaterial.MaterialType.IMMERSIVE,
-            materialLevel: getHdsMaterialLevel()
-          },
-          gradientMask: {
-            maskColor: $r('app.color.background_primary_50'),
-            maskHeight: 42
-          },
-          lightColor: this.theme.useWhiteGlow ? Color.White : this.theme.brand50,
-          adaptToHandedness: this.isWideScreen,
-        })
+        .vertical(false)
+        .barPosition(BarPosition.End)
+        .barFloatingStyle(this.floatingStyle())
     } else {
       if (this.isWideScreen && this.tabletUi) {
         HdsTabs({

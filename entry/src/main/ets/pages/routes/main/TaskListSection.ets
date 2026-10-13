@@ -1,3 +1,4 @@
+import { FocusTimerSheet } from '../focus/FocusTimerSheet';
 import { AppLog } from '../../../common/logging/AppLog';
 import { DDLStatus } from "../../../model/DDLStatus";
 import { DDLItemCardSwipeable } from "../../components/TaskItemCard";
@@ -18,6 +19,7 @@ import { TaskState, TaskStateAction } from "../../../model/TaskStateMachine";
 import { DialogCompat } from "../../../common/ui/DialogCompat";
 import { Toast } from '../../../common/ui/Toast';
 import { MaterialPresets } from '../../../common/style/SystemMaterialCompat';
+import { ImmersiveMaterialScope } from '../../components/ImmersiveMaterialScope';
 import { CategoryRepository } from '../../../common/repository/CategoryRepository';
 import { CategoryDisplayModel } from '../../../common/kmp/KmpCategoryRepositoryAdapter';
 import { CategoryFilter, CategoryFilterResolver } from '../../../common/category/CategoryFilter';
@@ -29,6 +31,7 @@ import {
   SemanticPageKind,
   SemanticSnapshot
 } from '../../../common/semantic/SemanticContract';
+import { WidgetRefreshBridge, WidgetUpdateReason } from '../../../utils/WidgetRefreshBridge';
 
 export interface TaskUIModel {
   title: string;
@@ -75,6 +78,8 @@ export struct TaskListSection {
   @State detailTask: DDLItem | null = null;
   @State isEditSheetShow: boolean = false;
   @State editingTask: DDLItem | null = null;
+  @State private focusedTask: DDLItem | null = null;
+  @State private isFocusTimerShow: boolean = false;
 
   private repo = TaskRepository.getInstance();
   private categoryRepository: CategoryRepository = CategoryRepository.getInstance();
@@ -117,7 +122,7 @@ export struct TaskListSection {
   private bindController() {
     this.controller.requestBatchComplete = (): Promise<void> => this.handleBatchComplete();
     this.controller.requestBatchArchive = (): Promise<void> => this.handleBatchArchive();
-    this.controller.requestBatchDelete = (): void => this.handleBatchDelete();
+    this.controller.requestBatchDelete = (): void => { this.handleBatchDelete(); };
     this.controller.requestBatchEdit = (): Promise<void> => this.handleBatchEdit();
     this.controller.requestExitSelection = (): void => this.exitSelectionMode();
     this.controller.loadData = (): Promise<void> => this.loadData();
@@ -272,6 +277,7 @@ export struct TaskListSection {
       await this.loadData();
       Toast.show({ message: successMessage });
     } catch (e) {
+      if (String(e).includes('操作已取消')) return;
       AppLog.error('Native', `Task action failed: ${e}`);
       Toast.show({ message: '操作失败' });
     }
@@ -453,7 +459,7 @@ export struct TaskListSection {
     }
   }
 
-  private handleBatchDelete() {
+  private async handleBatchDelete() {
     if (this.selectedIds.length === 0) return;
 
     VibrationUtils.vibrateMedium();
@@ -540,6 +546,14 @@ export struct TaskListSection {
     }
   }
 
+  private async openTaskFocus(taskId: number): Promise<void> {
+    const task: DDLItem | null = await this.repo.getDDLById(taskId);
+    if (task === null || task.state !== TaskState.ACTIVE) return;
+    this.focusedTask = task;
+    this.isFocusTimerShow = true;
+  }
+  @Builder private focusSheet() { FocusTimerSheet({ isShow: $isFocusTimerShow, initialTask: this.focusedTask }) }
+
   @Builder
   taskDetailSheet() {
     TaskDetailSheet({
@@ -612,18 +626,20 @@ export struct TaskListSection {
               if (this.showSearchEntry) {
                 ListItem() {
                   Column() {
-                    Search({ value: '', placeholder: '搜索任务' })
-                      .width('98%')
-                      .height(40)
-                      .focusable(false)
-                      .enableKeyboardOnFocus(false)
-                      .backgroundColor(Color.Transparent)
-                      .placeholderColor($r('sys.color.ohos_id_color_text_secondary'))
-                      .attributeModifier(MaterialPresets.buttonGlow())
-                      .onClick(() => {
-                        this.onSearchClick();
-                      })
-                      .margin({ bottom: 0, top: -8 })
+                    ImmersiveMaterialScope({ scopeHeight: 32 }) {
+                      Search({ value: '', placeholder: '搜索任务' })
+                        .width('98%')
+                        .height(40)
+                        .focusable(false)
+                        .enableKeyboardOnFocus(false)
+                        .backgroundColor(Color.Transparent)
+                        .placeholderColor($r('sys.color.ohos_id_color_text_secondary'))
+                        .attributeModifier(MaterialPresets.buttonGlow())
+                        .onClick(() => {
+                          this.onSearchClick();
+                        })
+                        .margin({ bottom: 0, top: -8 })
+                    }
                   }
                   .width('100%')
                   .alignItems(HorizontalAlign.Center)
@@ -661,6 +677,7 @@ export struct TaskListSection {
                         onSecondaryAction: async () => {
                           this.handleSecondaryAction(item.dbId, item.title, item.taskState)
                         },
+                        onFocusAction: item.taskState === TaskState.ACTIVE ? (): void => { this.openTaskFocus(item.dbId); } : undefined,
                         onEditAction: () => {
                           void this.openTaskEdit(item.dbId);
                         },
@@ -703,6 +720,9 @@ export struct TaskListSection {
               .onScroll((scrollOffset: number, scrollState: ScrollState) => {
                 this.controller.onScroll(this.scroller.currentOffset().yOffset);
               })
+              .onScrollStop(() => {
+                this.controller.onScroll(this.scroller.currentOffset().yOffset);
+              })
               .width("100%")
               .height("100%") // 撑满 TopSafeContainer 的剩余空间
               .scrollBar(BarState.Off)
@@ -725,6 +745,7 @@ export struct TaskListSection {
                 AppLog.error('Native', 'Manual sync failed');
               }
               await this.loadData();
+              WidgetRefreshBridge.requestKmpUpdate(WidgetUpdateReason.USER_REFRESH);
               this.isRefreshing = false;
             })
             .clip(false)
@@ -757,6 +778,10 @@ export struct TaskListSection {
         this.detailTask = null;
       },
       showClose: false
+    }))
+    .bindSheet($$this.isFocusTimerShow, this.focusSheet(), SheetCompat.immersive({
+      height: SheetSize.LARGE, enableOutsideInteractive: false, showClose: true, dragBar: true,
+      onDisappear: (): void => { this.isFocusTimerShow = false; this.focusedTask = null; this.loadData(); }
     }))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM, SafeAreaEdge.TOP])
   }

@@ -16,6 +16,7 @@ export class SettingsConstants {
   static readonly KEY_PROGRESS_DIRECTION = 'progress_direction';
   static readonly KEY_EXCITEMENT_TEXT = 'excitement_text';
   static readonly KEY_CONFETTI_AFTER_FINISHED = 'confetti_after_finished';
+  static readonly KEY_QUICK_ADD_ENABLED = 'quick_add_enabled'
   static readonly KEY_FULL_SCREEN_ADD = 'full_screen_add'
 
   static readonly KEY_AI_PROVIDER = 'ai_provider';
@@ -60,6 +61,7 @@ export class SettingsConstants {
 
   static readonly KEY_OVERVIEW_CARD_ORDER = 'overview_card_order';
   static readonly KEY_TREND_CARD_ORDER = 'trend_card_order';
+  static readonly KEY_OVERVIEW_SHOW_OVERDUE = 'overview_show_overdue';
   static readonly KEY_MONTHLY_ANALYSIS = 'monthly_analysis';
   static readonly KEY_LAST_ANALYZED_MONTH = 'last_analyzed_month';
 

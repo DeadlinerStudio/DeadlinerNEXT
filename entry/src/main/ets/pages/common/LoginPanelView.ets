@@ -4,7 +4,6 @@ import { promptAction } from '@kit.ArkUI';
 import { HuaweiAccountController, HuaweiAccountUtils } from '../../utils/account/HuaweiAccountUtils';
 import { BusinessError } from '@kit.BasicServicesKit';
 import auth from '@hw-agconnect/auth';
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { ITheme } from '../../common/theme/ThemeModel';
 import { Toast } from '../../common/ui/Toast';
 

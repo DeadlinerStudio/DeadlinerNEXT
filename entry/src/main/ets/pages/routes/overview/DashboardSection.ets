@@ -1,3 +1,5 @@
+import { FocusOverviewStatistics } from './FocusStatisticsModels';
+import { FocusStatisticsSection } from './FocusStatisticsSection';
 import { StatsCardContainer } from '../../components/OverviewComponents';
 import { FloatUpModifier } from "../../../utils/animation/FloatUpModifier";
 import { DailyStat, Metric } from "../../../utils/OverviewUtils";
@@ -7,6 +9,7 @@ import { BlurBackgroundModifier } from '../../../utils/animation/BlurBackgroundM
 
 @Component
 export struct DashboardSection {
+  @Prop focusStatistics: FocusOverviewStatistics | null = null;
   @Prop theme: ITheme;
   @Prop metrics: Metric[] = [];
   @Prop dailyStats: DailyStat[] = [];
@@ -160,6 +163,7 @@ export struct DashboardSection {
       }
 
       Blank().height(72)
+      Blank().height(100)
     }
     .width('100%')
   }
@@ -286,7 +290,7 @@ struct AIAnalysisCard {
 }
 
 @Component
-struct MetricCard {
+export struct MetricCard {
   @Prop metric: Metric;
 
   @StorageProp('customBackgroundImage') customBg: string = '';
@@ -335,7 +339,7 @@ struct MetricCard {
 }
 
 @Component
-struct LastMonthActivityMap {
+export struct LastMonthActivityMap {
   @Prop monthName: string = '';
   @Prop dailyStats: DailyStat[] = [];
 

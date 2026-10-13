@@ -49,6 +49,7 @@ import { MaterialPresets, canUseSystemMaterial } from '../../common/style/System
 import { DialogCompat } from '../../common/ui/DialogCompat';
 import { SheetCompat } from '../../common/ui/SheetCompat';
 import { Symbol } from '../components/infra/Symbol';
+import { ImmersiveMaterialScope } from '../components/ImmersiveMaterialScope';
 
 // ==========================================
 // MARK: - 核心 UI 组件
@@ -631,51 +632,57 @@ export struct AIWorkspaceView {
       .alignListItem(ListItemAlign.Center)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
 
-      // 输入区域
-      Row({ space: 12 }) {
-        TextInput({
-          text: $$this.inputText,
-          placeholder: this.isReadonlyHistoryMode ? '历史对话仅供查看，请新建对话继续' : '告诉 Deadliner 你的计划...'
-        })
-          .layoutWeight(1)
-          .backgroundColor($r('sys.color.comp_background_tertiary'))
-          .borderRadius(20)
-          .height(40)
-          .padding({ left: 14, right: 14 })
-          .attributeModifier(MaterialPresets.surfaceGlow(!this.isParsing && !this.isReadonlyHistoryMode))
-          .enabled(!this.isParsing && !this.isReadonlyHistoryMode)
-          .onSubmit(() => {
-            if (this.inputText.trim().length === 0 || this.isParsing || this.isReadonlyHistoryMode) {
-              return;
-            }
-            this.runSmartAgent()
-          })
+      // 输入框和发送键共享局部材质作用域，外部间距仍由页面负责。
+      Column() {
+        ImmersiveMaterialScope({ scopeHeight: 40 }) {
+          Row({ space: 12 }) {
+            TextInput({
+              text: $$this.inputText,
+              placeholder: this.isReadonlyHistoryMode ? '历史对话仅供查看，请新建对话继续' : '告诉 Deadliner 你的计划...'
+            })
+              .layoutWeight(1)
+              .backgroundColor($r('sys.color.comp_background_tertiary'))
+              .borderRadius(20)
+              .height(40)
+              .padding({ left: 14, right: 14 })
+              .attributeModifier(MaterialPresets.surfaceGlow(!this.isParsing && !this.isReadonlyHistoryMode))
+              .enabled(!this.isParsing && !this.isReadonlyHistoryMode)
+              .onSubmit(() => {
+                if (this.inputText.trim().length === 0 || this.isParsing || this.isReadonlyHistoryMode) {
+                  return;
+                }
+                this.runSmartAgent()
+              })
 
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          if (this.isParsing) {
-            SymbolGlyph($r('sys.symbol.arrow_clockwise'))
-              .fontSize(20)
-              .fontColor([$r('sys.color.ohos_id_color_text_primary')])
-              .symbolEffect(new BounceSymbolEffect(EffectScope.WHOLE, EffectDirection.UP), true)
-          } else {
-            SymbolGlyph($r('sys.symbol.arrow_up'))
-              .fontSize(20)
-              .fontColor([$r('sys.color.ohos_id_color_text_primary')])
+            Button({ type: ButtonType.Circle, stateEffect: true }) {
+              if (this.isParsing) {
+                SymbolGlyph($r('sys.symbol.arrow_clockwise'))
+                  .fontSize(20)
+                  .fontColor([$r('sys.color.ohos_id_color_text_primary')])
+                  .symbolEffect(new BounceSymbolEffect(EffectScope.WHOLE, EffectDirection.UP), true)
+              } else {
+                SymbolGlyph($r('sys.symbol.arrow_up'))
+                  .fontSize(20)
+                  .fontColor([$r('sys.color.ohos_id_color_text_primary')])
+              }
+            }
+            .width(40)
+            .height(40)
+            .backgroundColor(
+              !this.isParsing && !this.isReadonlyHistoryMode && this.inputText.trim().length > 0 ?
+                this.theme.brand : $r('sys.color.comp_background_tertiary')
+            )
+            .attributeModifier(MaterialPresets.buttonGlow(
+              this.inputText.trim().length > 0 && !this.isParsing && !this.isReadonlyHistoryMode,
+              undefined, !this.isParsing && !this.isReadonlyHistoryMode && this.inputText.trim().length > 0 ?
+              this.theme.brand : undefined
+            ))
+            .enabled(!this.isParsing && !this.isReadonlyHistoryMode && this.inputText.trim().length > 0)
+            .onClick(() => { this.runSmartAgent() })
           }
+          .width('100%')
+          .height(40)
         }
-        .width(40)
-        .height(40)
-        .backgroundColor(
-          !this.isParsing && !this.isReadonlyHistoryMode && this.inputText.trim().length > 0 ?
-            this.theme.brand : $r('sys.color.comp_background_tertiary')
-        )
-        .attributeModifier(MaterialPresets.buttonGlow(
-          this.inputText.trim().length > 0 && !this.isParsing && !this.isReadonlyHistoryMode,
-          undefined, !this.isParsing && !this.isReadonlyHistoryMode && this.inputText.trim().length > 0 ?
-          this.theme.brand : undefined
-        ))
-        .enabled(!this.isParsing && !this.isReadonlyHistoryMode && this.inputText.trim().length > 0)
-        .onClick(() => { this.runSmartAgent() })
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 36 + this.bottomPadding })

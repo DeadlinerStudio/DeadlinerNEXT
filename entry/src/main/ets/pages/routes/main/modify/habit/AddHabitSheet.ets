@@ -1,3 +1,5 @@
+import { LocalValues } from '../../../../../common/local/LocalValues';
+import { QuickAddSheet } from '../quickadd/QuickAddSheet';
 import { promptAction } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { HabitFormView } from './HabitFormView';
@@ -11,20 +13,32 @@ import { HdsTitleBarMenuButton } from '../../../../components/HdsTitleBarMenuBut
 export struct AddHabitSheet {
   @StorageProp('currentTheme') theme: ITheme = {} as ITheme;
   onDone: () => void = () => {}
+  allowQuickAdd: boolean = true;
   initialAiInputText: string = '';
   autoTriggerAI: boolean = false;
   initialName: string = '';
+  initialPeriodIndex: number = 0;
+  initialGoalIndex: number = 0;
+  initialTarget: string = '1';
+  initialWeekdaysMask: number = 127;
+  initialReminderTime: string | null = null;
 
   @State name: string = '';
   @State selectedPeriodIndex: number[] = [0];
   @State selectedGoalTypeIndex: number[] = [0];
   @State timesPerPeriod: string = '1';
   @State totalTarget: string = '';
+  @State weekdaysMask: number = 127;
   @State aiInputText: string = '';
   @State isAILoading: boolean = false;
   @State categoryUid: string | null = null;
 
   aboutToAppear(): void {
+    this.selectedPeriodIndex = [this.initialPeriodIndex];
+    this.selectedGoalTypeIndex = [this.initialGoalIndex];
+    this.timesPerPeriod = this.initialTarget;
+    if (this.initialGoalIndex === 1) this.totalTarget = this.initialTarget;
+    this.weekdaysMask = this.initialWeekdaysMask;
     if (this.initialName) {
       this.name = this.initialName;
     }
@@ -42,7 +56,7 @@ export struct AddHabitSheet {
     const gIndex = this.selectedGoalTypeIndex.length > 0 ? this.selectedGoalTypeIndex[0] : 0;
 
     const isSuccess = await HabitFormHelper.saveNewHabit(
-      this.name, pIndex, gIndex, this.timesPerPeriod, this.totalTarget, this.categoryUid
+      this.name, pIndex, gIndex, this.timesPerPeriod, this.totalTarget, this.categoryUid, this.weekdaysMask, this.initialReminderTime
     );
 
     if (isSuccess) {
@@ -65,6 +79,16 @@ export struct AddHabitSheet {
   }
 
   build() {
+    if (this.allowQuickAdd && LocalValues.getInstance().getQuickAddEnabled() &&
+      !this.initialName && !this.initialAiInputText) {
+      QuickAddSheet({ onDone: this.onDone, initialKind: 'HABIT' })
+    } else {
+      this.fullEditor()
+    }
+  }
+
+  @Builder
+  fullEditor() {
     HdsNavigation() {
       Column() {
         Blank().height(56)
@@ -81,6 +105,7 @@ export struct AddHabitSheet {
           selectedGoalTypeIndex: $selectedGoalTypeIndex,
           timesPerPeriod: $timesPerPeriod,
           totalTarget: $totalTarget,
+          weekdaysMask: $weekdaysMask,
           aiInputText: $aiInputText,
           isAILoading: $isAILoading,
           onAITriggered: (): Promise<void> => this.onAITriggered(),

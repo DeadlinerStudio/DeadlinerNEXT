@@ -18,6 +18,7 @@ export struct AddHabitPage {
   @State selectedGoalTypeIndex: number[] = [0];
   @State timesPerPeriod: string = '1';
   @State totalTarget: string = '';
+  @State weekdaysMask: number = 127;
   @State aiInputText: string = '';
   @State isAILoading: boolean = false;
   @State categoryUid: string | null = null;
@@ -33,7 +34,7 @@ export struct AddHabitPage {
     const gIndex = this.selectedGoalTypeIndex.length > 0 ? this.selectedGoalTypeIndex[0] : 0;
 
     const isSuccess = await HabitFormHelper.saveNewHabit(
-      this.name, pIndex, gIndex, this.timesPerPeriod, this.totalTarget, this.categoryUid
+      this.name, pIndex, gIndex, this.timesPerPeriod, this.totalTarget, this.categoryUid, this.weekdaysMask
     );
 
     if (isSuccess) {
@@ -69,6 +70,7 @@ export struct AddHabitPage {
           selectedGoalTypeIndex: $selectedGoalTypeIndex,
           timesPerPeriod: $timesPerPeriod,
           totalTarget: $totalTarget,
+          weekdaysMask: $weekdaysMask,
           aiInputText: $aiInputText,
           isAILoading: $isAILoading,
           onAITriggered: (): Promise<void> => this.onAITriggered(),

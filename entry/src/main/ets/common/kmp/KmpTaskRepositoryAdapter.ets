@@ -3,6 +3,7 @@ import { preferences } from '@kit.ArkData';
 import { util } from '@kit.ArkTS';
 import { DeadlineType, DDLItem, SubTask } from '../../model/DDLModels';
 import { TaskState, TaskStateAction } from '../../model/TaskStateMachine';
+import { FocusChangeConfirmation } from '../../pages/routes/focus/FocusChangeConfirmation';
 import { KmpPersistenceService } from './KmpPersistenceService';
 
 interface KmpTaskSubtaskPayload {
@@ -31,6 +32,16 @@ interface KmpTaskPayload {
   updatedAt: string;
   isDeleted: boolean;
   subtasks: KmpTaskSubtaskPayload[];
+}
+
+interface ActiveFocusTimerGuardPayload {
+  taskUid: string;
+  target?: FocusTargetGuardPayload | null;
+}
+interface FocusTargetGuardPayload { kind: string; uid: string; }
+
+interface FocusTimerGuardStatePayload {
+  timer: ActiveFocusTimerGuardPayload | null;
 }
 
 export interface TaskCreateParams {
@@ -143,6 +154,19 @@ export class KmpTaskRepositoryAdapter {
     await this.markType(uid, DeadlineType.HABIT);
   }
 
+  public async deleteHabitCarrierIfPresent(uid: string): Promise<boolean> {
+    const tasks: KmpTaskPayload[] = this.readTasks(this.persistence.taskListViewModelJson());
+    for (let index = 0; index < tasks.length; index++) {
+      const task: KmpTaskPayload = tasks[index];
+      if (!task.isDeleted && task.uid === uid) {
+        this.persistence.taskDeleteJson(uid, new Date().toISOString());
+        await this.markHabitUid(uid);
+        return true;
+      }
+    }
+    return false;
+  }
+
   public async taskUidForLegacyId(id: number): Promise<string | null> {
     const task: KmpTaskPayload | null = await this.findRawTaskByLegacyId(id, false);
     return task === null ? null : task.uid;
@@ -150,6 +174,9 @@ export class KmpTaskRepositoryAdapter {
 
   public async update(item: DDLItem): Promise<void> {
     const current: KmpTaskPayload = await this.requireTaskById(item.id);
+    if (current.state !== item.state && this.hasActiveFocusTimer(current.uid)) {
+      throw new Error('FOCUS_TIMER_REQUIRES_RESOLUTION');
+    }
     const updatedAt: string = new Date().toISOString();
     const updated: KmpTaskPayload = {
       uid: current.uid,
@@ -173,6 +200,10 @@ export class KmpTaskRepositoryAdapter {
   public async delete(id: number): Promise<boolean> {
     const task: KmpTaskPayload | null = await this.findRawTaskById(id);
     if (task === null) return false;
+    if (this.hasActiveFocusTimer(task.uid)) {
+      if (!await FocusChangeConfirmation.request(task.uid, false, true)) throw new Error('操作已取消或会话已变化');
+      return true;
+    }
     this.persistence.taskDeleteJson(task.uid, new Date().toISOString());
     return true;
   }
@@ -180,12 +211,23 @@ export class KmpTaskRepositoryAdapter {
   public async applyAction(id: number, action: TaskStateAction): Promise<DDLItem | null> {
     const task: KmpTaskPayload | null = await this.findRawTaskById(id);
     if (task === null) return null;
+    if (this.hasActiveFocusTimer(task.uid)) {
+      if (!await FocusChangeConfirmation.request(task.uid, false, false, this.toKmpAction(action))) throw new Error('操作已取消或会话已变化');
+      return this.toDDLItem(await this.requireTaskById(id));
+    }
     const actionPayload: string = JSON.stringify({
       action: this.toKmpAction(action),
       occurredAt: new Date().toISOString()
     });
     const tasks: KmpTaskPayload[] = this.readTasks(this.persistence.taskActionJson(task.uid, actionPayload));
     return this.toDDLItem(this.requireTask(tasks, task.uid));
+  }
+
+  private hasActiveFocusTimer(taskUid: string): boolean {
+    const state: FocusTimerGuardStatePayload = JSON.parse(this.persistence.focusStateJson(taskUid));
+    const bound: boolean = state.timer !== null && state.timer.taskUid === taskUid &&
+      (state.timer.target === null || state.timer.target === undefined || state.timer.target.kind === 'TASK');
+    return bound;
   }
 
   public async subtasksForTask(id: number): Promise<SubTask[] | null> {

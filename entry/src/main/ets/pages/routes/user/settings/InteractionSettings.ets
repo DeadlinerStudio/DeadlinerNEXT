@@ -43,6 +43,7 @@ struct InteractionSettings {
   readonly TITLE_BAR_CONTENT_HEIGHT: number = 18;
 
   @StorageLink(C.KEY_VIBRATION_ENABLE) vibrationEnable: boolean = true;
+  @StorageLink(C.KEY_QUICK_ADD_ENABLED) quickAddEnabled: boolean = false;
   @StorageLink(C.KEY_FULL_SCREEN_ADD) fullScreenAdd: boolean = false;
 
   @StorageLink(C.KEY_STARTUP_PAGE) startupPageType: number = 0;
@@ -96,6 +97,14 @@ struct InteractionSettings {
             })
           }
 
+          SettingsSection({ title: '添加' }) {
+            SubSettingsSwitch({
+              title: '启用快速添加',
+              subtitle: '输入一句话，实时预览任务或习惯；随时展开完整表单',
+              isOn: this.quickAddEnabled,
+              onChange: (isOn: boolean): Promise<void> => LocalValues.getInstance().setQuickAddEnabled(isOn)
+            })
+          }
           // --- 操作体验 ---
           if (!LocalValues.getInstance().getBasicMode()) {
             SettingsSection({ title: '操作体验' }) {

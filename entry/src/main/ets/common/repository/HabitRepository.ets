@@ -4,8 +4,12 @@ import { ReminderScheduler } from '../../utils/notification/ReminderScheduler';
 import { TaskRepository } from './TaskRepository';
 import { common } from '@kit.AbilityKit';
 import { KmpTaskRepositoryAdapter } from '../kmp/KmpTaskRepositoryAdapter';
-import { KmpHabitRepositoryAdapter } from '../kmp/KmpHabitRepositoryAdapter';
+import {
+  HabitPresentationState,
+  KmpHabitRepositoryAdapter
+} from '../kmp/KmpHabitRepositoryAdapter';
 import { KmpMigrationService } from '../migration/KmpMigrationService';
+import { KmpAutomaticSyncConfigurator } from '../kmp/KmpAutomaticSyncConfigurator';
 
 /** KMP is the sole habit and record source; this class preserves the existing ArkTS API. */
 export class HabitRepository {
@@ -31,6 +35,7 @@ export class HabitRepository {
     await KmpMigrationService.getInstance().awaitReady();
     await this.kmpTaskAdapter.initialize(this.context);
     await this.kmpHabits.initialize(this.context);
+    KmpAutomaticSyncConfigurator.getInstance().configure();
   }
 
   private formatDate(date: Date): string {
@@ -52,7 +57,8 @@ export class HabitRepository {
     iconKey: string | null = null,
     sortOrder: number = 0,
     alarmTime: string | null = null,
-    categoryUid: string | null = null
+    categoryUid: string | null = null,
+    weekdaysMask: number = 127
   ): Promise<number> {
     await this.initializeKmp();
     const uid: string | null = await this.kmpTaskAdapter.taskUidForLegacyId(ddlId);
@@ -120,6 +126,11 @@ export class HabitRepository {
     return this.kmpHabits.listArchived();
   }
 
+  public async getPresentationForDate(date: Date): Promise<HabitPresentationState> {
+    await this.initializeKmp();
+    return this.kmpHabits.presentationForDate(this.formatDate(date));
+  }
+
   public async updateHabit(habit: Habit): Promise<void> {
     await this.initializeKmp();
     if (!await this.kmpHabits.update(habit)) throw new Error('KMP habit not found for update');
@@ -145,6 +156,13 @@ export class HabitRepository {
   public async unarchiveHabit(habitId: number): Promise<void> {
     await this.initializeKmp();
     if (!await this.kmpHabits.setArchived(habitId, false)) throw new Error('KMP habit not found for restore');
+    this.scheduleReminderRefresh();
+    this.triggerDataSync();
+  }
+
+  public async archiveHabit(habitId: number): Promise<void> {
+    await this.initializeKmp();
+    if (!await this.kmpHabits.setArchived(habitId, true)) throw new Error('KMP habit not found for archive');
     this.scheduleReminderRefresh();
     this.triggerDataSync();
   }
@@ -235,7 +253,8 @@ export class HabitRepository {
 
   private async performReminderRefresh(): Promise<void> {
     try {
-      await ReminderScheduler.refreshHabits(await this.getAllHabits());
+      const state: HabitPresentationState = await this.kmpHabits.presentationForDate(this.formatDate(new Date()));
+      await ReminderScheduler.refreshHabits(state.reminderPlans);
     } catch (error) {
       AppLog.error('Native', '[HabitRepo] Reminder refresh failed: ' + String(error));
     } finally {

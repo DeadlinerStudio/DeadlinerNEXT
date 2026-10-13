@@ -1,3 +1,4 @@
+import { FocusTimerMiniBar } from './routes/focus/FocusTimerMiniBar';
 import { AppLog } from '../common/logging/AppLog';
 import { LengthMetrics, mediaquery, promptAction, SymbolGlyphModifier, display } from '@kit.ArkUI';
 import { LocalValues } from '../common/local/LocalValues';
@@ -13,10 +14,8 @@ import { ITheme } from '../common/theme/ThemeModel';
 import { TaskRepository } from '../common/repository/TaskRepository';
 import {
   DividerShowType,
-  hdsMaterial,
   HdsNavigation,
   HdsNavigationTitleMode,
-  HdsTabs,
   HdsTabsController
 } from '@kit.UIDesignKit';
 import { AdaptedHdsTabs } from './components/AdaptedHdsTabs';
@@ -43,6 +42,7 @@ import { MaterialPresets } from '../common/style/SystemMaterialCompat';
 import { SemanticTone } from '../common/semantic/SemanticContract';
 import { SemanticTopAtmosphere } from './components/semantic/SemanticTopAtmosphere';
 import { ThemeManager } from '../common/theme/ThemeManager';
+import { FocusRootBridge } from './routes/focus/FocusRootBridge';
 import { RootTabThemeScope } from './components/RootTabThemeScope';
 
 const TAB_VERTICAL_PADDING = 86;
@@ -430,6 +430,8 @@ struct Index {
     return false;
   }
 
+  @StorageLink('FocusTimerActive') focusActive: boolean = false;
+
   @State currentIndex: number = 0;
   @State listAtmosphereScrollProgress: number = 0;
   @State categoryFilter: CategoryFilter = CategoryFilter.all();
@@ -577,86 +579,65 @@ struct Index {
     .hideBackButton(true)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .backgroundColor(Color.Transparent)
-    .attributeModifier(MaterialPresets.backgroundImmersive(BlurStyle.COMPONENT_REGULAR))
-    .offset({ left: -1 })
-    .padding({ left: 1 })
+    .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+  }
+
+  @Builder
+  private pageContentBuilder(tab: HdsTabDescriptor) {
+    if (tab.id === HdsTabId.LIST) {
+      MainHomePage({
+        theme: this.getRootTabTheme(tab),
+        currentTabIndex: this.currentIndex,
+        aiSheetController: this.aiSheetController,
+        categoryFilter: $categoryFilter,
+        isCategorySideBarShown: $isCategorySideBarShown,
+        onSemanticToneChanged: (tone: SemanticTone): void => {
+          AppStorage.set('rootListSemanticTone', tone);
+        },
+        onAtmosphereScrollProgressChanged: (progress: number): void => {
+          this.listAtmosphereScrollProgress = progress;
+        }
+      })
+        .width('100%')
+        .height('100%')
+        .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+        .animation({ duration: 300, curve: Curve.EaseInOut })
+        .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+    } else if (tab.id === HdsTabId.OVERVIEW) {
+      OverviewPage({ rootTheme: this.getRootTabTheme(tab), currentTabIndex: this.currentIndex })
+        .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+        .animation({ duration: 300, curve: Curve.EaseInOut })
+        .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+    } else if (tab.id === HdsTabId.CAPTURE) {
+      CapturePage({ rootTheme: this.getRootTabTheme(tab), currentTabIndex: this.currentIndex })
+        .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+        .animation({ duration: 300, curve: Curve.EaseInOut })
+        .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+    } else if (tab.id === HdsTabId.AI) {
+      AIPage({
+        rootTheme: this.getRootTabTheme(tab),
+        isHdsTabActive: this.currentIndex === this.getVisibleTabIndex(tab.id)
+      })
+        .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+        .animation({ duration: 300, curve: Curve.EaseInOut })
+        .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+    } else {
+      UserPage({ rootTheme: this.getRootTabTheme(tab) })
+        .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
+        .animation({ duration: 300, curve: Curve.EaseInOut })
+        .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
+    }
   }
 
   @Builder
   private mainTabContent(tab: HdsTabDescriptor) {
-    if (tab.id === HdsTabId.LIST) {
-      TabContent() {
-        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
-          MainHomePage({
-            theme: this.getRootTabTheme(tab),
-            currentTabIndex: this.currentIndex,
-            aiSheetController: this.aiSheetController,
-            categoryFilter: $categoryFilter,
-            isCategorySideBarShown: $isCategorySideBarShown,
-            onSemanticToneChanged: (tone: SemanticTone): void => {
-              AppStorage.set('rootListSemanticTone', tone);
-            },
-            onAtmosphereScrollProgressChanged: (progress: number): void => {
-              this.listAtmosphereScrollProgress = progress;
-            }
-          })
-            .width('100%')
-            .height('100%')
-            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-            .animation({ duration: 300, curve: Curve.EaseInOut })
-            .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-        }
+    TabContent() {
+      RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
+        this.pageContentBuilder(tab)
       }
-      .tabBar(this.getTabBarStyle(tab))
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-    } else if (tab.id === HdsTabId.OVERVIEW) {
-      TabContent() {
-        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
-          OverviewPage({ rootTheme: this.getRootTabTheme(tab), currentTabIndex: this.currentIndex })
-            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-            .animation({ duration: 300, curve: Curve.EaseInOut })
-            .padding({ left: (this.isWideScreen && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-        }
-      }
-      .tabBar(this.getTabBarStyle(tab))
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-    } else if (tab.id === HdsTabId.CAPTURE) {
-      TabContent() {
-        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
-          CapturePage({ rootTheme: this.getRootTabTheme(tab), currentTabIndex: this.currentIndex })
-            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-            .animation({ duration: 300, curve: Curve.EaseInOut })
-            .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-        }
-      }
-      .tabBar(this.getTabBarStyle(tab))
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-    } else if (tab.id === HdsTabId.AI) {
-      TabContent() {
-        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
-          AIPage({
-            rootTheme: this.getRootTabTheme(tab),
-            isHdsTabActive: this.currentIndex === this.getVisibleTabIndex(tab.id)
-          })
-            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-            .animation({ duration: 300, curve: Curve.EaseInOut })
-            .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-        }
-      }
-      .tabBar(this.getTabBarStyle(tab))
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-    } else {
-      TabContent() {
-        RootTabThemeScope({ theme: this.getRootTabTheme(tab) }) {
-          UserPage({ rootTheme: this.getRootTabTheme(tab) })
-            .attributeModifier(new TabAnimModifier(this.getVisibleTabIndex(tab.id), this.currentIndex))
-            .animation({ duration: 300, curve: Curve.EaseInOut })
-            .padding({ left: (this.isWideScreen && this.tabletUi && !this.getFloatingTabs()) ? TAB_VERTICAL_PADDING : 0 })
-        }
-      }
-      .tabBar(this.getTabBarStyle(tab))
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     }
+    .tabBar(this.getTabBarStyle(tab))
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 
   @Builder
@@ -690,6 +671,10 @@ struct Index {
   private mainTabsWithSideBarScrimBuilder() {
     Stack() {
       this.mainTabsBuilder()
+      FocusRootBridge()
+      if (this.focusActive && !this.getFloatingTabs()) {
+        FocusTimerMiniBar({ onOpen: () => { AppStorage.setOrCreate('FocusTimerOpen', true); } }).align(Alignment.Bottom)
+      }
 
       if (this.isCategorySideBarShown) {
         Column()
