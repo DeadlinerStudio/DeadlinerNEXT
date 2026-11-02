@@ -9,7 +9,7 @@ const syncDeadlinerCoreKmpTask: HvigorTask = {
   postDependencies: ['default@PreBuild'],
   run: () => {
     const coreDirectory: string = process.env.DEADLINER_CORE_DIR ||
-      resolve(__dirname, '../../../ProjectDeadliner/DeadlinerCore');
+      resolve(__dirname, '../../DeadlinerCore');
     const deployScript: string = resolve(coreDirectory, 'runscript/buildAndDeploy.sh');
     if (!existsSync(deployScript)) {
       throw new Error(
