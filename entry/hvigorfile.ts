@@ -1,40 +1,52 @@
-import { hapTasks } from '@ohos/hvigor-ohos-plugin';
-import { HvigorPlugin, HvigorTask } from '@ohos/hvigor';
+import { hapTasks, OhosHapContext, OhosPluginId } from '@ohos/hvigor-ohos-plugin';
+import { HvigorPlugin } from '@ohos/hvigor';
 import { execFileSync } from 'child_process';
-import { existsSync } from 'fs';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
 
-const syncDeadlinerCoreKmpTask: HvigorTask = {
-  name: 'syncDeadlinerCoreKmp',
-  postDependencies: ['default@PreBuild'],
-  run: () => {
-    const coreDirectory: string = process.env.DEADLINER_CORE_DIR ||
-      resolve(__dirname, '../../DeadlinerCore');
-    const deployScript: string = resolve(coreDirectory, 'runscript/buildAndDeploy.sh');
-    if (!existsSync(deployScript)) {
-      throw new Error(
-        'Deadliner Core was not found at ' + coreDirectory +
-          '. Set DEADLINER_CORE_DIR to its checkout.',
-      );
-    }
-    const gradleJavaHome: string = process.env.DEADLINER_GRADLE_JAVA_HOME ||
-      execFileSync('/usr/libexec/java_home', ['-v', '21'], { encoding: 'utf8' }).trim();
-    execFileSync(
-      deployScript,
-      ['--skip-ios', '--skip-android', '--harmony-repo', resolve(__dirname, '..')],
-      { stdio: 'inherit', env: { ...process.env, JAVA_HOME: gradleJavaHome } },
-    );
-  },
-};
+const root = resolve(__dirname, '..');
 
-const deadlinerCoreKmpAutoSyncPlugin: HvigorPlugin = {
-  pluginId: 'deadliner-core-kmp-auto-sync',
-  apply: (node) => {
-    node.registerTask(syncDeadlinerCoreKmpTask);
-  },
-};
-
-export default {
-  system: hapTasks, /* Built-in plugin of Hvigor. It cannot be modified. */
-  plugins: [deadlinerCoreKmpAutoSyncPlugin] /* Build and deploy KMP before PreBuild. */
+function syncCore(configuration: string): void {
+  switch (process.env.DEADLINER_CORE_SOURCE || 'package') {
+    case 'package':
+      execFileSync(process.platform === 'win32' ? 'python' : 'python3', [
+        resolve(root, 'scripts/core_package.py'), 'harmony',
+        resolve(root, 'entry/libs/arm64-v8a/libDeadlinerCore.so'),
+        '--lock', resolve(root, 'core-package.lock.json'),
+      ], { stdio: 'inherit' });
+      break;
+    case 'local':
+      const core = process.env.DEADLINER_CORE_DIR || resolve(root, '../DeadlinerCore');
+      execFileSync(resolve(core, 'runscript/buildAndDeploy.sh'), [
+        '--skip-android', '--skip-ios', '--configuration', configuration, '--harmony-repo', root,
+      ], { stdio: 'inherit', env: {
+        ...process.env,
+        JAVA_HOME: process.env.DEADLINER_GRADLE_JAVA_HOME || process.env.JAVA_HOME ||
+          execFileSync('/usr/libexec/java_home', ['-v', '21'], { encoding: 'utf8' }).trim(),
+        DEVECO_HOME: process.env.DEVECO_HOME || resolve(dirname(process.execPath), '../../..'),
+      } });
+      break;
+    default:
+      throw new Error('DEADLINER_CORE_SOURCE must be package or local');
+  }
 }
+
+const corePackage: HvigorPlugin = {
+  pluginId: 'deadliner-core-package',
+  apply(node) {
+    node.afterNodeEvaluate(() => {
+      const context = node.getContext(OhosPluginId.OHOS_HAP_PLUGIN) as OhosHapContext;
+      const targets: string[] = [];
+      context.targets(target => {
+        const preBuild = target.getTargetName() + '@PreBuild';
+        if (node.getTaskByName(preBuild)) targets.push(preBuild);
+      });
+      node.registerTask({
+        name: 'syncDeadlinerCoreKmp',
+        postDependencies: targets,
+        run: () => syncCore(context.getBuildMode()),
+      });
+    });
+  },
+};
+
+export default { system: hapTasks, plugins: [corePackage] };
