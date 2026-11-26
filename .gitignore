@@ -14,3 +14,5 @@ build-profile.json5
 agconnect-services.json
 HdsMiniBarButton.ets
 .deadliner-core/
+
+/entry/libs/arm64-v8a/libDeadlinerCore.so

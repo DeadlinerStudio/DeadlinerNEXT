@@ -11,7 +11,7 @@ SYNC_ROOT="${HARMONY_REPO_ROOT}/.deadliner-core/harmony"
 CACHE_ROOT="${HARMONY_REPO_ROOT}/.deadliner-core/cache"
 STATE_FILE="${HARMONY_REPO_ROOT}/.deadliner-core/harmony-sync-state.json"
 
-MODE="${1:-${DEADLINER_CORE_SOURCE:-release}}"
+MODE="${1:-${DEADLINER_CORE_SOURCE:-package}}"
 RELEASE_TAG="${DEADLINER_CORE_TAG:-$DEFAULT_RELEASE_TAG}"
 RELEASE_REPO="${DEADLINER_CORE_RELEASE_REPO:-$DEFAULT_RELEASE_REPO}"
 LOCAL_CORE_REPO="${DEADLINER_CORE_DIR:-${DEADLINER_CORE_LOCAL_REPO:-$DEFAULT_CORE_REPO}}"
@@ -428,6 +428,11 @@ sync_from_release() {
 }
 
 main() {
+  if [[ "${MODE}" == package ]]; then
+    exec python3 "$HARMONY_REPO_ROOT/scripts/core_package.py" harmony \
+      "$HARMONY_REPO_ROOT/entry/libs/arm64-v8a/libDeadlinerCore.so" \
+      --lock "$HARMONY_REPO_ROOT/core-package.lock.json"
+  fi
   ensure_tools
   AUTH_TOKEN="$(resolve_github_token)"
   if detect_gh_auth; then
